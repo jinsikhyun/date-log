@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { type Place, categoryStyle } from "@/lib/places";
+import { type Place, addedByLabel, categoryStyle } from "@/lib/places";
 import { StarRating } from "@/components/StarRating";
 
 export function PlaceCard({ place }: { place: Place }) {
@@ -16,18 +16,33 @@ export function PlaceCard({ place }: { place: Place }) {
         aria-label={`${place.name} 상세 보기`}
       />
 
-      {/* 사진 자리 — 회색 placeholder */}
-      <div className="relative aspect-[4/3] bg-gradient-to-br from-stone-200 to-stone-300">
+      {/* 대표 사진 — 없으면 회색 placeholder */}
+      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
+        {place.image_url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={place.image_url}
+            alt={place.name}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-stone-400">
+            사진 준비 중
+          </span>
+        )}
         <span
-          className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
+          className={`absolute left-4 top-4 z-[1] rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
             place.category,
           )}`}
         >
           {place.category}
         </span>
-        <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-stone-400">
-          사진 준비 중
-        </span>
+        {addedByLabel(place.added_by) && (
+          <span className="absolute right-4 top-4 z-[1] rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+            {addedByLabel(place.added_by)}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-5">

@@ -4,10 +4,23 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { type Place, categoryStyle } from "@/lib/places";
-import { type Memory, MEMORY_COLUMNS, byDateAsc } from "@/lib/memories";
+import {
+  type Place,
+  addedByLabel,
+  categoryStyle,
+  placeInputToRow,
+} from "@/lib/places";
+import {
+  type Memory,
+  type MemoryReply,
+  MEMORY_COLUMNS,
+  MEMORY_REPLY_COLUMNS,
+  byDateAsc,
+} from "@/lib/memories";
 import { StarRating } from "@/components/StarRating";
 import { AddMemoryForm, type NewMemoryInput } from "@/components/AddMemoryForm";
+import { PhotoThumbnails } from "@/components/PhotoThumbnails";
+import { MemoryReplies } from "@/components/MemoryReplies";
 import {
   AddPlaceForm,
   placeFormInput,
@@ -15,22 +28,21 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, rating, first_visit_date, description, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, memory_count, created_at";
 
 const POLICY_HINT =
   "Supabase 정책(supabase/policies_open_write.sql) 적용 여부를 확인해 주세요.";
 
 const dot = (d: string | null) => (d ? d.split("-").join(".") : "날짜 미정");
 
-function toRow(input: NewPlaceInput) {
+/** memories 행 → 추억 폼 초기값 (수정 시) */
+function memoryToInput(m: Memory): NewMemoryInput {
   return {
-    name: input.name.trim(),
-    category: input.category,
-    address: input.address.trim(),
-    naver_map_link: input.naver_map_link.trim() || null,
-    rating: input.rating ? Number(input.rating) : null,
-    first_visit_date: input.first_visit_date || null,
-    description: input.description.trim() || null,
+    date: m.date ?? "",
+    content: m.content ?? "",
+    mood_tag: m.mood_tag ?? "",
+    author: "", // 저장 시 현재 사용자로 덮어씀
+    photo_urls: m.photo_urls ?? [],
   };
 }
 
@@ -43,6 +55,11 @@ export function PlaceDetail({ id }: { id: number }) {
   const [showMemoryForm, setShowMemoryForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editingMemoryId, setEditingMemoryId] = useState<number | null>(null);
+  const [deletingMemoryId, setDeletingMemoryId] = useState<number | null>(null);
+  const [repliesByMemory, setRepliesByMemory] = useState<
+    Record<number, MemoryReply[]>
+  >({});
 
   useEffect(() => {
     if (!Number.isFinite(id)) {
@@ -55,7 +72,10 @@ export function PlaceDetail({ id }: { id: number }) {
     (async () => {
       const [placeRes, memRes] = await Promise.all([
         supabase.from("places").select(PLACE_COLUMNS).eq("id", id).single(),
-        supabase.from("memories").select(MEMORY_COLUMNS).eq("place_id", id),
+        supabase
+          .from("memories")
+          .select(`${MEMORY_COLUMNS}, memory_replies(${MEMORY_REPLY_COLUMNS})`)
+          .eq("place_id", id),
       ]);
       if (cancelled) return;
 
@@ -73,7 +93,19 @@ export function PlaceDetail({ id }: { id: number }) {
       if (memRes.error) {
         console.error("[memories] 조회 실패:", memRes.error);
       } else {
-        setMemories(((memRes.data ?? []) as Memory[]).slice().sort(byDateAsc));
+        const rows = (memRes.data ?? []) as (Memory & {
+          memory_replies?: MemoryReply[];
+        })[];
+        const byMem: Record<number, MemoryReply[]> = {};
+        const mems = rows.map((row) => {
+          const { memory_replies, ...m } = row;
+          byMem[m.id] = (memory_replies ?? [])
+            .slice()
+            .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+          return m as Memory;
+        });
+        setMemories(mems.sort(byDateAsc));
+        setRepliesByMemory(byMem);
       }
       setLoading(false);
     })();
@@ -90,6 +122,8 @@ export function PlaceDetail({ id }: { id: number }) {
         date: input.date || null,
         content: input.content.trim(),
         mood_tag: input.mood_tag.trim() || null,
+        author: input.author || null,
+        photo_urls: input.photo_urls,
       };
 
       const { data, error: insErr } = await supabase
@@ -109,11 +143,65 @@ export function PlaceDetail({ id }: { id: number }) {
     [id],
   );
 
+  const handleEditMemory = useCallback(
+    async (memoryId: number, input: NewMemoryInput) => {
+      const { data, error: upErr } = await supabase
+        .from("memories")
+        .update({
+          date: input.date || null,
+          content: input.content.trim(),
+          mood_tag: input.mood_tag.trim() || null,
+          author: input.author || null,
+          photo_urls: input.photo_urls,
+        })
+        .eq("id", memoryId)
+        .select(MEMORY_COLUMNS);
+
+      if (upErr) {
+        console.error("[memories] 수정 실패:", upErr);
+        throw new Error(upErr.message);
+      }
+      if (!data || data.length === 0) {
+        throw new Error(`수정이 반영되지 않았어요. ${POLICY_HINT}`);
+      }
+
+      setMemories((prev) =>
+        prev
+          .map((mm) => (mm.id === memoryId ? (data[0] as Memory) : mm))
+          .sort(byDateAsc),
+      );
+      setEditingMemoryId(null);
+    },
+    [],
+  );
+
+  const handleDeleteMemory = useCallback(async (memoryId: number) => {
+    if (!window.confirm("이 추억을 삭제할까요? 되돌릴 수 없어요.")) return;
+
+    setDeletingMemoryId(memoryId);
+    const { data, error: delErr } = await supabase
+      .from("memories")
+      .delete()
+      .eq("id", memoryId)
+      .select("id");
+
+    setDeletingMemoryId(null);
+    if (delErr) {
+      window.alert(`삭제하지 못했어요: ${delErr.message}`);
+      return;
+    }
+    if (!data || data.length === 0) {
+      window.alert(`삭제되지 않았어요. ${POLICY_HINT}`);
+      return;
+    }
+    setMemories((prev) => prev.filter((mm) => mm.id !== memoryId));
+  }, []);
+
   const handleEditPlace = useCallback(
     async (input: NewPlaceInput) => {
       const { data, error: upErr } = await supabase
         .from("places")
-        .update(toRow(input))
+        .update(placeInputToRow(input))
         .eq("id", id)
         .select(PLACE_COLUMNS);
 
@@ -135,7 +223,9 @@ export function PlaceDetail({ id }: { id: number }) {
   const handleDeletePlace = useCallback(async () => {
     if (!place) return;
     const ok = window.confirm(
-      `'${place.name}'을(를) 삭제할까요?\n연결된 추억 ${memories.length}개도 함께 삭제되며 되돌릴 수 없어요.`,
+      memories.length > 0
+        ? `'${place.name}'을(를) 삭제할까요?\n연결된 추억 ${memories.length}개도 함께 삭제되며 되돌릴 수 없어요.`
+        : `'${place.name}'을(를) 삭제할까요? 되돌릴 수 없어요.`,
     );
     if (!ok) return;
 
@@ -159,7 +249,7 @@ export function PlaceDetail({ id }: { id: number }) {
     }
 
     // 연결된 memories 는 FK ON DELETE CASCADE 로 함께 삭제됨
-    router.push("/");
+    router.push(place.status === "wishlist" ? "/wishlist" : "/");
   }, [id, place, memories.length, router]);
 
   if (loading) {
@@ -229,9 +319,17 @@ export function PlaceDetail({ id }: { id: number }) {
         />
       ) : (
         <header className="overflow-hidden rounded-3xl bg-card ring-1 ring-border/70">
-          <div className="relative aspect-[16/7] bg-gradient-to-br from-stone-200 to-stone-300">
+          <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
+            {place.image_url && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={place.image_url}
+                alt={place.name}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
             <span
-              className={`absolute left-5 top-5 rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
+              className={`absolute left-5 top-5 z-[1] rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
                 place.category,
               )}`}
             >
@@ -246,12 +344,17 @@ export function PlaceDetail({ id }: { id: number }) {
               )}
             </div>
             <p className="text-sm text-muted">{place.address}</p>
+            {addedByLabel(place.added_by) && (
+              <span className="w-fit rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                {addedByLabel(place.added_by)}
+              </span>
+            )}
             {place.description && (
               <p className="text-sm leading-relaxed text-foreground/80">
                 {place.description}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <StarRating rating={place.rating} />
               {place.naver_map_link && (
                 <a
@@ -263,6 +366,26 @@ export function PlaceDetail({ id }: { id: number }) {
                   네이버지도에서 보기
                 </a>
               )}
+              {place.kakao_map_link && (
+                <a
+                  href={place.kakao_map_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
+                >
+                  카카오맵에서 보기
+                </a>
+              )}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  `${place.name} ${place.address}`,
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
+              >
+                구글지도에서 보기
+              </a>
             </div>
           </div>
         </header>
@@ -299,23 +422,60 @@ export function PlaceDetail({ id }: { id: number }) {
             {memories.map((m) => (
               <li key={m.id} className="relative pl-7">
                 <span className="absolute left-0 top-[18px] h-3.5 w-3.5 rounded-full border-2 border-accent bg-background" />
-                <article className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <time className="text-sm font-semibold text-accent">
-                      {dot(m.date)}
-                    </time>
-                    {m.mood_tag && (
-                      <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">
-                        {m.mood_tag}
+                {editingMemoryId === m.id ? (
+                  <AddMemoryForm
+                    initial={memoryToInput(m)}
+                    submitLabel="수정 저장"
+                    onSubmit={(input) => handleEditMemory(m.id, input)}
+                    onCancel={() => setEditingMemoryId(null)}
+                  />
+                ) : (
+                  <article className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <time className="text-sm font-semibold text-accent">
+                        {dot(m.date)}
+                      </time>
+                      {m.mood_tag && (
+                        <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">
+                          {m.mood_tag}
+                        </span>
+                      )}
+                      {m.author && (
+                        <span className="text-xs text-muted">· {m.author}</span>
+                      )}
+                      <span className="ml-auto flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMemoryForm(false);
+                            setEditingMemoryId(m.id);
+                          }}
+                          className="rounded-full px-2 py-0.5 text-xs font-medium text-stone-500 transition-colors hover:bg-stone-100 hover:text-accent"
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMemory(m.id)}
+                          disabled={deletingMemoryId === m.id}
+                          className="rounded-full px-2 py-0.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {deletingMemoryId === m.id ? "삭제 중…" : "삭제"}
+                        </button>
                       </span>
+                    </div>
+                    {m.content && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+                        {m.content}
+                      </p>
                     )}
-                  </div>
-                  {m.content && (
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
-                      {m.content}
-                    </p>
-                  )}
-                </article>
+                    <PhotoThumbnails urls={m.photo_urls} className="mt-3" />
+                    <MemoryReplies
+                      memoryId={m.id}
+                      initialReplies={repliesByMemory[m.id] ?? []}
+                    />
+                  </article>
+                )}
               </li>
             ))}
           </ol>

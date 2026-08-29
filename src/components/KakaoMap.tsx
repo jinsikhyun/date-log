@@ -1,69 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { type Place, categoryStyle } from "@/lib/places";
+import { ensureKakaoLoaded } from "@/lib/kakao";
+import {
+  attachBadgeHandlers,
+  createCategoryBadge,
+  placeInfoContent,
+} from "@/lib/mapBadge";
 
 type LoadStatus = "loading" | "ready" | "error";
-
-const SDK_SCRIPT_ID = "kakao-maps-sdk";
-
-/** SDK(+services 라이브러리) 로드 후 kakao.maps.load 까지 완료되면 resolve */
-function ensureKakaoLoaded(appKey: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") {
-      reject(new Error("window 가 없습니다 (서버 환경)."));
-      return;
-    }
-
-    const finish = () => {
-      if (!window.kakao?.maps) {
-        reject(new Error("window.kakao.maps 를 찾을 수 없습니다."));
-        return;
-      }
-      window.kakao.maps.load(() => {
-        if (!window.kakao.maps.services) {
-          reject(
-            new Error(
-              "services 라이브러리를 찾을 수 없습니다 (SDK URL 의 libraries=services 확인).",
-            ),
-          );
-        } else {
-          resolve();
-        }
-      });
-    };
-
-    if (window.kakao?.maps) {
-      finish();
-      return;
-    }
-
-    const existing = document.getElementById(
-      SDK_SCRIPT_ID,
-    ) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", finish);
-      existing.addEventListener("error", () =>
-        reject(new Error("이미 삽입된 SDK 스크립트 로드에 실패했습니다.")),
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = SDK_SCRIPT_ID;
-    script.async = true;
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
-    script.addEventListener("load", finish);
-    script.addEventListener("error", () =>
-      reject(
-        new Error(
-          "SDK 스크립트를 내려받지 못했습니다 (네트워크 차단, 잘못된 앱키, 또는 도메인 미등록).",
-        ),
-      ),
-    );
-    document.head.appendChild(script);
-  });
-}
 
 /** "…26 지하1층", "…31 1층, 2층" 같은 꼬리표를 떼어 지오코딩 성공률을 높인다 */
 function addressCandidates(raw: string): string[] {
@@ -74,29 +21,19 @@ function addressCandidates(raw: string): string[] {
   return cleaned && cleaned !== raw ? [raw, cleaned] : [raw];
 }
 
-function escapeHtml(input: string): string {
-  return input.replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
-}
-
-export function KakaoMap({ places }: { places: Place[] }) {
+export function KakaoMap({
+  places,
+  userPos,
+}: {
+  places: Place[];
+  userPos?: { lat: number; lng: number } | null;
+}) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const geocoderRef = useRef<kakao.maps.services.Geocoder | null>(null);
   const infoRef = useRef<kakao.maps.InfoWindow | null>(null);
-  const markersRef = useRef<kakao.maps.Marker[]>([]);
+  const overlaysRef = useRef<kakao.maps.CustomOverlay[]>([]);
   // 주소 → 좌표 캐시 (place 추가 시 전체 재지오코딩 방지)
   const coordCacheRef = useRef<Map<string, { lat: number; lng: number }>>(
     new Map(),
@@ -165,8 +102,8 @@ export function KakaoMap({ places }: { places: Place[] }) {
     const geocoder = geocoderRef.current;
     let cancelled = false;
 
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
+    overlaysRef.current.forEach((o) => o.setMap(null));
+    overlaysRef.current = [];
 
     if (places.length === 0) return;
 
@@ -174,9 +111,29 @@ export function KakaoMap({ places }: { places: Place[] }) {
     let pending = places.length;
     let placed = 0;
 
+    // "내 위치" 파란 점 (위치 권한 허용 시)
+    if (userPos) {
+      const upos = new kakao.maps.LatLng(userPos.lat, userPos.lng);
+      const dot = document.createElement("div");
+      dot.title = "내 위치";
+      dot.style.cssText =
+        "width:16px;height:16px;border-radius:9999px;background:#2563eb;" +
+        "border:3px solid #fff;box-shadow:0 0 0 4px rgba(37,99,235,.25);";
+      const ov = new kakao.maps.CustomOverlay({
+        position: upos,
+        content: dot,
+        map,
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+        zIndex: 5,
+      });
+      overlaysRef.current.push(ov);
+      bounds.extend(upos);
+    }
+
     const finalize = () => {
       if (cancelled) return;
-      if (placed > 0) map.setBounds(bounds);
+      if (placed > 0 || userPos) map.setBounds(bounds);
       if (placed < places.length) {
         console.warn(
           `[KakaoMap] ${places.length}곳 중 ${placed}곳만 지도에 표시됨 (나머지는 주소 변환 실패).`,
@@ -187,27 +144,42 @@ export function KakaoMap({ places }: { places: Place[] }) {
     const addMarker = (place: Place, lat: number, lng: number) => {
       if (cancelled) return;
       const pos = new kakao.maps.LatLng(lat, lng);
-      const marker = new kakao.maps.Marker({
+
+      // 카카오 기본 핀 대신 카테고리 원형 뱃지 (CustomOverlay)
+      const el = createCategoryBadge(place);
+      attachBadgeHandlers(
+        el,
+        () => {
+          infoRef.current?.setContent(
+            placeInfoContent(place.name, place.category),
+          );
+          infoRef.current?.setPosition(pos);
+          infoRef.current?.open(map);
+        },
+        () => router.push(`/places/${place.id}`),
+      );
+
+      const overlay = new kakao.maps.CustomOverlay({
         position: pos,
+        content: el,
         map,
-        title: place.name,
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+        zIndex: 3,
       });
-      markersRef.current.push(marker);
+      overlaysRef.current.push(overlay);
       bounds.extend(pos);
       placed += 1;
-
-      kakao.maps.event.addListener(marker, "click", () => {
-        infoRef.current?.setContent(
-          `<div style="padding:8px 12px;font-size:13px;line-height:1.5;white-space:nowrap;">` +
-            `<strong style="font-weight:700;">${escapeHtml(place.name)}</strong><br/>` +
-            `<span style="color:#8a7d70;">${escapeHtml(place.category)}</span>` +
-            `</div>`,
-        );
-        infoRef.current?.open(map, marker);
-      });
     };
 
     places.forEach((place) => {
+      // 1) DB 에 저장된 좌표(장소 검색 자동완성으로 채워짐) 가 있으면 그대로 사용
+      if (place.lat != null && place.lng != null) {
+        addMarker(place, place.lat, place.lng);
+        if (--pending === 0) finalize();
+        return;
+      }
+
       const cached = coordCacheRef.current.get(place.address);
       if (cached) {
         addMarker(place, cached.lat, cached.lng);
@@ -244,7 +216,7 @@ export function KakaoMap({ places }: { places: Place[] }) {
     return () => {
       cancelled = true;
     };
-  }, [places, status]);
+  }, [places, status, userPos, router]);
 
   const categoriesInView = [...new Set(places.map((p) => p.category))];
 

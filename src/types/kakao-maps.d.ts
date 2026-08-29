@@ -47,6 +47,36 @@ declare global {
       setMap(map: Map | null): void;
     }
 
+    interface PolylineOptions {
+      path: LatLng[];
+      strokeWeight?: number;
+      strokeColor?: string;
+      strokeOpacity?: number;
+      strokeStyle?: "solid" | "shortdash" | "dash" | "dot";
+      map?: Map;
+    }
+
+    class Polyline {
+      constructor(options: PolylineOptions);
+      setMap(map: Map | null): void;
+      setPath(path: LatLng[]): void;
+    }
+
+    interface CustomOverlayOptions {
+      position: LatLng;
+      content: string | HTMLElement;
+      map?: Map;
+      xAnchor?: number;
+      yAnchor?: number;
+      zIndex?: number;
+    }
+
+    class CustomOverlay {
+      constructor(options: CustomOverlayOptions);
+      setMap(map: Map | null): void;
+      setPosition(position: LatLng): void;
+    }
+
     interface InfoWindowOptions {
       content?: string | HTMLElement;
       removable?: boolean;
@@ -58,6 +88,7 @@ declare global {
       open(map: Map, marker?: Marker): void;
       close(): void;
       setContent(content: string | HTMLElement): void;
+      setPosition(position: LatLng): void;
     }
 
     namespace event {
@@ -87,6 +118,37 @@ declare global {
         addressSearch(
           address: string,
           callback: (results: AddressSearchResult[], status: string) => void,
+        ): void;
+      }
+
+      // 키워드로 장소 검색 (장소 추가 폼 자동완성)
+      interface PlacesSearchResultItem {
+        id: string;
+        place_name: string;
+        category_name: string;
+        category_group_code: string;
+        phone: string;
+        address_name: string;
+        road_address_name: string;
+        x: string; // 경도(lng)
+        y: string; // 위도(lat)
+        place_url: string;
+      }
+
+      interface PlacesSearchOptions {
+        size?: number; // 1~15
+        page?: number;
+      }
+
+      class Places {
+        keywordSearch(
+          keyword: string,
+          callback: (
+            data: PlacesSearchResultItem[],
+            status: string,
+            pagination: unknown,
+          ) => void,
+          options?: PlacesSearchOptions,
         ): void;
       }
     }
