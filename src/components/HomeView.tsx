@@ -25,6 +25,16 @@ type ViewMode = "feed" | "map";
 const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, rating, first_visit_date, description, memory_count, created_at";
 
+// 목록 조회 시엔 memories(count) 를 임베딩해서 장소별 실제 추억 개수를 가져온다.
+const PLACE_LIST_SELECT = `${PLACE_COLUMNS}, memories(count)`;
+
+type PlaceListRow = Place & { memories?: { count: number }[] };
+
+function withMemoryCount(row: PlaceListRow): Place {
+  const { memories, ...rest } = row;
+  return { ...rest, memory_count: memories?.[0]?.count ?? 0 };
+}
+
 export function HomeView() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +48,7 @@ export function HomeView() {
     (async () => {
       const { data, error } = await supabase
         .from("places")
-        .select(PLACE_COLUMNS)
+        .select(PLACE_LIST_SELECT)
         .order("first_visit_date", { ascending: false, nullsFirst: false })
         .order("id", { ascending: false });
 
@@ -54,7 +64,9 @@ export function HomeView() {
             : `장소를 불러오지 못했어요: ${error.message}`,
         );
       } else {
-        setPlaces((data ?? []) as Place[]);
+        setPlaces(
+          ((data ?? []) as unknown as PlaceListRow[]).map(withMemoryCount),
+        );
       }
       setLoading(false);
     })();

@@ -1,20 +1,6 @@
+import Link from "next/link";
 import { type Place, categoryStyle } from "@/lib/places";
-
-function StarRating({ rating }: { rating: number | null }) {
-  if (rating == null) {
-    return <span className="text-sm text-muted">평점 없음</span>;
-  }
-  const filled = Math.max(0, Math.min(5, Math.round(rating)));
-  return (
-    <span className="flex items-center gap-1.5 text-sm">
-      <span aria-hidden className="tracking-tight text-accent">
-        {"★".repeat(filled)}
-        <span className="text-border">{"★".repeat(5 - filled)}</span>
-      </span>
-      <span className="font-semibold">{rating.toFixed(1)}</span>
-    </span>
-  );
-}
+import { StarRating } from "@/components/StarRating";
 
 export function PlaceCard({ place }: { place: Place }) {
   const visited = place.first_visit_date
@@ -22,7 +8,14 @@ export function PlaceCard({ place }: { place: Place }) {
     : null;
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10">
+    <article className="group relative flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10">
+      {/* 카드 전체를 상세 페이지 링크로 (네이버지도 링크는 위에 z-20 로 띄움) */}
+      <Link
+        href={`/places/${place.id}`}
+        className="absolute inset-0 z-10"
+        aria-label={`${place.name} 상세 보기`}
+      />
+
       {/* 사진 자리 — 회색 placeholder */}
       <div className="relative aspect-[4/3] bg-gradient-to-br from-stone-200 to-stone-300">
         <span
@@ -53,7 +46,7 @@ export function PlaceCard({ place }: { place: Place }) {
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-3">
           <StarRating rating={place.rating} />
-          <div className="flex items-center gap-2">
+          <div className="relative z-20 flex items-center gap-2">
             {place.naver_map_link && (
               <a
                 href={place.naver_map_link}
