@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* 따뜻한 색감의 팔레트 (지금은 라이트 모드만) */
+:root {
+  --background: #fbf6f0;
+  --foreground: #3c332b;
+  --card: #ffffff;
+  --muted: #8a7d70;
+  --accent: #e0785c;
+  --border: #efe4d7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist-sans), "Apple SD Gothic Neo", "Pretendard",
+    ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
