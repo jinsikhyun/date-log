@@ -29,16 +29,48 @@ const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
 const labelClass = "text-xs font-medium text-muted";
 
+/** places 행 → 폼 초기값 (수정 시 사용) */
+export function placeFormInput(p: {
+  name: string;
+  category: string;
+  address: string;
+  naver_map_link: string | null;
+  rating: number | null;
+  first_visit_date: string | null;
+  description: string | null;
+}): NewPlaceInput {
+  return {
+    name: p.name,
+    category: p.category,
+    address: p.address,
+    naver_map_link: p.naver_map_link ?? "",
+    rating: p.rating != null ? String(p.rating) : "",
+    first_visit_date: p.first_visit_date ?? "",
+    description: p.description ?? "",
+  };
+}
+
 export function AddPlaceForm({
   onSubmit,
   onCancel,
+  initial,
+  submitLabel = "저장",
 }: {
   onSubmit: (input: NewPlaceInput) => Promise<void>;
   onCancel: () => void;
+  initial?: NewPlaceInput;
+  submitLabel?: string;
 }) {
-  const [form, setForm] = useState<NewPlaceInput>(EMPTY);
+  const base = initial ?? EMPTY;
+  const [form, setForm] = useState<NewPlaceInput>(base);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // 저장된 별점이 선택지에 없는 값이면(예: 3.7) 맨 앞에 끼워 넣어 유실 방지
+  const ratingChoices =
+    form.rating && !RATING_CHOICES.includes(form.rating)
+      ? [form.rating, ...RATING_CHOICES]
+      : RATING_CHOICES;
 
   const set = <K extends keyof NewPlaceInput>(key: K, value: NewPlaceInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -55,7 +87,7 @@ export function AddPlaceForm({
     setSaving(true);
     try {
       await onSubmit(form);
-      setForm(EMPTY);
+      setForm(base);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");
     } finally {
@@ -137,7 +169,7 @@ export function AddPlaceForm({
           onChange={(e) => set("rating", e.target.value)}
         >
           <option value="">없음</option>
-          {RATING_CHOICES.map((r) => (
+          {ratingChoices.map((r) => (
             <option key={r} value={r}>
               {r}
             </option>
@@ -181,7 +213,7 @@ export function AddPlaceForm({
           disabled={saving}
           className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
         >
-          {saving ? "저장 중…" : "저장"}
+          {saving ? "저장 중…" : submitLabel}
         </button>
         <button
           type="button"

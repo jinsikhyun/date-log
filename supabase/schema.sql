@@ -6,7 +6,8 @@
 --   정책은 DROP POLICY IF EXISTS 후 CREATE POLICY (PostgreSQL 은 CREATE POLICY IF NOT EXISTS 미지원),
 --   시드는 ON CONFLICT DO NOTHING.
 --
--- 정책 요약(공개 배포 기준): 방문자(anon)는 SELECT + INSERT 만. UPDATE/DELETE 는 거부.
+-- 정책 요약: 방문자(anon)에게 SELECT / INSERT / UPDATE / DELETE 전부 허용.
+--   (둘이서만 쓰는 프로토타입. 실수 방지는 앱의 확인창이 담당.)
 -- ⚠️ 다음 단계: Supabase Auth 도입 후 UPDATE/DELETE 를 소유자에게만 허용하고,
 --    memories 에 is_private 컬럼 + 비공개 정책을 추가한다.
 -- ─────────────────────────────────────────────────────────────
@@ -28,11 +29,12 @@ create table if not exists public.places (
 
 alter table public.places enable row level security;
 
--- 공개 배포 기준: 방문자(anon)는 읽기 + 추가(INSERT)만. 수정/삭제는 정책 없음 = 거부.
--- ⚠️ 다음 단계: Supabase Auth 도입 후 UPDATE/DELETE 는 소유자에게만 허용.
+-- 방문자(anon)에게 읽기·추가·수정·삭제 전부 허용. (프로토타입 — 확인창이 안전장치)
 drop policy if exists "places: prototype full access" on public.places;
 drop policy if exists "places: public read"   on public.places;
 drop policy if exists "places: public insert" on public.places;
+drop policy if exists "places: public update" on public.places;
+drop policy if exists "places: public delete" on public.places;
 create policy "places: public read"
   on public.places for select
   to anon, authenticated
@@ -41,6 +43,14 @@ create policy "places: public insert"
   on public.places for insert
   to anon, authenticated
   with check (true);
+create policy "places: public update"
+  on public.places for update
+  to anon, authenticated
+  using (true) with check (true);
+create policy "places: public delete"
+  on public.places for delete
+  to anon, authenticated
+  using (true);
 
 -- ── memories (구조만 준비, 이번 단계 UI 없음) ──────────────────
 create table if not exists public.memories (
@@ -56,10 +66,12 @@ create index if not exists memories_place_id_idx on public.memories (place_id);
 
 alter table public.memories enable row level security;
 
--- places 와 동일: 읽기 + 추가만. (아직 UI 없음)
+-- places 와 동일: 읽기·추가·수정·삭제 전부 허용.
 drop policy if exists "memories: prototype full access" on public.memories;
 drop policy if exists "memories: public read"   on public.memories;
 drop policy if exists "memories: public insert" on public.memories;
+drop policy if exists "memories: public update" on public.memories;
+drop policy if exists "memories: public delete" on public.memories;
 create policy "memories: public read"
   on public.memories for select
   to anon, authenticated
@@ -68,6 +80,14 @@ create policy "memories: public insert"
   on public.memories for insert
   to anon, authenticated
   with check (true);
+create policy "memories: public update"
+  on public.memories for update
+  to anon, authenticated
+  using (true) with check (true);
+create policy "memories: public delete"
+  on public.memories for delete
+  to anon, authenticated
+  using (true);
 
 -- ── 시드: 장소 11개 ──────────────────────────────────────────
 insert into public.places (name, category, address, naver_map_link, rating, first_visit_date, description) values

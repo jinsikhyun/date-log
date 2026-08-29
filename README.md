@@ -25,8 +25,10 @@ npm run dev                  # http://localhost:3000
 
 `supabase/schema.sql` 을 Supabase 대시보드 > SQL Editor 에서 실행 (테이블 + 정책 + 시드 11개, 멱등).
 
-정책: 방문자(anon)는 **읽기 + 장소 추가**만 가능. 수정·삭제는 거부.
-이미 예전 정책이 걸린 DB라면 `supabase/policies_public.sql` 만 추가 실행.
+정책: 방문자(anon)에게 읽기·추가·수정·삭제를 모두 허용 (둘이서만 쓰는 프로토타입, 실수 방지는 앱 확인창).
+이미 예전 정책이 걸린 DB라면 추가 실행:
+- `supabase/policies_public.sql` — 읽기 + 추가
+- `supabase/policies_open_write.sql` — 수정 + 삭제까지 개방
 
 ## 배포 (Vercel)
 
