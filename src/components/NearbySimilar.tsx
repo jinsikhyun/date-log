@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { ensureKakaoLoaded, geocode } from "@/lib/kakao";
 import { haversineKm } from "@/lib/courses";
 import type { Place } from "@/lib/places";

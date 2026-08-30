@@ -28,8 +28,8 @@ create table if not exists public.places (
   lat              double precision,
   lng              double precision,
   status           text not null default 'visited', -- 'visited' | 'wishlist'
-  wanted_by        text,                             -- '나' | '여자친구' | '둘다' | null (wishlist 전용)
-  added_by         text,                             -- 등록한 사람 ('진식' / '지민')
+  wanted_by        text,                             -- 커플 구성원 display_name | '둘다' | null (wishlist 전용, CHECK 없음)
+  added_by         text,                             -- 등록한 사람 (로그인 사용자 display_name)
   memory_count     integer not null default 0,
   created_at       timestamptz not null default now(),
   constraint places_name_address_key unique (name, address)
@@ -43,9 +43,9 @@ alter table public.places add column if not exists status text not null default 
 alter table public.places add column if not exists wanted_by text;
 alter table public.places drop constraint if exists places_status_check;
 alter table public.places add constraint places_status_check check (status in ('visited', 'wishlist'));
+-- wanted_by 는 이제 커플별 profiles.display_name 을 값으로 가지므로 고정 CHECK 없음
+-- (drop-wanted-by-check.sql 참고)
 alter table public.places drop constraint if exists places_wanted_by_check;
-alter table public.places add constraint places_wanted_by_check
-  check (wanted_by is null or wanted_by in ('나', '여자친구', '둘다'));
 alter table public.places add column if not exists added_by text;
 alter table public.places add column if not exists kakao_map_link text;
 alter table public.places add column if not exists via_course boolean not null default false;
@@ -195,3 +195,41 @@ insert into public.places (name, category, address, naver_map_link, rating, firs
   ('시노라 서촌점', '카페', '서울 종로구 자하문로 116', 'https://map.naver.com/p/search/%EC%8B%9C%EB%85%B8%EB%9D%BC%20%EC%84%9C%EC%B4%8C%EC%A0%90', 4.5, '2026-08-29', '드립 커피 향이 가득한, 조용히 머무르며 이야기 나누기 좋은 감성 카페.'),
   ('에디션덴마크 쇼룸', '카페', '서울 종로구 자하문로9길 24', 'https://map.naver.com/p/search/%EC%97%90%EB%94%94%EC%85%98%EB%8D%B4%EB%A7%88%ED%81%AC%20%EC%87%BC%EB%A3%B8', 4.0, '2026-08-29', '서촌에서 느끼는 작은 덴마크. 차 한잔과 함께 북유럽의 여유를 즐길 수 있는 곳.')
 on conflict (name, address) do nothing;
+
+-- ── 멀티 커플 모델 (1단계: 구조만, RLS 없음) ────────────────
+create table if not exists public.couples (
+  id          uuid primary key default gen_random_uuid(),
+  name        text,
+  invite_code text unique,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists public.profiles (
+  id           uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  couple_id    uuid references public.couples(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+
+alter table public.places         add column if not exists couple_id uuid references public.couples(id);
+alter table public.memories       add column if not exists couple_id uuid references public.couples(id);
+alter table public.memory_replies add column if not exists couple_id uuid references public.couples(id);
+alter table public.courses        add column if not exists couple_id uuid references public.couples(id);
+
+insert into public.couples (name, invite_code)
+values ('진식지민', 'JINJIM-0628')
+on conflict (invite_code) do nothing;
+
+update public.places         set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
+update public.memories       set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
+update public.memory_replies set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
+update public.courses        set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
+
+-- RLS 는 다음 단계에서 커플 스코프로 켤 것. 지금은 명시적으로 OFF.
+alter table public.couples  disable row level security;
+alter table public.profiles disable row level security;
+
+-- ⚠️ 4단계에서 places/memories/memory_replies/courses/course_places/profiles/couples 의
+--    "public" 개방 정책을 커플 스코프 정책으로 교체한다.
+--    (my_couple_id() 함수 + set_couple_id() insert 트리거 포함)
+--    전체 내용은 supabase/add-couple-rls.sql 참고.

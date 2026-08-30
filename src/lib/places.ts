@@ -30,8 +30,8 @@ export function addedByLabel(name: string | null): string | null {
   return name ? `${name}이 추가함` : null;
 }
 
-// 위시리스트에서 "누가 가고 싶어해요?" 선택지
-export const WANTED_BY_OPTIONS = ["나", "여자친구", "둘다"] as const;
+// 위시리스트 "누가 가고 싶어해요?" 선택지는 이제 커플 profiles 에서 실시간으로
+// 불러온다 (AuthProvider.coupleMembers + "둘다"). 하드코딩 목록은 제거됨.
 
 /** status → 뱃지에 쓸 짧은 라벨 */
 export function statusLabel(status: string): string {
@@ -48,14 +48,18 @@ export function statusBadgeClass(status: string): string {
 /** wanted_by 값 → 카드에 보여줄 문구 */
 export function wantedByLabel(v: string | null): string | null {
   switch (v) {
+    case "둘다":
+      return "둘 다 가고 싶어해요";
+    // 구 값 (마이그레이션 전 데이터 대비)
     case "나":
       return "내가 가고 싶어해요";
     case "여자친구":
       return "여자친구가 가고 싶어해요";
-    case "둘다":
-      return "둘 다 가고 싶어해요";
-    default:
+    case null:
+    case "":
       return null;
+    default:
+      return `${v}이 가고 싶어해요`; // '진식' / '지민'
   }
 }
 

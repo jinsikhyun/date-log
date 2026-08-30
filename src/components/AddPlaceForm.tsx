@@ -1,10 +1,10 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { type PlaceStatus, WANTED_BY_OPTIONS } from "@/lib/places";
+import { type PlaceStatus } from "@/lib/places";
 import { uploadPhoto } from "@/lib/photos";
 import { ensureKakaoLoaded } from "@/lib/kakao";
-import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 
 export interface NewPlaceInput {
@@ -94,8 +94,15 @@ export function AddPlaceForm({
   initialStatus?: PlaceStatus; // initial 이 없을 때 토글 기본값
   submitLabel?: string;
 }) {
-  const { user, openPicker } = useCurrentUser();
+  const { displayName, coupleMembers } = useAuth();
   const { categories } = useCategories();
+  // "누가 가고 싶어해요?" 옵션 = 우리 커플 두 사람 이름 (하드코딩 X) + "둘다"
+  const wantedByOptions = [
+    ...coupleMembers
+      .map((m) => m.display_name)
+      .filter((n): n is string => !!n),
+    "둘다",
+  ];
   const base = initial ?? { ...EMPTY, status: initialStatus ?? "visited" };
   const [form, setForm] = useState<NewPlaceInput>(base);
   const [error, setError] = useState<string | null>(null);
@@ -238,15 +245,11 @@ export function AddPlaceForm({
       setError("사진 업로드가 끝난 뒤에 저장해 주세요.");
       return;
     }
-    if (!user) {
-      setError("먼저 상단에서 '누구인지' 선택해 주세요.");
-      openPicker();
-      return;
-    }
 
     setSaving(true);
     try {
-      await onSubmit({ ...form, added_by: user });
+      // added_by 는 폼 입력이 아니라 현재 로그인한 사용자의 이름으로 자동
+      await onSubmit({ ...form, added_by: displayName });
       setForm(base);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");
@@ -397,11 +400,15 @@ export function AddPlaceForm({
             onChange={(e) => set("wanted_by", e.target.value)}
           >
             <option value="">선택 안 함</option>
-            {WANTED_BY_OPTIONS.map((w) => (
+            {wantedByOptions.map((w) => (
               <option key={w} value={w}>
                 {w}
               </option>
             ))}
+            {/* 저장돼 있던 값이 지금 옵션에 없어도 유실 방지 */}
+            {form.wanted_by && !wantedByOptions.includes(form.wanted_by) && (
+              <option value={form.wanted_by}>{form.wanted_by}</option>
+            )}
           </select>
         </div>
       )}

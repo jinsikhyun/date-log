@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { statusLabel } from "@/lib/places";
 import { RELATIONSHIP_START_DATE, daysTogether } from "@/lib/recap";
 

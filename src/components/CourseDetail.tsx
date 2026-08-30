@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { geocode, kakaoDirectionsFromTo } from "@/lib/kakao";
 import { categoryStyle, statusBadgeClass, statusLabel } from "@/lib/places";
 import {

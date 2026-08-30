@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { useAuth } from "@/components/AuthProvider";
 import { uploadPhoto } from "@/lib/photos";
 
 export interface NewMemoryInput {
@@ -43,7 +43,7 @@ export function AddMemoryForm({
   initial?: NewMemoryInput;
   submitLabel?: string;
 }) {
-  const { user, openPicker } = useCurrentUser();
+  const { displayName } = useAuth();
   const [form, setForm] = useState<NewMemoryInput>(initial ?? empty);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,15 +108,11 @@ export function AddMemoryForm({
       setError("사진 업로드가 끝난 뒤에 저장해 주세요.");
       return;
     }
-    if (!user) {
-      setError("먼저 상단에서 '누구인지' 선택해 주세요.");
-      openPicker();
-      return;
-    }
 
     setSaving(true);
     try {
-      await onSubmit({ ...form, author: user });
+      // 새 추억은 로그인한 사용자로. 기존 추억 수정 시엔 원 작성자 유지.
+      await onSubmit({ ...form, author: initial?.author || displayName });
       setForm(initial ?? empty());
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");

@@ -3,7 +3,7 @@
 -- Supabase 대시보드 > SQL Editor 에 통째로 붙여넣고 Run. (여러 번 실행해도 안전)
 --
 -- status    : 'visited'(다녀온 곳, 기본값) | 'wishlist'(가고 싶은 곳)
--- wanted_by : 위시리스트 항목에서만 사용. '나' | '여자친구' | '둘다' | NULL
+-- wanted_by : 위시리스트 항목에서만 사용. '진식' | '지민' | '둘다' | NULL
 -- ─────────────────────────────────────────────────────────────
 
 alter table public.places
@@ -19,7 +19,7 @@ alter table public.places
 alter table public.places drop constraint if exists places_wanted_by_check;
 alter table public.places
   add constraint places_wanted_by_check
-  check (wanted_by is null or wanted_by in ('나', '여자친구', '둘다'));
+  check (wanted_by is null or wanted_by in ('진식', '지민', '둘다'));
 
 -- 기존 행은 전부 '다녀온 곳' 으로 명시
 update public.places set status = 'visited' where status is null or status = '';

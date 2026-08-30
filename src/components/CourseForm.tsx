@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import {
   categoryStyle,
   placeInputToRow,
@@ -10,7 +10,7 @@ import {
   statusLabel,
 } from "@/lib/places";
 import { PlaceAutocompleteInput } from "@/components/PlaceAutocompleteInput";
-import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 
 export interface CourseFormInput {
@@ -73,7 +73,7 @@ export function CourseForm({
   initial?: CourseFormInput;
   submitLabel?: string;
 }) {
-  const { user, openPicker } = useCurrentUser();
+  const { displayName } = useAuth();
   const { categories } = useCategories();
   const base = initial ?? EMPTY;
   const [title, setTitle] = useState(base.title);
@@ -152,11 +152,6 @@ export function CourseForm({
       setNError("장소명, 카테고리, 주소를 입력해 주세요.");
       return;
     }
-    if (!user) {
-      setNError("먼저 상단에서 '누구인지' 선택해 주세요.");
-      openPicker();
-      return;
-    }
     setNSaving(true);
     try {
       const { data, error: insErr } = await supabase
@@ -172,7 +167,7 @@ export function CourseForm({
               kakao_map_link: nKakao,
               // 코스 짜면서 새로 넣는 곳 = 아직 안 가본 곳 → 위시리스트로 분류
               status: "wishlist",
-              added_by: user,
+              added_by: displayName,
             }),
           ),
           // 단, 큐레이션한 "가고 싶은 곳"이 아니므로 /wishlist 페이지에는 숨긴다

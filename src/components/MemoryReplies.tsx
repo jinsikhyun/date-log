@@ -1,9 +1,9 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { type MemoryReply, MEMORY_REPLY_COLUMNS } from "@/lib/memories";
-import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 /** 추억 카드 하단의 채팅 말풍선 답장 — 목록 + 입력 + 삭제를 자체 관리 */
 export function MemoryReplies({
@@ -13,7 +13,7 @@ export function MemoryReplies({
   memoryId: number;
   initialReplies: MemoryReply[];
 }) {
-  const { user, openPicker } = useCurrentUser();
+  const { displayName: me } = useAuth();
   const [replies, setReplies] = useState<MemoryReply[]>(initialReplies);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,16 +23,15 @@ export function MemoryReplies({
     e.preventDefault();
     const content = text.trim();
     if (!content) return;
-    if (!user) {
-      setErr("먼저 위에서 '누구인지' 골라줘!");
-      openPicker();
+    if (!me) {
+      setErr("로그인이 필요해!");
       return;
     }
     setBusy(true);
     setErr(null);
     const { data, error } = await supabase
       .from("memory_replies")
-      .insert({ memory_id: memoryId, author: user, content })
+      .insert({ memory_id: memoryId, author: me, content })
       .select(MEMORY_REPLY_COLUMNS)
       .single();
     setBusy(false);
@@ -45,7 +44,7 @@ export function MemoryReplies({
   };
 
   const remove = async (rep: MemoryReply) => {
-    if (rep.author !== user) return;
+    if (rep.author !== me) return;
     if (!window.confirm("이 답장 지울까?")) return;
     const { data, error } = await supabase
       .from("memory_replies")
@@ -68,7 +67,7 @@ export function MemoryReplies({
       {replies.length > 0 && (
         <ul className="space-y-1.5">
           {replies.map((rep) => {
-            const mine = rep.author != null && rep.author === user;
+            const mine = rep.author != null && rep.author === me;
             return (
               <li
                 key={rep.id}

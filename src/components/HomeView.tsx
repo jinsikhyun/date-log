@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PlaceCard } from "@/components/PlaceCard";
 import { AddPlaceForm, type NewPlaceInput } from "@/components/AddPlaceForm";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { type Place, placeInputToRow } from "@/lib/places";
 import { useCategories } from "@/components/CategoriesProvider";
 import { NearbyPanel } from "@/components/NearbyPanel";

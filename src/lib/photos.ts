@@ -4,7 +4,7 @@
 //  - HEIC/HEIF 는 Safari 처럼 네이티브 디코딩이 되면 그대로, 안 되면(크롬 등) heic2any 로 변환한다.
 //  - 성공 시 "place-photos" 버킷의 public URL 을 돌려준다. 실패하면 throw.
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 const BUCKET = "place-photos";
 const MAX_WIDTH = 1600;
