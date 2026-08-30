@@ -23,7 +23,6 @@ export function ShareCourseButton({
   return (
     <ShareImageModal
       filename={filename}
-      shareTitle={title}
       renderCard={(ref) => (
         <CourseShareCard
           ref={ref}

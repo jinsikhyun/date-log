@@ -48,18 +48,16 @@ function XIcon() {
  */
 export function ShareImageModal({
   filename,
-  shareTitle,
   title = "이미지로 공유",
   renderCard,
 }: {
   filename: string;
-  shareTitle?: string;
   title?: string;
   renderCard: (ref: RefObject<HTMLDivElement | null>) => ReactNode;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const { phase, previewUrl, error, shareable, capture, download, share, reset } =
-    useShareImage(cardRef, filename, shareTitle);
+    useShareImage(cardRef, filename);
   const [open, setOpen] = useState(false);
 
   // reset() 은 "닫을 때"만 호출한다. openModal 에서 부르면 openModal 이

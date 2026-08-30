@@ -107,16 +107,13 @@ export function canShareImage(): boolean {
   }
 }
 
-/** OS 공유 시트 열기 (이미지 파일). 사용자가 취소하면 AbortError 를 던진다. */
+/** OS 공유 시트 열기 (이미지 파일 하나만). 사용자가 취소하면 AbortError 를 던진다.
+ *  title/text 를 같이 넘기면 일부 공유 대상(특히 macOS "복사")이 이미지를
+ *  두 번 처리하는 경우가 있어 files 만 전달한다. */
 export async function shareImage(
   blob: Blob,
   filename: string,
-  opts?: { title?: string; text?: string },
 ): Promise<void> {
   const file = new File([blob], filename, { type: "image/png" });
-  await navigator.share({
-    files: [file],
-    title: opts?.title,
-    text: opts?.text,
-  });
+  await navigator.share({ files: [file] });
 }

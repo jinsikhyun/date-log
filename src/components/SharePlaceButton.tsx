@@ -12,7 +12,6 @@ export function SharePlaceButton({ place }: { place: Place }) {
   return (
     <ShareImageModal
       filename={filename}
-      shareTitle={place.name}
       renderCard={(ref) => <ShareCard ref={ref} place={place} />}
     />
   );

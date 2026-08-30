@@ -17,7 +17,6 @@ export type SharePhase = "idle" | "capturing" | "ready" | "sharing";
 export function useShareImage(
   targetRef: RefObject<HTMLElement | null>,
   filename: string,
-  shareTitle?: string,
 ) {
   const [phase, setPhase] = useState<SharePhase>("idle");
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -31,6 +30,7 @@ export function useShareImage(
   //  - lastDownloadRef: 마지막 다운로드 시각 → 1초 내 재호출은 무시 (클릭 1회 = 파일 1개)
   const capturingRef = useRef(false);
   const lastDownloadRef = useRef(0);
+  const lastShareRef = useRef(0);
   const sharingRef = useRef(false);
 
   useEffect(
@@ -74,12 +74,15 @@ export function useShareImage(
   };
 
   const share = async () => {
-    if (!blob || sharingRef.current) return;
+    console.log("[share] share triggered", Date.now()); // TEMP: 중복호출 확인용
+    const now = Date.now();
+    if (!blob || sharingRef.current || now - lastShareRef.current < 1500) return;
+    lastShareRef.current = now;
     sharingRef.current = true;
     setPhase("sharing");
     setError(null);
     try {
-      await shareImage(blob, filename, { title: shareTitle });
+      await shareImage(blob, filename);
       setPhase("ready");
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
