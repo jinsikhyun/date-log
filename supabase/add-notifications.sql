@@ -76,7 +76,11 @@ begin
   end if;
 
   if tg_table_name = 'places' then
-    msg  := coalesce(actor_name, '상대방') || '님이 장소를 기록했습니다';
+    if new.status = 'wishlist' then
+      msg := coalesce(actor_name, '상대방') || '님이 가고 싶은 장소를 추가했습니다';
+    else
+      msg := coalesce(actor_name, '상대방') || '님이 장소를 기록했습니다';
+    end if;
     link := '/places/' || new.id;
 
   elsif tg_table_name = 'memories' then
