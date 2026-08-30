@@ -1,11 +1,12 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { type MemoryReply, MEMORY_REPLY_COLUMNS } from "@/lib/memories";
 import { type Reaction } from "@/lib/reactions";
 import { useAuth } from "@/components/AuthProvider";
 import { Reactions } from "@/components/Reactions";
+import { EmojiPicker } from "@/components/EmojiPicker";
 
 /** 추억 카드 하단의 채팅 말풍선 답장 — 목록 + 입력 + 삭제를 자체 관리 */
 export function MemoryReplies({
@@ -22,6 +23,24 @@ export function MemoryReplies({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 커서 위치에 이모지 삽입 후 그 뒤로 커서 이동 + 포커스 유지.
+  // (EmojiPicker 버튼들이 mousedown 을 preventDefault 해서 입력창 포커스/선택이 유지됨)
+  const insertEmoji = (emoji: string) => {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+    requestAnimationFrame(() => {
+      const node = inputRef.current;
+      if (!node) return;
+      node.focus();
+      const pos = start + emoji.length;
+      node.setSelectionRange(pos, pos);
+    });
+  };
 
   const add = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -120,13 +139,15 @@ export function MemoryReplies({
         </ul>
       )}
 
-      <form onSubmit={add} className="flex gap-1.5">
+      <form onSubmit={add} className="flex items-center gap-1">
         <input
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="한마디 남겨볼까? 👀"
           className="min-w-0 flex-1 rounded-full border border-border bg-white px-3 py-1.5 text-sm outline-none transition-colors focus:border-accent"
         />
+        <EmojiPicker onPick={insertEmoji} />
         <button
           type="submit"
           disabled={busy || !text.trim()}
