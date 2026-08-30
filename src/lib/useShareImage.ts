@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import {
   captureElement,
   downloadBlob,
@@ -26,6 +26,11 @@ export function useShareImage(
   // 이 훅을 쓰는 컴포넌트는 데이터 로드 후에만 렌더돼 SSR 을 안 타므로 바로 확인해도 안전
   const [shareable] = useState(() => canShareImage());
 
+  // 한 번의 동작이 정확히 한 번만 실행되도록 (StrictMode 이중호출 / 더블클릭 방지)
+  const capturingRef = useRef(false);
+  const downloadingRef = useRef(false);
+  const sharingRef = useRef(false);
+
   useEffect(
     () => () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -34,10 +39,11 @@ export function useShareImage(
   );
 
   const capture = async () => {
+    if (capturingRef.current) return; // 이미 캡처 중이면 무시
+    capturingRef.current = true;
     setError(null);
     setPhase("capturing");
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
       const el = targetRef.current;
       if (!el) throw new Error("카드를 준비하지 못했어요.");
       const b = await captureElement(el);
@@ -51,15 +57,23 @@ export function useShareImage(
       console.error("[share] 캡처 실패:", e);
       setError(e instanceof Error ? e.message : "이미지를 만들지 못했어요.");
       setPhase("idle");
+    } finally {
+      capturingRef.current = false;
     }
   };
 
   const download = () => {
-    if (blob) downloadBlob(blob, filename);
+    if (!blob || downloadingRef.current) return; // 클릭 한 번에 파일 하나만
+    downloadingRef.current = true;
+    downloadBlob(blob, filename);
+    window.setTimeout(() => {
+      downloadingRef.current = false;
+    }, 700);
   };
 
   const share = async () => {
-    if (!blob) return;
+    if (!blob || sharingRef.current) return;
+    sharingRef.current = true;
     setPhase("sharing");
     setError(null);
     try {
@@ -68,11 +82,13 @@ export function useShareImage(
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
         setPhase("ready"); // 사용자가 공유 시트를 닫음 — 오류 아님
-        return;
+      } else {
+        console.error("[share] 공유 실패:", e);
+        setError("공유하지 못했어요. 다운로드로 저장해 보세요.");
+        setPhase("ready");
       }
-      console.error("[share] 공유 실패:", e);
-      setError("공유하지 못했어요. 다운로드로 저장해 보세요.");
-      setPhase("ready");
+    } finally {
+      sharingRef.current = false;
     }
   };
 

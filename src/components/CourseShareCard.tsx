@@ -34,7 +34,6 @@ export const CourseShareCard = forwardRef<
         background: SC.cardBg,
         color: SC.fg,
         borderRadius: 24,
-        overflow: "hidden",
         border: `1px solid ${SC.border}`,
       }}
     >

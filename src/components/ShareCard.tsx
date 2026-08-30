@@ -28,11 +28,12 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
           background: SC.cardBg,
           color: SC.fg,
           borderRadius: 24,
-          overflow: "hidden",
           border: `1px solid ${SC.border}`,
         }}
       >
-        {/* 대표 사진 (없으면 카테고리 아이콘) */}
+        {/* 대표 사진 (없으면 카테고리 아이콘).
+            overflow:hidden 은 여기(고정 높이 300)만 — 배경이미지를 둥근 윗모서리로 자르기 위함.
+            루트에는 overflow 를 두지 않는다(하단 잘림 우려 제거). */}
         <div
           style={{
             position: "relative",
@@ -40,6 +41,7 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
             height: 300,
             background: SC.accentTint,
             overflow: "hidden",
+            borderRadius: "23px 23px 0 0",
           }}
         >
           {place.image_url ? (

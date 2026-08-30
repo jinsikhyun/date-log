@@ -63,6 +63,7 @@ export function ShareImageModal({
   const [open, setOpen] = useState(false);
 
   const openModal = () => {
+    if (open) return; // 이미 열려 있으면 무시 (중복 캡처 방지)
     reset(); // 이전 미리보기 정리 후 새로 캡처
     setOpen(true);
     void capture();
