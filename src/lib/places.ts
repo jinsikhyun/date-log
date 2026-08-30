@@ -1,3 +1,5 @@
+import { withSubjectParticle } from "@/lib/korean";
+
 // 카테고리 색/아이콘/정렬은 categories.ts (DB 관리)로 이동. 기존 import 호환용 재노출.
 export { categoryStyle, categoryIcon, orderCategories } from "@/lib/categories";
 
@@ -25,9 +27,9 @@ export interface Place {
   created_at: string;
 }
 
-/** "진식이 추가함" 같은 뱃지 문구. added_by 없으면 null. */
+/** "진식이 추가함" / "징구리가 추가함" — 받침에 따라 조사 처리. added_by 없으면 null. */
 export function addedByLabel(name: string | null): string | null {
-  return name ? `${name}이 추가함` : null;
+  return name ? `${withSubjectParticle(name)} 추가함` : null;
 }
 
 // 위시리스트 "누가 가고 싶어해요?" 선택지는 이제 커플 profiles 에서 실시간으로
@@ -59,7 +61,7 @@ export function wantedByLabel(v: string | null): string | null {
     case "":
       return null;
     default:
-      return `${v}이 가고 싶어해요`; // '진식' / '지민'
+      return `${withSubjectParticle(v)} 가고 싶어해요`; // 커플 구성원 이름 (받침 처리)
   }
 }
 
