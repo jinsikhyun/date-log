@@ -24,6 +24,7 @@ import { MemoryReplies } from "@/components/MemoryReplies";
 import { Reactions } from "@/components/Reactions";
 import { type Reaction, REACTION_COLUMNS } from "@/lib/reactions";
 import { NearbySimilar } from "@/components/NearbySimilar";
+import { SharePlaceButton } from "@/components/SharePlaceButton";
 import { DirectionsButton } from "@/components/DirectionsButton";
 import {
   AddPlaceForm,
@@ -415,6 +416,8 @@ export function PlaceDetail({ id }: { id: number }) {
           </div>
         </header>
       )}
+
+      {!editing && <SharePlaceButton place={place} />}
 
       {/* 우리의 추억 */}
       <section className="space-y-5">

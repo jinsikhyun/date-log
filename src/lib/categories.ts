@@ -72,6 +72,11 @@ export function categoryIcon(name: string): string {
   return registry.find((c) => c.name === name)?.icon ?? DEFAULT_ICON;
 }
 
+/** 카테고리의 원시 색 이름 (COLOR_CLASSES 의 키). 캡처용 인라인 색 매핑 등에 사용. */
+export function categoryColorName(name: string): string {
+  return registry.find((c) => c.name === name)?.color ?? DEFAULT_COLOR;
+}
+
 /** 이름 목록을 주어진 카테고리 순서로 정렬 (미등록은 뒤로) */
 export function orderNamesBy(
   cats: Category[],
