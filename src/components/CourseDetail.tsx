@@ -14,6 +14,7 @@ import {
 } from "@/lib/courses";
 import { CourseForm, type CourseFormInput } from "@/components/CourseForm";
 import { CourseMap, type MapStop } from "@/components/CourseMap";
+import { ShareCourseButton } from "@/components/ShareCourseButton";
 
 const COURSE_DETAIL_SELECT =
   "id, title, concept, created_at, course_places(id, order_index, places(id, name, category, address, image_url, lat, lng, status))";
@@ -294,6 +295,19 @@ export function CourseDetail({ id }: { id: number }) {
           )}
           <p className="mt-3 text-xs text-muted">장소 {stops.length}곳</p>
         </header>
+      )}
+
+      {!editing && stops.length > 0 && (
+        <ShareCourseButton
+          title={course.title}
+          concept={course.concept}
+          stops={stops.map((s) => ({
+            id: s.places!.id,
+            name: s.places!.name,
+            category: s.places!.category,
+          }))}
+          coords={coords}
+        />
       )}
 
       {!editing && (
