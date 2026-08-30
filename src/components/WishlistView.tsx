@@ -67,7 +67,13 @@ export function WishlistView() {
       .insert(placeInputToRow(input))
       .select(PLACE_COLUMNS)
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      throw new Error(
+        error.code === "23505"
+          ? "이미 같은 이름·주소의 장소가 우리 목록에 있어요."
+          : error.message,
+      );
+    }
 
     const saved = data as Place;
     setAdding(false);

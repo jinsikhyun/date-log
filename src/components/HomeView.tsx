@@ -160,7 +160,11 @@ export function HomeView() {
 
       if (error) {
         console.error("[places] 추가 실패:", error);
-        throw new Error(error.message);
+        throw new Error(
+          error.code === "23505"
+            ? "이미 같은 이름·주소의 장소가 우리 목록에 있어요."
+            : error.message,
+        );
       }
 
       const saved = data as Place;

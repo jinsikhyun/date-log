@@ -31,8 +31,9 @@ create table if not exists public.places (
   wanted_by        text,                             -- 커플 구성원 display_name | '둘다' | null (wishlist 전용, CHECK 없음)
   added_by         text,                             -- 등록한 사람 (로그인 사용자 display_name)
   memory_count     integer not null default 0,
-  created_at       timestamptz not null default now(),
-  constraint places_name_address_key unique (name, address)
+  created_at       timestamptz not null default now()
+  -- 장소 유일성은 커플 단위 (couple_id, name, address) — couple_id 컬럼이 생긴 뒤
+  -- 아래 "멀티 커플 모델" 섹션에서 places_couple_name_address_key 로 건다.
 );
 
 -- 기존 DB 에도 컬럼 보장
@@ -228,6 +229,13 @@ update public.places         set couple_id = (select id from public.couples wher
 update public.memories       set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
 update public.memory_replies set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
 update public.courses        set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
+
+-- 장소 유일성을 (name, address) 전역 → (couple_id, name, address) 커플 단위로.
+-- (전역이면 다른 커플이 같은 장소를 못 넣음)  → scope-place-uniqueness.sql 도 참고
+alter table public.places drop constraint if exists places_name_address_key;
+alter table public.places drop constraint if exists places_couple_name_address_key;
+alter table public.places add constraint places_couple_name_address_key
+  unique (couple_id, name, address);
 
 -- RLS 는 다음 단계에서 커플 스코프로 켤 것. 지금은 명시적으로 OFF.
 alter table public.couples  disable row level security;
