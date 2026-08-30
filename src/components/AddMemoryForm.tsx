@@ -43,7 +43,7 @@ export function AddMemoryForm({
   initial?: NewMemoryInput;
   submitLabel?: string;
 }) {
-  const { displayName } = useAuth();
+  const { authorName } = useAuth();
   const [form, setForm] = useState<NewMemoryInput>(initial ?? empty);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,11 +108,16 @@ export function AddMemoryForm({
       setError("사진 업로드가 끝난 뒤에 저장해 주세요.");
       return;
     }
+    const author = initial?.author || authorName;
+    if (!author) {
+      setError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
+      return;
+    }
 
     setSaving(true);
     try {
       // 새 추억은 로그인한 사용자로. 기존 추억 수정 시엔 원 작성자 유지.
-      await onSubmit({ ...form, author: initial?.author || displayName });
+      await onSubmit({ ...form, author });
       setForm(initial ?? empty());
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");

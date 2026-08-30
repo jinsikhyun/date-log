@@ -13,7 +13,7 @@ export function MemoryReplies({
   memoryId: number;
   initialReplies: MemoryReply[];
 }) {
-  const { displayName: me } = useAuth();
+  const { authorName: me } = useAuth();
   const [replies, setReplies] = useState<MemoryReply[]>(initialReplies);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,7 @@ export function MemoryReplies({
     const content = text.trim();
     if (!content) return;
     if (!me) {
-      setErr("로그인이 필요해!");
+      setErr("프로필 이름이 없어! 설정에서 이름부터 정해줘.");
       return;
     }
     setBusy(true);

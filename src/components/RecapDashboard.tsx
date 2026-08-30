@@ -79,10 +79,13 @@ export function RecapDashboard() {
 
   // 커플 구성원 이름(created_at 오름차순). 레이스 레인 이름 = added_by 매칭 기준.
   const runners = useMemo(
-    () =>
-      coupleMembers
-        .map((m) => m.display_name)
-        .filter((n): n is string => !!n && n.trim().length > 0),
+    () => [
+      ...new Set(
+        coupleMembers
+          .map((m) => m.display_name?.trim())
+          .filter((n): n is string => !!n),
+      ),
+    ],
     [coupleMembers],
   );
 

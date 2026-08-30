@@ -73,7 +73,7 @@ export function CourseForm({
   initial?: CourseFormInput;
   submitLabel?: string;
 }) {
-  const { displayName } = useAuth();
+  const { authorName } = useAuth();
   const { categories } = useCategories();
   const base = initial ?? EMPTY;
   const [title, setTitle] = useState(base.title);
@@ -152,6 +152,10 @@ export function CourseForm({
       setNError("장소명, 카테고리, 주소를 입력해 주세요.");
       return;
     }
+    if (!authorName) {
+      setNError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
+      return;
+    }
     setNSaving(true);
     try {
       const { data, error: insErr } = await supabase
@@ -167,7 +171,7 @@ export function CourseForm({
               kakao_map_link: nKakao,
               // 코스 짜면서 새로 넣는 곳 = 아직 안 가본 곳 → 위시리스트로 분류
               status: "wishlist",
-              added_by: displayName,
+              added_by: authorName,
             }),
           ),
           // 단, 큐레이션한 "가고 싶은 곳"이 아니므로 /wishlist 페이지에는 숨긴다

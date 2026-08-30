@@ -14,7 +14,7 @@ const COURSE_LIST_SELECT =
   "id, title, concept, created_at, course_places(order_index, places(id, name, category, address, image_url, lat, lng, status))";
 
 const POLICY_HINT =
-  "Supabase 정책(supabase/courses.sql) 적용 여부를 확인해 주세요.";
+  "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
 function coverImage(course: CourseWithStops): string | null {
   const stops = sortedStops(course);

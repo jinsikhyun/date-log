@@ -33,7 +33,7 @@ const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
 
 const POLICY_HINT =
-  "Supabase 정책(supabase/policies_open_write.sql) 적용 여부를 확인해 주세요.";
+  "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
 const dot = (d: string | null) => (d ? d.split("-").join(".") : "날짜 미정");
 
@@ -43,7 +43,7 @@ function memoryToInput(m: Memory): NewMemoryInput {
     date: m.date ?? "",
     content: m.content ?? "",
     mood_tag: m.mood_tag ?? "",
-    author: "", // 저장 시 현재 사용자로 덮어씀
+    author: m.author ?? "", // 원 작성자 유지 (AddMemoryForm 이 비었을 때만 현재 사용자로 채움)
     photo_urls: m.photo_urls ?? [],
   };
 }

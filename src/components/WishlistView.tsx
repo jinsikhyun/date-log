@@ -20,7 +20,7 @@ const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
 
 const POLICY_HINT =
-  "Supabase 정책(supabase/policies_open_write.sql) 적용 여부를 확인해 주세요.";
+  "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
 export function WishlistView() {
   const [places, setPlaces] = useState<Place[]>([]);

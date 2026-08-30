@@ -30,8 +30,10 @@ interface AuthCtx {
   profile: Profile | null;
   /** 내 couple_id 에 속한 profiles (나 + 파트너). 이름 옵션 등에 사용 */
   coupleMembers: CoupleMember[];
-  /** 내 display_name (없으면 이메일, 그것도 없으면 "") */
+  /** 내 display_name (없으면 이메일, 그것도 없으면 "") — 화면 표시용 */
   displayName: string;
+  /** 저장용 이름 — 프로필 display_name 만 (이메일 폴백 X). 없으면 null → 저장 막기 */
+  authorName: string | null;
   /** 세션 + 프로필 확인이 끝났는지 */
   ready: boolean;
   signOut: () => Promise<void>;
@@ -56,10 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 세션
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAuthChecked(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setUser(data.session?.user ?? null);
+        setAuthChecked(true);
+      })
+      .catch(() => setAuthChecked(true)); // 네트워크 오류로도 ready 는 풀어준다
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setAuthChecked(true);
@@ -81,11 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select(PROFILE_COLUMNS)
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setProfile((data as Profile) ?? null);
-        setProfileChecked(true);
-      });
+      .then(
+        ({ data }) => {
+          if (cancelled) return;
+          setProfile((data as Profile) ?? null);
+          setProfileChecked(true);
+        },
+        () => {
+          // 네트워크 오류로도 ready 는 풀어준다
+          if (!cancelled) setProfileChecked(true);
+        },
+      );
     return () => {
       cancelled = true;
     };
@@ -139,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         coupleMembers,
         displayName: profile?.display_name ?? user?.email ?? "",
+        authorName: profile?.display_name?.trim() || null,
         ready: authChecked && profileChecked,
         signOut,
         refreshProfile,

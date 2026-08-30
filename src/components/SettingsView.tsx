@@ -58,13 +58,21 @@ export function SettingsView() {
     setSaveMsg(null);
     setSaving(true);
     const value = startDate || null; // 비우면 미설정으로
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("couples")
       .update({ start_date: value })
-      .eq("id", profile.couple_id);
+      .eq("id", profile.couple_id)
+      .select("id");
     setSaving(false);
     if (error) {
       setSaveErr(`저장 실패: ${error.message}`);
+      return;
+    }
+    if (!data || data.length === 0) {
+      // RLS 로 UPDATE 가 막히면 에러 없이 0행이 온다 (add-couple-start-date.sql 미적용 등)
+      setSaveErr(
+        "저장이 반영되지 않았어요. supabase/add-couple-start-date.sql 적용 여부를 확인해 주세요.",
+      );
       return;
     }
     setSavedStartDate(value);

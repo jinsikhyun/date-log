@@ -94,13 +94,16 @@ export function AddPlaceForm({
   initialStatus?: PlaceStatus; // initial 이 없을 때 토글 기본값
   submitLabel?: string;
 }) {
-  const { displayName, coupleMembers } = useAuth();
+  const { authorName, coupleMembers } = useAuth();
   const { categories } = useCategories();
   // "누가 가고 싶어해요?" 옵션 = 우리 커플 두 사람 이름 (하드코딩 X) + "둘다"
+  // 두 사람 이름이 같아도 옵션/키가 안 겹치게 중복 제거.
   const wantedByOptions = [
-    ...coupleMembers
-      .map((m) => m.display_name)
-      .filter((n): n is string => !!n),
+    ...new Set(
+      coupleMembers
+        .map((m) => m.display_name?.trim())
+        .filter((n): n is string => !!n),
+    ),
     "둘다",
   ];
   const base = initial ?? { ...EMPTY, status: initialStatus ?? "visited" };
@@ -245,11 +248,15 @@ export function AddPlaceForm({
       setError("사진 업로드가 끝난 뒤에 저장해 주세요.");
       return;
     }
+    if (!authorName) {
+      setError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
+      return;
+    }
 
     setSaving(true);
     try {
       // added_by 는 폼 입력이 아니라 현재 로그인한 사용자의 이름으로 자동
-      await onSubmit({ ...form, added_by: displayName });
+      await onSubmit({ ...form, added_by: authorName });
       setForm(base);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");

@@ -35,30 +35,15 @@ begin
   return new;
 end $$;
 
--- 1) 기존 데이터/커플 통합 ───────────────────────────────────
---    시드 커플(JINJIM-0628)에 기존 데이터 24/9/3/3 행이 이미 붙어 있음.
---    3단계 테스트로 생긴 별도 커플의 프로필들을 이 시드 커플로 합치고,
---    이제 아무것도 안 가리키는 빈 커플은 삭제한다.
-do $$
-declare seed uuid;
-begin
-  select id into seed from public.couples where invite_code = 'JINJIM-0628';
-  if seed is null then
-    raise exception 'invite_code = JINJIM-0628 커플이 없습니다. add-couples-model.sql 를 먼저 실행하세요.';
-  end if;
-
-  update public.profiles
-    set couple_id = seed
-    where couple_id is distinct from seed;
-
-  delete from public.couples c
-  where c.id <> seed
-    and not exists (select 1 from public.profiles       x where x.couple_id = c.id)
-    and not exists (select 1 from public.places         x where x.couple_id = c.id)
-    and not exists (select 1 from public.memories       x where x.couple_id = c.id)
-    and not exists (select 1 from public.memory_replies x where x.couple_id = c.id)
-    and not exists (select 1 from public.courses        x where x.couple_id = c.id);
-end $$;
+-- 1) (제거됨) 기존 데이터/커플 통합
+--    ⚠️ 원래 여기 있던 블록은
+--        update public.profiles set couple_id = <JINJIM-0628 seed>
+--          where couple_id is distinct from seed;
+--       라서, 이 스크립트를 "다시 실행"할 때마다 **모든 프로필을 진식지민 커플로
+--       강제 편입**시키는 파괴적 동작이었다. (3단계 테스트 계정 A/B 를 한 번 합치려는
+--       일회성 마이그레이션이었는데 재실행 시 신규 가입자까지 빨아들임)
+--    → 통합은 이미 완료됐고, 재실행 안전을 위해 블록을 통째로 삭제한다.
+--       새로 가입한 계정은 온보딩에서 자기 커플을 만들거나 초대코드로 합류한다.
 
 -- 2) places ─────────────────────────────────────────────────
 alter table public.places enable row level security;
