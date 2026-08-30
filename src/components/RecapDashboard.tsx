@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { statusLabel } from "@/lib/places";
-import { RELATIONSHIP_START_DATE, daysTogether } from "@/lib/recap";
+import { daysTogether } from "@/lib/recap";
+import { useAuth } from "@/components/AuthProvider";
+import { withSubjectParticle } from "@/lib/korean";
 
 type PlaceRow = {
   id: number;
@@ -22,7 +24,6 @@ type MemRow = {
   content: string | null;
 };
 
-const RUNNERS = ["진식", "지민"] as const;
 const fmtDate = (d: string) => d.split("-").join(".");
 
 function HighlightCard({
@@ -68,20 +69,53 @@ function HighlightCard({
 }
 
 export function RecapDashboard() {
+  const { profile, ready, coupleMembers } = useAuth();
+
   const [places, setPlaces] = useState<PlaceRow[] | null>(null);
   const [memories, setMemories] = useState<MemRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // 레이스에서 러너 아이콘을 누르면 그 사람이 등록한 것 목록을 펼침
-  const [openRunner, setOpenRunner] = useState<
-    (typeof RUNNERS)[number] | null
-  >(null);
+  const [openRunner, setOpenRunner] = useState<string | null>(null);
 
-  // 함께한 지 N일째 — 1분마다 재계산해서 자정 넘어가면 자동으로 +1
-  const [days, setDays] = useState(daysTogether());
+  // 커플 구성원 이름(created_at 오름차순). 레이스 레인 이름 = added_by 매칭 기준.
+  const runners = useMemo(
+    () =>
+      coupleMembers
+        .map((m) => m.display_name)
+        .filter((n): n is string => !!n && n.trim().length > 0),
+    [coupleMembers],
+  );
+
+  // 관계 시작일 (undefined=로딩 중, null=미설정, string=설정됨)
+  const [startDate, setStartDate] = useState<string | null | undefined>(
+    undefined,
+  );
   useEffect(() => {
-    const t = setInterval(() => setDays(daysTogether()), 60_000);
+    // /recap 은 미들웨어가 커플 연결을 보장하므로 couple_id 는 사실상 항상 있다.
+    if (!ready || !profile?.couple_id) return;
+    let cancelled = false;
+    supabase
+      .from("couples")
+      .select("start_date")
+      .eq("id", profile.couple_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) {
+          setStartDate((data?.start_date as string | null) ?? null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, profile?.couple_id]);
+
+  // 함께한 지 N일째 — 1분마다 강제 리렌더해서 자정 넘어가면 자동으로 +1
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => forceTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
   }, []);
+  const days = startDate ? daysTogether(startDate) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -148,11 +182,12 @@ export function RecapDashboard() {
         }
       : null;
 
-    // 레이스 — added_by 기준
-    const race = Object.fromEntries(
-      RUNNERS.map((n) => [n, places.filter((p) => p.added_by === n).length]),
-    ) as Record<(typeof RUNNERS)[number], number>;
-    const max = Math.max(...RUNNERS.map((n) => race[n]), 1);
+    // 레이스 — 커플 구성원 display_name 별로 added_by 개수
+    const race: Record<string, number> = {};
+    runners.forEach((n) => {
+      race[n] = places.filter((p) => p.added_by === n).length;
+    });
+    const max = Math.max(...runners.map((n) => race[n] ?? 0), 1);
 
     return {
       visited: visited.length,
@@ -164,7 +199,7 @@ export function RecapDashboard() {
       race,
       max,
     };
-  }, [places, memories]);
+  }, [places, memories, runners]);
 
   const placeById = useMemo(
     () => new Map((places ?? []).map((p) => [p.id, p])),
@@ -188,16 +223,33 @@ export function RecapDashboard() {
 
       {/* 함께한 지 N일째 */}
       <div className="rounded-3xl bg-card p-8 text-center ring-1 ring-border/70">
-        <p className="text-sm font-medium text-muted">함께한 지</p>
-        <p className="mt-1 text-5xl font-extrabold text-accent sm:text-6xl">
-          {days.toLocaleString()}
-          <span className="ml-1 text-2xl font-bold text-foreground/80">
-            일째
-          </span>
-        </p>
-        <p className="mt-2 text-xs text-muted">
-          {fmtDate(RELATIONSHIP_START_DATE)}부터
-        </p>
+        {startDate === undefined ? (
+          <div className="mx-auto h-14 w-44 animate-pulse rounded-xl bg-stone-200/70" />
+        ) : startDate === null ? (
+          <>
+            <p className="text-sm font-medium text-muted">함께한 지</p>
+            <p className="mt-2 text-base font-bold text-foreground/80">
+              관계 시작일을 설정해주세요
+            </p>
+            <Link
+              href="/settings"
+              className="mt-3 inline-block rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              설정에서 입력하기 →
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-muted">함께한 지</p>
+            <p className="mt-1 text-5xl font-extrabold text-accent sm:text-6xl">
+              {(days ?? 0).toLocaleString()}
+              <span className="ml-1 text-2xl font-bold text-foreground/80">
+                일째
+              </span>
+            </p>
+            <p className="mt-2 text-xs text-muted">{fmtDate(startDate)}부터</p>
+          </>
+        )}
       </div>
 
       {error && (
@@ -263,137 +315,139 @@ export function RecapDashboard() {
           </div>
 
           {/* 누가 더 많이 등록했을까 — 레이스 */}
-          <div className="rounded-3xl bg-card p-5 ring-1 ring-border/70 sm:p-6">
-            <p className="text-sm font-bold">누가 더 많이 등록했을까 🏃</p>
-            <p className="mt-0.5 text-[11px] text-muted">
-              러너를 누르면 그 사람이 등록한 목록을 볼 수 있어요
-            </p>
-            <div className="mt-5 space-y-7">
-              {RUNNERS.map((name) => {
-                const count = stats.race[name];
-                const pct = 4 + (count / stats.max) * 86; // 4%~90%
-                const labelPct = Math.min(84, Math.max(16, pct));
-                return (
-                  <div key={name}>
-                    <div className="relative h-14 rounded-full bg-stone-100">
-                      <span
-                        aria-hidden
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xl"
-                      >
-                        🏁
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenRunner((r) => (r === name ? null : name))
-                        }
-                        aria-pressed={openRunner === name}
-                        aria-label={`${name} 등록 목록 보기`}
-                        className={`absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-lg text-white shadow transition-shadow hover:shadow-lg ${
-                          openRunner === name
-                            ? "ring-2 ring-accent ring-offset-2"
-                            : ""
-                        }`}
-                        style={{
-                          left: `${pct}%`,
-                          animation:
-                            "recap-runner-bounce 0.6s ease-in-out infinite",
-                        }}
-                      >
-                        🏃
-                      </button>
+          {runners.length > 0 && (
+            <div className="rounded-3xl bg-card p-5 ring-1 ring-border/70 sm:p-6">
+              <p className="text-sm font-bold">누가 더 많이 등록했을까 🏃</p>
+              <p className="mt-0.5 text-[11px] text-muted">
+                러너를 누르면 그 사람이 등록한 목록을 볼 수 있어요
+              </p>
+              <div className="mt-5 space-y-7">
+                {runners.map((name) => {
+                  const count = stats.race[name] ?? 0;
+                  const pct = 4 + (count / stats.max) * 86; // 4%~90%
+                  const labelPct = Math.min(84, Math.max(16, pct));
+                  return (
+                    <div key={name}>
+                      <div className="relative h-14 rounded-full bg-stone-100">
+                        <span
+                          aria-hidden
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-xl"
+                        >
+                          🏁
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenRunner((r) => (r === name ? null : name))
+                          }
+                          aria-pressed={openRunner === name}
+                          aria-label={`${name} 등록 목록 보기`}
+                          className={`absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-lg text-white shadow transition-shadow hover:shadow-lg ${
+                            openRunner === name
+                              ? "ring-2 ring-accent ring-offset-2"
+                              : ""
+                          }`}
+                          style={{
+                            left: `${pct}%`,
+                            animation:
+                              "recap-runner-bounce 0.6s ease-in-out infinite",
+                          }}
+                        >
+                          🏃
+                        </button>
+                      </div>
+                      <div className="relative mt-1.5 h-4">
+                        <p
+                          className="absolute -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-muted"
+                          style={{ left: `${labelPct}%` }}
+                        >
+                          {name} · {count}곳
+                        </p>
+                      </div>
                     </div>
-                    <div className="relative mt-1.5 h-4">
-                      <p
-                        className="absolute -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-muted"
-                        style={{ left: `${labelPct}%` }}
-                      >
-                        {name} · {count}곳
+                  );
+                })}
+              </div>
+
+              {openRunner && (
+                <div className="mt-5 border-t border-border/60 pt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold">
+                      {withSubjectParticle(openRunner)} 등록한 것
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setOpenRunner(null)}
+                      className="text-xs text-muted transition-colors hover:text-accent"
+                    >
+                      닫기
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    {/* 추가한 장소 */}
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-muted">
+                        추가한 장소 {runnerPlaces.length}곳
                       </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {openRunner && (
-              <div className="mt-5 border-t border-border/60 pt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold">
-                    {openRunner}이(가) 등록한 것
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setOpenRunner(null)}
-                    className="text-xs text-muted transition-colors hover:text-accent"
-                  >
-                    닫기
-                  </button>
-                </div>
-
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  {/* 추가한 장소 */}
-                  <div>
-                    <p className="mb-1.5 text-xs font-medium text-muted">
-                      추가한 장소 {runnerPlaces.length}곳
-                    </p>
-                    {runnerPlaces.length === 0 ? (
-                      <p className="text-xs text-muted">없어요</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {runnerPlaces.map((p) => (
-                          <li key={p.id}>
-                            <Link
-                              href={`/places/${p.id}`}
-                              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-stone-50"
-                            >
-                              <span className="min-w-0 flex-1 truncate font-medium">
-                                {p.name}
-                              </span>
-                              <span className="shrink-0 text-[11px] text-muted">
-                                {statusLabel(p.status)}
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  {/* 작성한 추억 */}
-                  <div>
-                    <p className="mb-1.5 text-xs font-medium text-muted">
-                      작성한 추억 {runnerMems.length}개
-                    </p>
-                    {runnerMems.length === 0 ? (
-                      <p className="text-xs text-muted">없어요</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {runnerMems.map((m) => {
-                          const pl = placeById.get(m.place_id);
-                          return (
-                            <li key={m.id}>
+                      {runnerPlaces.length === 0 ? (
+                        <p className="text-xs text-muted">없어요</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {runnerPlaces.map((p) => (
+                            <li key={p.id}>
                               <Link
-                                href={`/places/${m.place_id}`}
-                                className="block rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-stone-50"
+                                href={`/places/${p.id}`}
+                                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-stone-50"
                               >
-                                <span className="line-clamp-1 text-foreground/85">
-                                  {m.content?.trim() || "(내용 없음)"}
+                                <span className="min-w-0 flex-1 truncate font-medium">
+                                  {p.name}
                                 </span>
-                                <span className="text-[11px] text-muted">
-                                  {pl ? pl.name : "(삭제된 장소)"}
+                                <span className="shrink-0 text-[11px] text-muted">
+                                  {statusLabel(p.status)}
                                 </span>
                               </Link>
                             </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* 작성한 추억 */}
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-muted">
+                        작성한 추억 {runnerMems.length}개
+                      </p>
+                      {runnerMems.length === 0 ? (
+                        <p className="text-xs text-muted">없어요</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {runnerMems.map((m) => {
+                            const pl = placeById.get(m.place_id);
+                            return (
+                              <li key={m.id}>
+                                <Link
+                                  href={`/places/${m.place_id}`}
+                                  className="block rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-stone-50"
+                                >
+                                  <span className="line-clamp-1 text-foreground/85">
+                                    {m.content?.trim() || "(내용 없음)"}
+                                  </span>
+                                  <span className="text-[11px] text-muted">
+                                    {pl ? pl.name : "(삭제된 장소)"}
+                                  </span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </>
       ) : null}
     </div>

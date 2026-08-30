@@ -201,8 +201,10 @@ create table if not exists public.couples (
   id          uuid primary key default gen_random_uuid(),
   name        text,
   invite_code text unique,
+  start_date  date,                              -- 관계 시작일 (설정 페이지에서 입력)
   created_at  timestamptz not null default now()
 );
+alter table public.couples add column if not exists start_date date;
 
 create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
@@ -216,9 +218,11 @@ alter table public.memories       add column if not exists couple_id uuid refere
 alter table public.memory_replies add column if not exists couple_id uuid references public.couples(id);
 alter table public.courses        add column if not exists couple_id uuid references public.couples(id);
 
-insert into public.couples (name, invite_code)
-values ('진식지민', 'JINJIM-0628')
+insert into public.couples (name, invite_code, start_date)
+values ('진식지민', 'JINJIM-0628', date '2025-06-28')
 on conflict (invite_code) do nothing;
+update public.couples set start_date = date '2025-06-28'
+  where invite_code = 'JINJIM-0628' and start_date is null;
 
 update public.places         set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
 update public.memories       set couple_id = (select id from public.couples where invite_code = 'JINJIM-0628') where couple_id is null;
@@ -233,3 +237,8 @@ alter table public.profiles disable row level security;
 --    "public" 개방 정책을 커플 스코프 정책으로 교체한다.
 --    (my_couple_id() 함수 + set_couple_id() insert 트리거 포함)
 --    전체 내용은 supabase/add-couple-rls.sql 참고.
+
+-- 관계 시작일(설정 페이지) 저장을 위해 couples UPDATE 정책 추가.
+-- 전체 내용은 supabase/add-couple-start-date.sql 참고.
+-- create policy "couples: update own" on public.couples for update to authenticated
+--   using (id = public.my_couple_id()) with check (id = public.my_couple_id());

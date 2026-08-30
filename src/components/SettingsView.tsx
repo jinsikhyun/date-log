@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -11,6 +11,13 @@ export function SettingsView() {
   const { user, profile, ready } = useAuth();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 관계 시작일
+  const [startDate, setStartDate] = useState(""); // <input type="date"> 값 ("" = 미설정)
+  const [savedStartDate, setSavedStartDate] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -25,12 +32,15 @@ export function SettingsView() {
     let cancelled = false;
     supabase
       .from("couples")
-      .select("invite_code")
+      .select("invite_code, start_date")
       .eq("id", profile.couple_id)
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled) return;
         setInviteCode((data?.invite_code as string) ?? null);
+        const sd = (data?.start_date as string | null) ?? null;
+        setSavedStartDate(sd);
+        setStartDate(sd ?? "");
         setLoading(false);
       });
     return () => {
@@ -41,6 +51,27 @@ export function SettingsView() {
   if (!ready || !user || !profile?.couple_id) {
     return <p className="text-sm text-muted">불러오는 중…</p>;
   }
+
+  const handleSaveStartDate = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSaveErr(null);
+    setSaveMsg(null);
+    setSaving(true);
+    const value = startDate || null; // 비우면 미설정으로
+    const { error } = await supabase
+      .from("couples")
+      .update({ start_date: value })
+      .eq("id", profile.couple_id);
+    setSaving(false);
+    if (error) {
+      setSaveErr(`저장 실패: ${error.message}`);
+      return;
+    }
+    setSavedStartDate(value);
+    setSaveMsg("저장했어요.");
+  };
+
+  const dirty = (startDate || null) !== (savedStartDate ?? null);
 
   return (
     <div className="space-y-5">
@@ -64,6 +95,58 @@ export function SettingsView() {
           합류하기”에서 입력하면 같은 커플로 연결돼요.
         </p>
       </div>
+
+      {/* 관계 시작일 */}
+      <form
+        onSubmit={handleSaveStartDate}
+        className="rounded-3xl bg-card p-5 ring-1 ring-border/70"
+      >
+        <p className="text-xs font-medium text-muted">관계 시작일</p>
+        <p className="mt-1 text-xs text-muted">
+          “함께한 지 N일째” 계산의 기준이 돼요. 둘 중 누구든 수정할 수 있어요.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={startDate}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setSaveMsg(null);
+              setSaveErr(null);
+            }}
+            disabled={loading || saving}
+            className="rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent"
+          />
+          <button
+            type="submit"
+            disabled={loading || saving || !dirty}
+            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+          >
+            {saving ? "저장 중…" : "저장"}
+          </button>
+          {startDate && (
+            <button
+              type="button"
+              onClick={() => {
+                setStartDate("");
+                setSaveMsg(null);
+                setSaveErr(null);
+              }}
+              disabled={loading || saving}
+              className="text-xs text-muted transition-colors hover:text-accent"
+            >
+              비우기
+            </button>
+          )}
+        </div>
+        {saveMsg && (
+          <p className="mt-2 text-xs font-medium text-accent">{saveMsg}</p>
+        )}
+        {saveErr && (
+          <p className="mt-2 text-xs font-medium text-red-600">{saveErr}</p>
+        )}
+      </form>
 
       <div className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
         <p className="text-xs font-medium text-muted">내 계정</p>
