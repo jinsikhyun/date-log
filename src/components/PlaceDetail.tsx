@@ -95,6 +95,13 @@ export function PlaceDetail({ id }: { id: number }) {
         return;
       }
 
+      // 코스 전용 장소는 독립적인 상세 페이지가 없다 (오직 그 코스 안에서만)
+      if ((placeRes.data as Place).status === "course_only") {
+        setError("장소를 찾을 수 없어요.");
+        setLoading(false);
+        return;
+      }
+
       setPlace(placeRes.data as Place);
       if (memRes.error) {
         console.error("[memories] 조회 실패:", memRes.error);

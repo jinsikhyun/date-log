@@ -3,7 +3,7 @@ import { withSubjectParticle } from "@/lib/korean";
 // 카테고리 색/아이콘/정렬은 categories.ts (DB 관리)로 이동. 기존 import 호환용 재노출.
 export { categoryStyle, categoryIcon, orderCategories } from "@/lib/categories";
 
-export type PlaceStatus = "visited" | "wishlist";
+export type PlaceStatus = "visited" | "wishlist" | "course_only";
 
 // Supabase `places` 테이블의 한 행.
 export interface Place {
@@ -37,14 +37,16 @@ export function addedByLabel(name: string | null): string | null {
 
 /** status → 뱃지에 쓸 짧은 라벨 */
 export function statusLabel(status: string): string {
-  return status === "wishlist" ? "위시리스트" : "다녀옴";
+  if (status === "wishlist") return "위시리스트";
+  if (status === "course_only") return "이 코스 전용";
+  return "다녀옴";
 }
 
 /** status 뱃지 색상 클래스 */
 export function statusBadgeClass(status: string): string {
-  return status === "wishlist"
-    ? "bg-accent/10 text-accent"
-    : "bg-stone-100 text-stone-500";
+  if (status === "wishlist") return "bg-accent/10 text-accent";
+  if (status === "course_only") return "bg-violet-100 text-violet-700";
+  return "bg-stone-100 text-stone-500";
 }
 
 /** wanted_by 값 → 카드에 보여줄 문구 */
@@ -83,9 +85,9 @@ export interface PlaceRowInput {
   added_by: string; // 현재 선택된 사용자 이름 (폼 필드 아님, 저장 시 자동 주입)
 }
 
-/** 폼 입력을 DB row 로. wishlist 면 방문 전용 필드(별점/방문일/한줄평/사진)는 비운다. */
+/** 폼 입력을 DB row 로. wishlist/course_only 면 방문 전용 필드(별점/방문일/한줄평/사진)는 비운다. */
 export function placeInputToRow(input: PlaceRowInput) {
-  const wishlist = input.status === "wishlist";
+  const lite = input.status === "wishlist" || input.status === "course_only";
   return {
     name: input.name.trim(),
     category: input.category,
@@ -96,10 +98,10 @@ export function placeInputToRow(input: PlaceRowInput) {
     lng: input.lng ? Number(input.lng) : null,
     status: input.status,
     added_by: input.added_by || null,
-    wanted_by: wishlist ? input.wanted_by || null : null,
-    rating: wishlist || !input.rating ? null : Number(input.rating),
-    first_visit_date: wishlist ? null : input.first_visit_date || null,
-    description: wishlist ? null : input.description.trim() || null,
-    image_url: wishlist ? null : input.image_url.trim() || null,
+    wanted_by: input.status === "wishlist" ? input.wanted_by || null : null,
+    rating: lite || !input.rating ? null : Number(input.rating),
+    first_visit_date: lite ? null : input.first_visit_date || null,
+    description: lite ? null : input.description.trim() || null,
+    image_url: lite ? null : input.image_url.trim() || null,
   };
 }

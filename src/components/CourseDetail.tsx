@@ -169,6 +169,14 @@ export function CourseDetail({ id }: { id: number }) {
         .insert(rows);
       if (insErr) throw new Error(insErr.message);
 
+      // "이번 코스에만" 장소는 saveNewPlace 가 courseId 로 바로 연결하지만, 혹시 대비
+      if (input.courseOnlyPlaceIds && input.courseOnlyPlaceIds.length > 0) {
+        await supabase
+          .from("places")
+          .update({ owning_course_id: id })
+          .in("id", input.courseOnlyPlaceIds);
+      }
+
       // 임베딩 + 좌표를 다시 계산하는 게 간단해서 새로고침
       window.location.reload();
     },
@@ -281,6 +289,7 @@ export function CourseDetail({ id }: { id: number }) {
       {editing ? (
         <CourseForm
           initial={formInitial}
+          courseId={id}
           submitLabel="수정 저장"
           onSubmit={handleEdit}
           onCancel={() => setEditing(false)}
@@ -358,12 +367,19 @@ export function CourseDetail({ id }: { id: number }) {
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <Link
-                            href={`/places/${p.id}`}
-                            className="truncate font-semibold transition-colors hover:text-accent"
-                          >
-                            {p.name}
-                          </Link>
+                          {p.status === "course_only" ? (
+                            // 코스 전용 장소는 상세 페이지가 없음 (오직 이 코스 안에서만)
+                            <span className="truncate font-semibold">
+                              {p.name}
+                            </span>
+                          ) : (
+                            <Link
+                              href={`/places/${p.id}`}
+                              className="truncate font-semibold transition-colors hover:text-accent"
+                            >
+                              {p.name}
+                            </Link>
+                          )}
                           <span
                             className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${categoryStyle(
                               p.category,

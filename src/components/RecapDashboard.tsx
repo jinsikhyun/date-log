@@ -126,7 +126,8 @@ export function RecapDashboard() {
       const [pRes, mRes] = await Promise.all([
         supabase
           .from("places")
-          .select("id, name, status, image_url, added_by, first_visit_date"),
+          .select("id, name, status, image_url, added_by, first_visit_date")
+          .neq("status", "course_only"), // 코스 전용 장소는 통계에서 제외
         supabase
           .from("memories")
           .select("id, place_id, photo_urls, author, content"),

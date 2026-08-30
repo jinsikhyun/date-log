@@ -26,6 +26,8 @@ export interface CourseFormInput {
   title: string;
   concept: string;
   placeIds: number[]; // 코스 내 순서대로
+  // "이번 코스에만 추가"로 만든 장소들 — 코스 생성/저장 후 owning_course_id 를 채워야 함
+  courseOnlyPlaceIds?: number[];
 }
 
 interface PickPlace {
@@ -83,11 +85,13 @@ export function CourseForm({
   onSubmit,
   onCancel,
   initial,
+  courseId,
   submitLabel = "저장",
 }: {
   onSubmit: (input: CourseFormInput) => Promise<void>;
   onCancel: () => void;
   initial?: CourseFormInput;
+  courseId?: number; // 수정 화면이면 이 코스의 id (course_only 장소를 바로 연결)
   submitLabel?: string;
 }) {
   const { authorName } = useAuth();
@@ -113,6 +117,8 @@ export function CourseForm({
   );
   const [farExpanded, setFarExpanded] = useState(false);
   const geoCache = useRef(new Map<number, Coord | null>());
+  // "이번 코스에만 추가"로 만든 장소 중 아직 owning_course_id 가 안 채워진 것 (코스 생성 시)
+  const [courseOnlyPending, setCourseOnlyPending] = useState<number[]>([]);
 
   // "+ 새 장소 추가" 미니 폼
   const [addingNew, setAddingNew] = useState(false);
@@ -128,10 +134,13 @@ export function CourseForm({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error: qErr } = await supabase
-        .from("places")
-        .select(PICK_COLUMNS)
-        .order("name");
+      // course_only 장소는 후보에서 제외. 단 수정 중인 코스 소유의 course_only 는
+      // "코스 순서" 목록 렌더용으로 포함해야 한다.
+      let q = supabase.from("places").select(PICK_COLUMNS);
+      q = courseId
+        ? q.or(`status.neq.course_only,owning_course_id.eq.${courseId}`)
+        : q.neq("status", "course_only");
+      const { data, error: qErr } = await q.order("name");
       if (cancelled) return;
       if (qErr) {
         setError(`장소 목록을 불러오지 못했어요: ${qErr.message}`);
@@ -142,7 +151,7 @@ export function CourseForm({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [courseId]);
 
   const byId = useMemo(() => {
     const m = new Map<number, PickPlace>();
@@ -205,7 +214,10 @@ export function CourseForm({
   const selected = placeIds
     .map((id) => byId.get(id))
     .filter((p): p is PickPlace => p != null);
-  const available = allPlaces.filter((p) => !placeIds.includes(p.id));
+  // 후보 = 아직 안 담긴 장소. course_only 는 절대 후보에 안 뜬다(오직 소유 코스 안에서만).
+  const available = allPlaces.filter(
+    (p) => !placeIds.includes(p.id) && p.status !== "course_only",
+  );
 
   // 기준점 + 거리 계산이 준비됐는지
   const split = anchorId != null && !!anchorCoord && candCoords.size > 0;
@@ -272,7 +284,8 @@ export function CourseForm({
     setNError(null);
   };
 
-  const saveNewPlace = async () => {
+  /** mode: "wishlist" = 가고 싶은 곳에도 추가 / "course_only" = 이번 코스에만 */
+  const saveNewPlace = async (mode: "wishlist" | "course_only") => {
     setNError(null);
     if (!nName.trim() || !nCategory || !nAddress.trim()) {
       setNError("장소명, 카테고리, 주소를 입력해 주세요.");
@@ -282,6 +295,7 @@ export function CourseForm({
       setNError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
       return;
     }
+    const courseOnly = mode === "course_only";
     setNSaving(true);
     try {
       const { data, error: insErr } = await supabase
@@ -295,11 +309,13 @@ export function CourseForm({
               lat: nLat,
               lng: nLng,
               kakao_map_link: nKakao,
-              status: "wishlist",
+              status: courseOnly ? "course_only" : "wishlist",
               added_by: authorName,
             }),
           ),
-          via_course: true,
+          via_course: courseOnly,
+          // 수정 화면이면 코스 id 를 바로 연결, 생성 화면이면 저장 후 채운다
+          owning_course_id: courseOnly ? (courseId ?? null) : null,
         })
         .select(PICK_COLUMNS)
         .single();
@@ -310,6 +326,9 @@ export function CourseForm({
         [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
       );
       addToCourse(created.id);
+      if (courseOnly && courseId == null) {
+        setCourseOnlyPending((prev) => [...prev, created.id]);
+      }
       resetNewForm();
     } catch (err) {
       setNError(
@@ -333,7 +352,12 @@ export function CourseForm({
     }
     setSaving(true);
     try {
-      await onSubmit({ title, concept, placeIds });
+      await onSubmit({
+        title,
+        concept,
+        placeIds,
+        courseOnlyPlaceIds: courseOnlyPending,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");
     } finally {
@@ -532,8 +556,7 @@ export function CourseForm({
         {addingNew && (
           <div className="mt-1 flex flex-col gap-2 rounded-xl border border-border bg-stone-50 p-3">
             <p className="text-xs text-muted">
-              새 장소가 목록에 등록되고 이 코스에 바로 담겨요. (가고 싶은 곳
-              등록은 별도예요)
+              새 장소가 이 코스에 바로 담겨요. 저장 방식은 아래에서 골라요.
             </p>
             <div className="flex flex-col gap-1">
               <label className={labelClass} htmlFor="cf-new-name">
@@ -590,14 +613,23 @@ export function CourseForm({
             {nError && (
               <p className="text-xs font-medium text-red-600">{nError}</p>
             )}
-            <div className="flex gap-2">
+            <p className="text-[11px] text-muted">이 장소를 어떻게 저장할까요?</p>
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={saveNewPlace}
+                onClick={() => saveNewPlace("wishlist")}
                 disabled={nSaving}
                 className="rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
               >
-                {nSaving ? "저장 중…" : "장소 저장 + 코스에 추가"}
+                {nSaving ? "저장 중…" : "가고 싶은 곳에 추가"}
+              </button>
+              <button
+                type="button"
+                onClick={() => saveNewPlace("course_only")}
+                disabled={nSaving}
+                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {nSaving ? "저장 중…" : "이번 코스에만 추가"}
               </button>
               <button
                 type="button"
@@ -608,6 +640,12 @@ export function CourseForm({
                 취소
               </button>
             </div>
+            <p className="text-[11px] text-muted">
+              · <b>가고 싶은 곳</b>: /가고싶은 곳 목록에도 뜨고, 코스를 지워도
+              남아요.
+              <br />· <b>이번 코스에만</b>: 이 코스 안에서만 보이고, 코스를
+              지우면 같이 삭제돼요.
+            </p>
           </div>
         )}
       </div>

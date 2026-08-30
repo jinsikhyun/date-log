@@ -59,7 +59,8 @@ export function NearbySimilar({ place }: { place: Place }) {
         .from("places")
         .select("id, name, category, address, lat, lng")
         .eq("category", place.category)
-        .neq("id", place.id);
+        .neq("id", place.id)
+        .neq("status", "course_only"); // 코스 전용 장소는 다른 곳에 노출 안 함
 
       const rows: OurRow[] = [];
       for (const p of sameCat ?? []) {

@@ -89,6 +89,15 @@ export function CoursesView() {
       throw new Error(`코스 장소가 저장되지 않았어요. ${POLICY_HINT}`);
     }
 
+    // "이번 코스에만 추가"로 만든 장소들 — 이제 코스 id 가 있으니 연결 (코스 삭제 시 함께 삭제)
+    if (input.courseOnlyPlaceIds && input.courseOnlyPlaceIds.length > 0) {
+      const { error: linkErr } = await supabase
+        .from("places")
+        .update({ owning_course_id: course.id })
+        .in("id", input.courseOnlyPlaceIds);
+      if (linkErr) console.error("[courses] course_only 링크 실패:", linkErr);
+    }
+
     // 방금 만든 코스 상세로 이동 (임베딩/좌표는 거기서 정확히 로드)
     setShowForm(false);
     router.push(`/courses/${course.id}`);

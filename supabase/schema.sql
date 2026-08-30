@@ -43,7 +43,10 @@ alter table public.places add column if not exists lng double precision; -- 카�
 alter table public.places add column if not exists status text not null default 'visited';
 alter table public.places add column if not exists wanted_by text;
 alter table public.places drop constraint if exists places_status_check;
-alter table public.places add constraint places_status_check check (status in ('visited', 'wishlist'));
+alter table public.places add constraint places_status_check check (status in ('visited', 'wishlist', 'course_only'));
+-- 코스 전용 장소: 이 코스가 삭제되면 함께 삭제 (add-course-only-places.sql 참고)
+alter table public.places add column if not exists owning_course_id bigint references public.courses(id) on delete cascade;
+create index if not exists places_owning_course_idx on public.places (owning_course_id);
 -- wanted_by 는 이제 커플별 profiles.display_name 을 값으로 가지므로 고정 CHECK 없음
 -- (drop-wanted-by-check.sql 참고)
 alter table public.places drop constraint if exists places_wanted_by_check;
