@@ -84,13 +84,16 @@ export function ShareImagePanel({
         <p className="mt-2 text-sm font-medium text-red-600">{error}</p>
       )}
 
-      {/* 화면 밖 캡처 전용 카드 (display:none 이면 캡처 안 되므로 왼쪽 밖으로) */}
+      {/* 화면 밖 캡처 전용 카드.
+          display:none 이면 html2canvas 가 크기를 못 재므로, 렌더는 유지한 채
+          화면 밖으로만 밀어낸다. width:fit-content 로 카드 폭만큼만 차지(뷰포트 상속 방지). */}
       <div
         aria-hidden
         style={{
-          position: "fixed",
-          left: "-10000px",
-          top: 0,
+          position: "absolute",
+          left: "-9999px",
+          top: "-9999px",
+          width: "fit-content",
           pointerEvents: "none",
         }}
       >

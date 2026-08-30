@@ -3,6 +3,9 @@
 //    Tailwind 색 클래스를 안 쓰고 전부 인라인 hex 로만 스타일링한다.
 import { categoryColorName } from "@/lib/categories";
 
+/** 공유 카드 고정 폭(px). 캡처 영역이 뷰포트를 물려받지 않도록 항상 이 값으로 고정. */
+export const CARD_W = 400;
+
 export const SC = {
   cardBg: "#ffffff",
   fg: "#3c332b",

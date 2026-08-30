@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import { haversineKm, walkMinutes } from "@/lib/courses";
-import { SC, catTag } from "@/lib/shareCardStyle";
+import { SC, CARD_W, catTag } from "@/lib/shareCardStyle";
 
 export type ShareStop = {
   id: number;
@@ -27,7 +27,8 @@ export const CourseShareCard = forwardRef<
     <div
       ref={ref}
       style={{
-        width: 380,
+        width: CARD_W,
+        boxSizing: "border-box",
         fontFamily: SC.font,
         background: SC.cardBg,
         color: SC.fg,
@@ -100,6 +101,7 @@ export const CourseShareCard = forwardRef<
                 <span
                   style={{
                     flex: "1 1 auto",
+                    minWidth: 0, // flex item 이 내용만큼 안 늘어나서 카드가 넓어지는 것 방지
                     fontSize: 15,
                     fontWeight: 700,
                     overflow: "hidden",

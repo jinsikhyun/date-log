@@ -1,14 +1,14 @@
 import { forwardRef } from "react";
 import type { Place } from "@/lib/places";
 import { categoryIcon } from "@/lib/categories";
-import { SC, catTag } from "@/lib/shareCardStyle";
+import { SC, CARD_W, catTag } from "@/lib/shareCardStyle";
 
 function stars(r: number): string {
   const n = Math.max(0, Math.min(5, Math.round(r)));
   return "★".repeat(n) + "☆".repeat(5 - n);
 }
 
-/** 화면 밖에 숨겨두고 html2canvas 로 캡처하는 장소 공유 카드 (360px 폭, 세로로 약간 긴 비율) */
+/** 화면 밖에 숨겨두고 html2canvas 로 캡처하는 장소 공유 카드 (고정 폭, 세로로 약간 긴 비율) */
 export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
   function ShareCard({ place }, ref) {
     const tag = catTag(place.category);
@@ -17,7 +17,8 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
       <div
         ref={ref}
         style={{
-          width: 360,
+          width: CARD_W,
+          boxSizing: "border-box",
           fontFamily: SC.font,
           background: SC.cardBg,
           color: SC.fg,
@@ -26,33 +27,34 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
           border: `1px solid ${SC.border}`,
         }}
       >
-        {/* 대표 사진 (없으면 카테고리 아이콘) */}
+        {/* 대표 사진 (없으면 카테고리 아이콘).
+            object-fit 대신 background-size:cover — html2canvas 가 object-fit 을
+            제대로 못 그려서 사진이 눌리거나 비뚤어 보이는 것 방지. */}
         <div
           style={{
             position: "relative",
-            width: 360,
-            height: 360,
+            width: "100%",
+            height: 300,
             background: SC.accentTint,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "hidden",
           }}
         >
           {place.image_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={place.image_url}
-              crossOrigin="anonymous"
-              alt=""
+            <div
               style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
+                position: "absolute",
+                inset: 0,
+                backgroundImage: `url("${place.image_url}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
               }}
             />
           ) : (
-            <span style={{ fontSize: 130, lineHeight: 1 }}>
+            <span style={{ fontSize: 120, lineHeight: 1 }}>
               {categoryIcon(place.category)}
             </span>
           )}
