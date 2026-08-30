@@ -1,6 +1,13 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { supabase } from "@/lib/supabase/client";
 import {
   categoryStyle,
@@ -9,6 +16,8 @@ import {
   statusBadgeClass,
   statusLabel,
 } from "@/lib/places";
+import { geocode } from "@/lib/kakao";
+import { haversineKm } from "@/lib/courses";
 import { PlaceAutocompleteInput } from "@/components/PlaceAutocompleteInput";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
@@ -24,9 +33,17 @@ interface PickPlace {
   name: string;
   category: string;
   status: string; // 'visited' | 'wishlist'
+  lat: number | null;
+  lng: number | null;
+  address: string;
 }
+type Coord = { lat: number; lng: number };
+
+const NEAR_KM = 2; // "이 근처" 기준 반경
 
 const EMPTY: CourseFormInput = { title: "", concept: "", placeIds: [] };
+
+const PICK_COLUMNS = "id, name, category, status, lat, lng, address";
 
 const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
@@ -74,7 +91,7 @@ export function CourseForm({
   submitLabel?: string;
 }) {
   const { authorName } = useAuth();
-  const { categories } = useCategories();
+  const { categories, orderNames } = useCategories();
   const base = initial ?? EMPTY;
   const [title, setTitle] = useState(base.title);
   const [concept, setConcept] = useState(base.concept);
@@ -82,6 +99,20 @@ export function CourseForm({
   const [allPlaces, setAllPlaces] = useState<PickPlace[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // 기준점(첫 장소). 한 번 정해지면 이 코스를 짜는 동안 고정 — 장소를 더 넣거나
+  // 순서를 바꿔도 안 바뀜. 선택을 전부 비우면 초기화.
+  const [anchorId, setAnchorId] = useState<number | null>(
+    base.placeIds[0] ?? null,
+  );
+  const [anchorCoord, setAnchorCoord] = useState<Coord | null | undefined>(
+    undefined,
+  ); // undefined=해석 중, null=좌표 못 구함
+  const [candCoords, setCandCoords] = useState<Map<number, Coord | null>>(
+    new Map(),
+  );
+  const [farExpanded, setFarExpanded] = useState(false);
+  const geoCache = useRef(new Map<number, Coord | null>());
 
   // "+ 새 장소 추가" 미니 폼
   const [addingNew, setAddingNew] = useState(false);
@@ -97,10 +128,9 @@ export function CourseForm({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // status 무관 — 다녀온 곳 + 위시리스트 전부 후보
       const { data, error: qErr } = await supabase
         .from("places")
-        .select("id, name, category, status")
+        .select(PICK_COLUMNS)
         .order("name");
       if (cancelled) return;
       if (qErr) {
@@ -120,18 +150,114 @@ export function CourseForm({
     return m;
   }, [allPlaces]);
 
+  /** 장소 좌표: 저장된 lat/lng 우선, 없으면 주소 지오코딩 (캐시) */
+  const resolveCoord = useCallback(
+    async (p: PickPlace): Promise<Coord | null> => {
+      const cached = geoCache.current.get(p.id);
+      if (cached !== undefined) return cached;
+      let c: Coord | null = null;
+      if (p.lat != null && p.lng != null) {
+        c = { lat: p.lat, lng: p.lng };
+      } else if (p.address) {
+        try {
+          c = await geocode(p.address);
+        } catch {
+          c = null;
+        }
+      }
+      geoCache.current.set(p.id, c);
+      return c;
+    },
+    [],
+  );
+
+  // 기준점 좌표 해석
+  useEffect(() => {
+    if (anchorId == null) return;
+    const p = byId.get(anchorId);
+    if (!p) return;
+    let cancelled = false;
+    (async () => {
+      const c = await resolveCoord(p);
+      if (!cancelled) setAnchorCoord(c);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [anchorId, byId, resolveCoord]);
+
+  // 기준점이 잡히면 후보 장소들 좌표를 채워 거리 계산
+  useEffect(() => {
+    if (!anchorCoord || allPlaces.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const m = new Map<number, Coord | null>();
+      for (const p of allPlaces) {
+        m.set(p.id, await resolveCoord(p));
+      }
+      if (!cancelled) setCandCoords(m);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [anchorCoord, allPlaces, resolveCoord]);
+
   const selected = placeIds
     .map((id) => byId.get(id))
     .filter((p): p is PickPlace => p != null);
   const available = allPlaces.filter((p) => !placeIds.includes(p.id));
 
+  // 기준점 + 거리 계산이 준비됐는지
+  const split = anchorId != null && !!anchorCoord && candCoords.size > 0;
+
+  const distKm = (id: number): number | null => {
+    const c = candCoords.get(id);
+    if (!c || !anchorCoord) return null;
+    return haversineKm(anchorCoord, c);
+  };
+
+  const nearAvail = split
+    ? available.filter((p) => {
+        const d = distKm(p.id);
+        return d != null && d <= NEAR_KM;
+      })
+    : [];
+  const nearIds = new Set(nearAvail.map((p) => p.id));
+  const farAvail = split
+    ? available.filter((p) => !nearIds.has(p.id)) // 2km 초과 + 좌표 못 구한 곳
+    : [];
+
+  /** 장소 목록을 카테고리 순서대로 그룹핑 (데이터 있는 카테고리만) */
+  const groupByCat = (list: PickPlace[]) => {
+    const cats = orderNames(list.map((p) => p.category));
+    return cats
+      .map((cat) => ({ cat, items: list.filter((p) => p.category === cat) }))
+      .filter((g) => g.items.length > 0);
+  };
+
+  const addToCourse = (id: number) => {
+    setPlaceIds((ids) => [...ids, id]);
+    setAnchorId((cur) => cur ?? id); // 첫 장소면 기준점, 이미 있으면 유지
+  };
+
+  const removeFromCourse = (id: number) => {
+    const next = placeIds.filter((x) => x !== id);
+    setPlaceIds(next);
+    if (next.length === 0) {
+      setAnchorId(null);
+      setAnchorCoord(undefined);
+      setCandCoords(new Map());
+      setFarExpanded(false);
+    }
+  };
+
   const move = (from: number, to: number) => {
     if (to < 0 || to >= placeIds.length) return;
     setPlaceIds((ids) => {
-      const next = [...ids];
-      const [x] = next.splice(from, 1);
-      next.splice(to, 0, x);
-      return next;
+      const nx = [...ids];
+      const [x] = nx.splice(from, 1);
+      nx.splice(to, 0, x);
+      return nx;
     });
   };
 
@@ -169,15 +295,13 @@ export function CourseForm({
               lat: nLat,
               lng: nLng,
               kakao_map_link: nKakao,
-              // 코스 짜면서 새로 넣는 곳 = 아직 안 가본 곳 → 위시리스트로 분류
               status: "wishlist",
               added_by: authorName,
             }),
           ),
-          // 단, 큐레이션한 "가고 싶은 곳"이 아니므로 /wishlist 페이지에는 숨긴다
           via_course: true,
         })
-        .select("id, name, category, status")
+        .select(PICK_COLUMNS)
         .single();
       if (insErr) throw new Error(insErr.message);
 
@@ -185,7 +309,7 @@ export function CourseForm({
       setAllPlaces((prev) =>
         [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      setPlaceIds((ids) => [...ids, created.id]); // 코스에 바로 추가
+      addToCourse(created.id);
       resetNewForm();
     } catch (err) {
       setNError(
@@ -216,6 +340,38 @@ export function CourseForm({
       setSaving(false);
     }
   };
+
+  // 렌더 헬퍼 (중첩 컴포넌트 아님 — 매 렌더 새로 만들지 않도록 함수로 호출)
+  const pickButton = (p: PickPlace) => (
+    <button
+      key={p.id}
+      type="button"
+      onClick={() => addToCourse(p.id)}
+      className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-accent/10 hover:text-accent"
+    >
+      + {p.name}
+      <span
+        className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass(
+          p.status,
+        )}`}
+      >
+        {statusLabel(p.status)}
+      </span>
+    </button>
+  );
+
+  const categoryGroups = (list: PickPlace[]) => (
+    <div className="flex flex-col gap-3">
+      {groupByCat(list).map((g) => (
+        <div key={g.cat} className="flex flex-col gap-1.5">
+          <p className="text-[11px] font-semibold text-muted">{g.cat}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {g.items.map(pickButton)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <form
@@ -297,9 +453,7 @@ export function CourseForm({
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setPlaceIds((ids) => ids.filter((id) => id !== p.id))
-                    }
+                    onClick={() => removeFromCourse(p.id)}
                     aria-label="빼기"
                     className="rounded-md px-1.5 py-0.5 text-sm text-red-500 hover:bg-red-50"
                   >
@@ -312,28 +466,59 @@ export function CourseForm({
         )}
       </div>
 
-      {/* 추가할 장소 (다녀온 곳 + 위시리스트 전부) */}
-      <div className="flex flex-col gap-2">
+      {/* 추가할 장소 (다녀온 곳 + 위시리스트 전부, 카테고리별 그룹) */}
+      <div className="flex flex-col gap-3">
         <span className={labelClass}>장소 추가</span>
-        <div className="flex flex-wrap gap-1.5">
-          {available.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setPlaceIds((ids) => [...ids, p.id])}
-              className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-accent/10 hover:text-accent"
-            >
-              + {p.name}
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass(
-                  p.status,
-                )}`}
-              >
-                {statusLabel(p.status)}
-              </span>
-            </button>
-          ))}
-          {!addingNew && (
+
+        {anchorId != null && !split && available.length > 0 && (
+          <p className="text-[11px] text-muted">이 근처 장소 계산 중…</p>
+        )}
+
+        {split ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-bold text-foreground/80">
+                이 근처{" "}
+                <span className="font-medium text-muted">
+                  ({NEAR_KM}km 이내 · {nearAvail.length})
+                </span>
+              </p>
+              {nearAvail.length === 0 ? (
+                <p className="rounded-xl bg-stone-50 px-3 py-3 text-center text-xs text-muted">
+                  기준점 {NEAR_KM}km 안에 아직 안 담은 장소가 없어요.
+                </p>
+              ) : (
+                categoryGroups(nearAvail)
+              )}
+            </div>
+
+            {farAvail.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFarExpanded((v) => !v)}
+                  className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-accent"
+                >
+                  <span>먼 지역 장소 더보기 ({farAvail.length}개)</span>
+                  <span
+                    className={`transition-transform ${
+                      farExpanded ? "rotate-180" : ""
+                    }`}
+                  >
+                    ▾
+                  </span>
+                </button>
+                {farExpanded && categoryGroups(farAvail)}
+              </div>
+            )}
+          </>
+        ) : (
+          categoryGroups(available)
+        )}
+
+        {/* + 새 장소 추가 — 항상 맨 마지막 */}
+        {!addingNew && (
+          <div>
             <button
               type="button"
               onClick={() => setAddingNew(true)}
@@ -341,8 +526,8 @@ export function CourseForm({
             >
               + 새 장소 추가
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {addingNew && (
           <div className="mt-1 flex flex-col gap-2 rounded-xl border border-border bg-stone-50 p-3">
