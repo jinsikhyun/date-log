@@ -14,6 +14,14 @@ type OurRow = { id: number; name: string; category: string; km: number | null };
 const OUR_MAX = 3; // "우리 리스트에서" 는 2~3개만
 const OUR_WITHIN_KM = 2; // 2km 이내만
 const KAKAO_MAX = 5; // "아직 안 가본 곳 발견" 은 5개
+const KAKAO_RADIUS = 2000; // 카카오 주변 검색 반경 (m) — 1km → 2km 로 넓힘
+
+// 우리 카테고리 → 카카오 category_group_code (딱 맞는 코드가 있는 것만).
+// 나머지(술집/바/사진/전시/기타)는 코드가 없어 keywordSearch 로 fallback.
+const KAKAO_CATEGORY_CODE: Record<string, string> = {
+  맛집: "FD6", // 음식점
+  카페: "CE7", // 카페
+};
 
 /** 미터 → "350m" / "1.2km" */
 function fmtDist(m: number): string {
@@ -77,7 +85,7 @@ export function NearbySimilar({ place }: { place: Place }) {
         : rows;
       setOurNearby(near.slice(0, OUR_MAX));
 
-      // ── 2) 아직 안 가본 곳 발견 — 카카오 주변 1km 검색 (좌표 있을 때만) ──
+      // ── 2) 아직 안 가본 곳 발견 — 카카오 주변 2km 검색 (좌표 있을 때만) ──
       const basePos = base;
       const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
       if (!basePos || !appKey) {
@@ -86,31 +94,47 @@ export function NearbySimilar({ place }: { place: Place }) {
         await ensureKakaoLoaded(appKey);
         const { kakao } = window;
 
-        const { data: allNames } = await supabase.from("places").select("name");
-        const ours = new Set((allNames ?? []).map((x) => norm(x.name)));
+        // 우리 DB 에 이미 있는 곳(이름+주소)은 제외
+        const { data: mine } = await supabase
+          .from("places")
+          .select("name, address");
+        const ourNames = new Set((mine ?? []).map((x) => norm(x.name)));
+        const ourNameAddr = new Set(
+          (mine ?? []).map((x) => `${norm(x.name)}|${norm(x.address ?? "")}`),
+        );
+        const isOurs = (r: kakao.maps.services.PlacesSearchResultItem) => {
+          const n = norm(r.place_name);
+          if (ourNames.has(n)) return true;
+          const addr = norm(r.road_address_name || r.address_name || "");
+          return ourNameAddr.has(`${n}|${addr}`);
+        };
 
         const svc = new kakao.maps.services.Places();
+        const opts = {
+          location: new kakao.maps.LatLng(basePos.lat, basePos.lng),
+          radius: KAKAO_RADIUS,
+          sort: kakao.maps.services.SortBy.DISTANCE, // 현재 장소에서 가까운 순
+          size: 15,
+        } as const;
+
+        const code = KAKAO_CATEGORY_CODE[place.category];
         const results = await new Promise<
           kakao.maps.services.PlacesSearchResultItem[]
         >((resolve) => {
-          svc.keywordSearch(
-            place.category,
-            (data, status) =>
-              resolve(status === kakao.maps.services.Status.OK ? data : []),
-            {
-              location: new kakao.maps.LatLng(basePos.lat, basePos.lng),
-              radius: 1000,
-              sort: "distance",
-              size: 15,
-            },
-          );
+          const cb = (
+            data: kakao.maps.services.PlacesSearchResultItem[],
+            status: string,
+          ) => resolve(status === kakao.maps.services.Status.OK ? data : []);
+          if (code) {
+            // 맛집(FD6)/카페(CE7): 정확한 카테고리 코드로
+            svc.categorySearch(code, cb, opts);
+          } else {
+            // 그 외: 기존 키워드 방식 유지
+            svc.keywordSearch(place.category, cb, opts);
+          }
         });
 
-        setDiscovered(
-          results
-            .filter((r) => !ours.has(norm(r.place_name)))
-            .slice(0, KAKAO_MAX),
-        );
+        setDiscovered(results.filter((r) => !isOurs(r)).slice(0, KAKAO_MAX));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "추천을 불러오지 못했어요.");

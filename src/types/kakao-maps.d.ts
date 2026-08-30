@@ -107,6 +107,11 @@ declare global {
         ERROR: "ERROR";
       };
 
+      const SortBy: {
+        ACCURACY: "accuracy";
+        DISTANCE: "distance";
+      };
+
       interface AddressSearchResult {
         x: string; // 경도(lng)
         y: string; // 위도(lat)
@@ -147,6 +152,16 @@ declare global {
       class Places {
         keywordSearch(
           keyword: string,
+          callback: (
+            data: PlacesSearchResultItem[],
+            status: string,
+            pagination: unknown,
+          ) => void,
+          options?: PlacesSearchOptions,
+        ): void;
+        // 카테고리 그룹 코드(FD6 음식점 / CE7 카페 등)로 장소 검색
+        categorySearch(
+          code: string,
           callback: (
             data: PlacesSearchResultItem[],
             status: string,
