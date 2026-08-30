@@ -5,6 +5,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { categoryStyle } from "@/lib/places";
 import { PhotoThumbnails } from "@/components/PhotoThumbnails";
+import { Reactions } from "@/components/Reactions";
+import { type Reaction, REACTION_COLUMNS } from "@/lib/reactions";
 import {
   type MemoryWithPlace,
   MEMORY_WITH_PLACE_COLUMNS,
@@ -15,6 +17,7 @@ const dot = (d: string | null) => (d ? d.split("-").join(".") : "날짜 미정")
 
 export function MemoriesFeed() {
   const [memories, setMemories] = useState<MemoryWithPlace[]>([]);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,9 +37,21 @@ export function MemoriesFeed() {
         console.error("[memories] 모아보기 조회 실패:", qErr);
         setError(`추억을 불러오지 못했어요: ${qErr.message}`);
       } else {
-        setMemories(
-          ((data ?? []) as unknown as MemoryWithPlace[]).slice().sort(byDateDesc),
-        );
+        const list = ((data ?? []) as unknown as MemoryWithPlace[])
+          .slice()
+          .sort(byDateDesc);
+        setMemories(list);
+
+        // 추억 카드에 달린 이모지 반응
+        const memIds = list.map((m) => m.id);
+        if (memIds.length > 0) {
+          const { data: rx } = await supabase
+            .from("reactions")
+            .select(REACTION_COLUMNS)
+            .eq("target_type", "memory")
+            .in("target_id", memIds);
+          if (!cancelled) setReactions((rx ?? []) as Reaction[]);
+        }
       }
       setLoading(false);
     })();
@@ -148,6 +163,14 @@ export function MemoriesFeed() {
                     💬 답글 {replyCount}개
                   </p>
                 )}
+
+                <div className="relative">
+                  <Reactions
+                    targetType="memory"
+                    targetId={m.id}
+                    initial={reactions.filter((r) => r.target_id === m.id)}
+                  />
+                </div>
               </figure>
             );
 

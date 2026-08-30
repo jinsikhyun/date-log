@@ -21,6 +21,8 @@ import { StarRating } from "@/components/StarRating";
 import { AddMemoryForm, type NewMemoryInput } from "@/components/AddMemoryForm";
 import { PhotoThumbnails } from "@/components/PhotoThumbnails";
 import { MemoryReplies } from "@/components/MemoryReplies";
+import { Reactions } from "@/components/Reactions";
+import { type Reaction, REACTION_COLUMNS } from "@/lib/reactions";
 import { NearbySimilar } from "@/components/NearbySimilar";
 import { DirectionsButton } from "@/components/DirectionsButton";
 import {
@@ -62,6 +64,7 @@ export function PlaceDetail({ id }: { id: number }) {
   const [repliesByMemory, setRepliesByMemory] = useState<
     Record<number, MemoryReply[]>
   >({});
+  const [reactions, setReactions] = useState<Reaction[]>([]);
 
   useEffect(() => {
     if (!Number.isFinite(id)) {
@@ -108,6 +111,19 @@ export function PlaceDetail({ id }: { id: number }) {
         });
         setMemories(mems.sort(byDateAsc));
         setRepliesByMemory(byMem);
+
+        // 추억 + 답글에 달린 이모지 반응 한 번에 로드
+        const targetIds = [
+          ...mems.map((m) => m.id),
+          ...Object.values(byMem).flat().map((r) => r.id),
+        ];
+        if (targetIds.length > 0) {
+          const { data: rx } = await supabase
+            .from("reactions")
+            .select(REACTION_COLUMNS)
+            .in("target_id", targetIds);
+          if (!cancelled) setReactions((rx ?? []) as Reaction[]);
+        }
       }
       setLoading(false);
     })();
@@ -479,9 +495,20 @@ export function PlaceDetail({ id }: { id: number }) {
                       </p>
                     )}
                     <PhotoThumbnails urls={m.photo_urls} className="mt-3" />
+                    <Reactions
+                      targetType="memory"
+                      targetId={m.id}
+                      initial={reactions.filter(
+                        (r) =>
+                          r.target_type === "memory" && r.target_id === m.id,
+                      )}
+                    />
                     <MemoryReplies
                       memoryId={m.id}
                       initialReplies={repliesByMemory[m.id] ?? []}
+                      initialReactions={reactions.filter(
+                        (r) => r.target_type === "reply",
+                      )}
                     />
                   </article>
                 )}

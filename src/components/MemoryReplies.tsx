@@ -3,15 +3,19 @@
 import { type FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { type MemoryReply, MEMORY_REPLY_COLUMNS } from "@/lib/memories";
+import { type Reaction } from "@/lib/reactions";
 import { useAuth } from "@/components/AuthProvider";
+import { Reactions } from "@/components/Reactions";
 
 /** 추억 카드 하단의 채팅 말풍선 답장 — 목록 + 입력 + 삭제를 자체 관리 */
 export function MemoryReplies({
   memoryId,
   initialReplies,
+  initialReactions = [],
 }: {
   memoryId: number;
   initialReplies: MemoryReply[];
+  initialReactions?: Reaction[];
 }) {
   const { authorName: me } = useAuth();
   const [replies, setReplies] = useState<MemoryReply[]>(initialReplies);
@@ -71,7 +75,9 @@ export function MemoryReplies({
             return (
               <li
                 key={rep.id}
-                className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                className={`flex flex-col ${
+                  mine ? "items-end" : "items-start"
+                }`}
               >
                 <div
                   className={`group flex max-w-[80%] items-end gap-1 rounded-2xl px-3 py-1.5 text-sm ${
@@ -101,6 +107,13 @@ export function MemoryReplies({
                     </button>
                   )}
                 </div>
+                <Reactions
+                  targetType="reply"
+                  targetId={rep.id}
+                  initial={initialReactions.filter(
+                    (r) => r.target_id === rep.id,
+                  )}
+                />
               </li>
             );
           })}

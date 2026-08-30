@@ -265,3 +265,16 @@ create table if not exists public.notifications (
 create index if not exists notifications_recipient_idx
   on public.notifications (recipient_id, is_read, created_at desc);
 -- places/memories/memory_replies 에 AFTER INSERT 트리거(notify_partner) → 파트너에게 알림.
+
+-- ── 이모지 반응 (reactions) ─────────────────────────────────
+-- 테이블만 여기 두고, 헬퍼 함수/RLS 전체는 supabase/add-reactions.sql 참고.
+create table if not exists public.reactions (
+  id          bigint generated always as identity primary key,
+  target_type text  not null check (target_type in ('memory', 'reply')),
+  target_id   bigint not null,
+  profile_id  uuid  not null references public.profiles(id) on delete cascade,
+  emoji       text  not null,
+  created_at  timestamptz not null default now(),
+  constraint reactions_one_per_target unique (target_type, target_id, profile_id)
+);
+create index if not exists reactions_target_idx on public.reactions (target_type, target_id);
