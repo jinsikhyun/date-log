@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { geocode } from "@/lib/kakao";
+import { geocode, kakaoDirectionsFromTo } from "@/lib/kakao";
 import { categoryStyle, statusBadgeClass, statusLabel } from "@/lib/places";
 import {
   type CourseWithStops,
@@ -27,10 +27,14 @@ function Connector({
   a,
   b,
   loading,
+  fromName,
+  toName,
 }: {
   a: Coord | null;
   b: Coord | null;
   loading: boolean;
+  fromName: string;
+  toName: string;
 }) {
   if (loading) {
     return <div className="py-1.5 pl-4 text-xs text-muted">↓ 계산 중…</div>;
@@ -49,6 +53,17 @@ function Connector({
       <span>
         직선거리 {km.toFixed(km < 1 ? 2 : 1)}km · 도보 약 {walkMinutes(km)}분
       </span>
+      <a
+        href={kakaoDirectionsFromTo(
+          { name: fromName, lat: a.lat, lng: a.lng },
+          { name: toName, lat: b.lat, lng: b.lng },
+        )}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-full bg-stone-100 px-2 py-0.5 font-medium text-stone-600 transition-colors hover:bg-stone-200"
+      >
+        길찾기
+      </a>
     </div>
   );
 }
@@ -355,6 +370,8 @@ export function CourseDetail({ id }: { id: number }) {
                         a={coords.get(p.id) ?? null}
                         b={coords.get(stops[i + 1].places!.id) ?? null}
                         loading={coordsLoading}
+                        fromName={p.name}
+                        toName={stops[i + 1].places!.name}
                       />
                     )}
                   </Fragment>

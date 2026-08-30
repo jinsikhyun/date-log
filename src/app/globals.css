@@ -26,3 +26,14 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* /recap 레이스 러너 바운스 */
+@keyframes recap-runner-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}

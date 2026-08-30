@@ -133,11 +133,15 @@ declare global {
         x: string; // 경도(lng)
         y: string; // 위도(lat)
         place_url: string;
+        distance?: string; // location 옵션을 준 경우 미터 단위 거리
       }
 
       interface PlacesSearchOptions {
         size?: number; // 1~15
         page?: number;
+        location?: LatLng; // 이 좌표 기준 검색
+        radius?: number; // location 과 함께, 미터 (최대 20000)
+        sort?: "accuracy" | "distance";
       }
 
       class Places {

@@ -20,6 +20,7 @@ create table if not exists public.places (
   address          text    not null,
   naver_map_link   text,
   kakao_map_link   text,                             -- 카카오 place_url 또는 장소명 검색 링크
+  via_course       boolean not null default false,   -- 코스 미니폼으로 생성 → /wishlist 에는 숨김
   rating           numeric(2,1),
   first_visit_date date,
   description      text,
@@ -47,6 +48,7 @@ alter table public.places add constraint places_wanted_by_check
   check (wanted_by is null or wanted_by in ('나', '여자친구', '둘다'));
 alter table public.places add column if not exists added_by text;
 alter table public.places add column if not exists kakao_map_link text;
+alter table public.places add column if not exists via_course boolean not null default false;
 update public.places set status = 'visited' where status is null or status = '';
 update public.places set added_by = '진식' where added_by is null;
 update public.places

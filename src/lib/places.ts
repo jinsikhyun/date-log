@@ -11,6 +11,7 @@ export interface Place {
   address: string;
   naver_map_link: string | null;
   kakao_map_link: string | null; // 카카오 place_url 또는 장소명 검색 링크
+  via_course: boolean; // 코스 미니폼으로 생성됨 → status='wishlist' 여도 /wishlist 에는 숨김
   rating: number | null;
   first_visit_date: string | null; // 'YYYY-MM-DD'
   description: string | null;

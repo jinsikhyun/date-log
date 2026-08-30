@@ -161,8 +161,8 @@ export function CourseForm({
     try {
       const { data, error: insErr } = await supabase
         .from("places")
-        .insert(
-          placeInputToRow(
+        .insert({
+          ...placeInputToRow(
             blankRow({
               name: nName,
               category: nCategory,
@@ -170,12 +170,14 @@ export function CourseForm({
               lat: nLat,
               lng: nLng,
               kakao_map_link: nKakao,
-              // 일반 장소로 생성 (위시리스트에 자동 등록하지 않음 — 별도 관리)
-              status: "visited",
+              // 코스 짜면서 새로 넣는 곳 = 아직 안 가본 곳 → 위시리스트로 분류
+              status: "wishlist",
               added_by: user,
             }),
           ),
-        )
+          // 단, 큐레이션한 "가고 싶은 곳"이 아니므로 /wishlist 페이지에는 숨긴다
+          via_course: true,
+        })
         .select("id, name, category, status")
         .single();
       if (insErr) throw new Error(insErr.message);

@@ -17,7 +17,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "Supabase 정책(supabase/policies_open_write.sql) 적용 여부를 확인해 주세요.";
@@ -37,6 +37,7 @@ export function WishlistView() {
         .from("places")
         .select(PLACE_COLUMNS)
         .eq("status", "wishlist")
+        .eq("via_course", false) // 코스 미니폼으로 만든 곳은 여기 안 보임
         .order("created_at", { ascending: false });
       if (cancelled) return;
       if (error) {

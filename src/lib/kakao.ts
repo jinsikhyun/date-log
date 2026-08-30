@@ -130,3 +130,25 @@ export async function geocode(
   }
   return null;
 }
+
+// ── 카카오맵 길찾기 URL (경로 계산은 카카오맵이, 우리는 링크만) ──
+// 카카오 지도 Web API "길찾기 URL 만들기": /link/to/{이름},{lat},{lng}
+//                                    /link/from/{이름},{lat},{lng}/to/{이름},{lat},{lng}
+
+interface DirPoint {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+const seg = (p: DirPoint) => `${encodeURIComponent(p.name)},${p.lat},${p.lng}`;
+
+/** 목적지만 지정 (출발지는 카카오맵이 현재 위치를 물어봄) */
+export function kakaoDirectionsTo(dest: DirPoint): string {
+  return `https://map.kakao.com/link/to/${seg(dest)}`;
+}
+
+/** 출발 → 도착 길찾기 */
+export function kakaoDirectionsFromTo(from: DirPoint, to: DirPoint): string {
+  return `https://map.kakao.com/link/from/${seg(from)}/to/${seg(to)}`;
+}

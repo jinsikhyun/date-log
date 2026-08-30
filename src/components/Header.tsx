@@ -62,6 +62,9 @@ export function Header() {
           >
             추억
           </Link>
+          <Link href="/recap" className={tabClass(pathname === "/recap")}>
+            우리의 기록
+          </Link>
         </nav>
       </div>
     </header>

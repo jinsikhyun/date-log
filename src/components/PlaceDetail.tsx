@@ -21,6 +21,8 @@ import { StarRating } from "@/components/StarRating";
 import { AddMemoryForm, type NewMemoryInput } from "@/components/AddMemoryForm";
 import { PhotoThumbnails } from "@/components/PhotoThumbnails";
 import { MemoryReplies } from "@/components/MemoryReplies";
+import { NearbySimilar } from "@/components/NearbySimilar";
+import { DirectionsButton } from "@/components/DirectionsButton";
 import {
   AddPlaceForm,
   placeFormInput,
@@ -28,7 +30,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "Supabase 정책(supabase/policies_open_write.sql) 적용 여부를 확인해 주세요.";
@@ -386,6 +388,13 @@ export function PlaceDetail({ id }: { id: number }) {
               >
                 구글지도에서 보기
               </a>
+              <DirectionsButton
+                name={place.name}
+                lat={place.lat}
+                lng={place.lng}
+                address={place.address}
+                className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              />
             </div>
           </div>
         </header>
@@ -481,6 +490,8 @@ export function PlaceDetail({ id }: { id: number }) {
           </ol>
         ) : null}
       </section>
+
+      <NearbySimilar place={place} />
     </div>
   );
 }
