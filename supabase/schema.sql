@@ -250,3 +250,18 @@ alter table public.profiles disable row level security;
 -- 전체 내용은 supabase/add-couple-start-date.sql 참고.
 -- create policy "couples: update own" on public.couples for update to authenticated
 --   using (id = public.my_couple_id()) with check (id = public.my_couple_id());
+
+-- ── 우편함 알림 (notifications) ──────────────────────────────
+-- 테이블만 여기 두고, 트리거/함수/RLS 전체는 supabase/add-notifications.sql 참고.
+create table if not exists public.notifications (
+  id           bigint generated always as identity primary key,
+  couple_id    uuid not null references public.couples(id)  on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  message      text not null,
+  related_link text,
+  is_read      boolean not null default false,
+  created_at   timestamptz not null default now()
+);
+create index if not exists notifications_recipient_idx
+  on public.notifications (recipient_id, is_read, created_at desc);
+-- places/memories/memory_replies 에 AFTER INSERT 트리거(notify_partner) → 파트너에게 알림.

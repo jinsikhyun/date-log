@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
+import { NotificationBell } from "@/components/NotificationBell";
 import { withConjunctionParticle, withSubjectParticle } from "@/lib/korean";
 
 const tabClass = (active: boolean) =>
@@ -208,11 +209,14 @@ export function Header() {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {authReady &&
               (authUser ? (
-                <AccountMenu
-                  meLabel={displayName || authUser.email || "나"}
-                  partnerName={partnerName}
-                  onSignOut={() => void signOut()}
-                />
+                <>
+                  <NotificationBell />
+                  <AccountMenu
+                    meLabel={displayName || authUser.email || "나"}
+                    partnerName={partnerName}
+                    onSignOut={() => void signOut()}
+                  />
+                </>
               ) : (
                 <Link
                   href="/login"
