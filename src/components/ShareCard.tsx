@@ -8,7 +8,12 @@ function stars(r: number): string {
   return "★".repeat(n) + "☆".repeat(5 - n);
 }
 
-/** 화면 밖에 숨겨두고 html2canvas 로 캡처하는 장소 공유 카드 (고정 폭, 세로로 약간 긴 비율) */
+/**
+ * 화면 밖에 숨겨두고 html2canvas 로 캡처하는 장소 공유 카드.
+ * ⚠️ html2canvas 는 flexbox / absolute overlay / object-fit 처리가 부실하다.
+ *    → 레이아웃은 block + inline-block(vertical-align) 로만, 사진은 background-size:cover,
+ *      카테고리 태그는 사진 위 오버레이가 아니라 본문 안 일반 흐름에 둔다.
+ */
 export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
   function ShareCard({ place }, ref) {
     const tag = catTag(place.category);
@@ -27,18 +32,13 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
           border: `1px solid ${SC.border}`,
         }}
       >
-        {/* 대표 사진 (없으면 카테고리 아이콘).
-            object-fit 대신 background-size:cover — html2canvas 가 object-fit 을
-            제대로 못 그려서 사진이 눌리거나 비뚤어 보이는 것 방지. */}
+        {/* 대표 사진 (없으면 카테고리 아이콘) */}
         <div
           style={{
             position: "relative",
             width: "100%",
             height: 300,
             background: SC.accentTint,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             overflow: "hidden",
           }}
         >
@@ -54,41 +54,62 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
               }}
             />
           ) : (
-            <span style={{ fontSize: 120, lineHeight: 1 }}>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                textAlign: "center",
+                fontSize: 120,
+                lineHeight: "300px",
+              }}
+            >
               {categoryIcon(place.category)}
-            </span>
+            </div>
           )}
+        </div>
 
+        {/* 본문 */}
+        <div style={{ padding: "18px 22px 14px" }}>
           <span
             style={{
-              position: "absolute",
-              left: 16,
-              top: 16,
+              display: "inline-block",
               background: tag.bg,
               color: tag.fg,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
-              padding: "5px 12px",
+              padding: "4px 11px",
               borderRadius: 999,
+              whiteSpace: "nowrap",
             }}
           >
             {place.category}
           </span>
-        </div>
 
-        {/* 본문 */}
-        <div style={{ padding: "20px 22px 14px" }}>
-          <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.25 }}>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 23,
+              fontWeight: 800,
+              lineHeight: 1.3,
+            }}
+          >
             {place.name}
           </div>
-          <div style={{ marginTop: 7, fontSize: 13, color: SC.muted }}>
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              color: SC.muted,
+              lineHeight: 1.5,
+            }}
+          >
             {place.address}
           </div>
 
           {place.rating != null && (
             <div
               style={{
-                marginTop: 13,
+                marginTop: 12,
                 fontSize: 16,
                 color: SC.accent,
                 letterSpacing: 2,
@@ -105,7 +126,7 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
           {place.description && (
             <div
               style={{
-                marginTop: 13,
+                marginTop: 12,
                 fontSize: 14,
                 lineHeight: 1.6,
                 color: SC.fgSoft,
@@ -117,21 +138,16 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
         </div>
 
         {/* 워터마크 */}
-        <div
-          style={{
-            padding: "0 22px 18px",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
+        <div style={{ padding: "0 22px 18px" }}>
           <span
             style={{
+              display: "inline-block",
               width: 6,
               height: 6,
               borderRadius: 999,
               background: SC.accent,
-              display: "inline-block",
+              verticalAlign: "middle",
+              marginRight: 6,
             }}
           />
           <span
@@ -140,6 +156,7 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
               fontWeight: 800,
               letterSpacing: 0.3,
               color: SC.muted,
+              verticalAlign: "middle",
             }}
           >
             date.log
