@@ -412,12 +412,11 @@ export function PlaceDetail({ id }: { id: number }) {
                 address={place.address}
                 className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white transition-opacity hover:opacity-90"
               />
+              <SharePlaceButton place={place} />
             </div>
           </div>
         </header>
       )}
-
-      {!editing && <SharePlaceButton place={place} />}
 
       {/* 우리의 추억 */}
       <section className="space-y-5">

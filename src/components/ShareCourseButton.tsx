@@ -1,7 +1,7 @@
 "use client";
 
 import { CourseShareCard, type ShareStop } from "@/components/CourseShareCard";
-import { ShareImagePanel } from "@/components/ShareImagePanel";
+import { ShareImageModal } from "@/components/ShareImageModal";
 
 type Coord = { lat: number; lng: number };
 
@@ -21,7 +21,7 @@ export function ShareCourseButton({
     .replace(/\s+/g, "-")}.png`;
 
   return (
-    <ShareImagePanel
+    <ShareImageModal
       filename={filename}
       shareTitle={title}
       renderCard={(ref) => (

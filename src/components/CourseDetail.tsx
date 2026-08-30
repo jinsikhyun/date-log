@@ -287,7 +287,23 @@ export function CourseDetail({ id }: { id: number }) {
         />
       ) : (
         <header className="rounded-3xl bg-card p-6 ring-1 ring-border/70 sm:p-8">
-          <h1 className="text-2xl font-bold">{course.title}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-bold">{course.title}</h1>
+            {stops.length > 0 && (
+              <div className="shrink-0 pt-1">
+                <ShareCourseButton
+                  title={course.title}
+                  concept={course.concept}
+                  stops={stops.map((s) => ({
+                    id: s.places!.id,
+                    name: s.places!.name,
+                    category: s.places!.category,
+                  }))}
+                  coords={coords}
+                />
+              </div>
+            )}
+          </div>
           {course.concept && (
             <p className="mt-2 text-sm leading-relaxed text-foreground/80">
               {course.concept}
@@ -295,19 +311,6 @@ export function CourseDetail({ id }: { id: number }) {
           )}
           <p className="mt-3 text-xs text-muted">장소 {stops.length}곳</p>
         </header>
-      )}
-
-      {!editing && stops.length > 0 && (
-        <ShareCourseButton
-          title={course.title}
-          concept={course.concept}
-          stops={stops.map((s) => ({
-            id: s.places!.id,
-            name: s.places!.name,
-            category: s.places!.category,
-          }))}
-          coords={coords}
-        />
       )}
 
       {!editing && (

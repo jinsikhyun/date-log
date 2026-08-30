@@ -2,7 +2,7 @@
 
 import type { Place } from "@/lib/places";
 import { ShareCard } from "@/components/ShareCard";
-import { ShareImagePanel } from "@/components/ShareImagePanel";
+import { ShareImageModal } from "@/components/ShareImageModal";
 
 export function SharePlaceButton({ place }: { place: Place }) {
   const filename = `datelog-${(place.name || "place")
@@ -10,7 +10,7 @@ export function SharePlaceButton({ place }: { place: Place }) {
     .replace(/\s+/g, "-")}.png`;
 
   return (
-    <ShareImagePanel
+    <ShareImageModal
       filename={filename}
       shareTitle={place.name}
       renderCard={(ref) => <ShareCard ref={ref} place={place} />}
