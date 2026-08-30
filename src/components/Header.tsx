@@ -53,7 +53,7 @@ export function Header() {
   const partnerName = partner?.display_name?.trim() || null;
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-5 sm:px-8">
         <div className="flex items-baseline gap-3">
           <Link

@@ -8,7 +8,10 @@ export function PlaceCard({ place }: { place: Place }) {
     : null;
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10">
+    <article className="group relative isolate flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10">
+      {/* isolate: 카드 내부 z-10/z-20 이 카드 안에서만 겹치도록 stacking context 를 가둔다.
+          (안 그러면 z-20 배지 줄이 sticky 헤더(z-20)와 같은 층이라, 스크롤 시
+           카드가 헤더 밑을 지날 때 배지만 헤더 위로 삐져나와 보인다) */}
       {/* 카드 전체를 상세 페이지 링크로 (네이버지도 링크는 위에 z-20 로 띄움) */}
       <Link
         href={`/places/${place.id}`}

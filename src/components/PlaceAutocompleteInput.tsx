@@ -114,7 +114,7 @@ export function PlaceAutocompleteInput({
         </span>
       )}
       {open && suggestions.length > 0 && (
-        <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-auto rounded-xl border border-border bg-white py-1 shadow-lg">
+        <ul className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-auto rounded-xl border border-border bg-white py-1 shadow-lg">
           {suggestions.map((s) => (
             <li key={s.id}>
               <button
