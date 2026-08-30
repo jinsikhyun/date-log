@@ -11,6 +11,10 @@ export function SettingsView() {
   const { user, profile, ready } = useAuth();
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [partner, setPartner] = useState<
+    { display_name: string | null; email: string | null } | null
+  >(null);
+  const [partnerLoading, setPartnerLoading] = useState(true);
 
   // 관계 시작일
   const [startDate, setStartDate] = useState(""); // <input type="date"> 값 ("" = 미설정)
@@ -43,6 +47,29 @@ export function SettingsView() {
         setStartDate(sd ?? "");
         setLoading(false);
       });
+
+    // 파트너 = 같은 커플의 나 아닌 프로필 (혹시 여러 개여도 첫 명만)
+    supabase
+      .from("profiles")
+      .select("display_name, email")
+      .eq("couple_id", profile.couple_id)
+      .neq("id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const row = data?.[0];
+        setPartner(
+          row
+            ? {
+                display_name: (row.display_name as string | null) ?? null,
+                email: (row.email as string | null) ?? null,
+              }
+            : null,
+        );
+        setPartnerLoading(false);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -162,6 +189,24 @@ export function SettingsView() {
           {profile.display_name ?? "(이름 없음)"}
           <span className="ml-2 text-muted">{user.email}</span>
         </p>
+      </div>
+
+      <div className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
+        <p className="text-xs font-medium text-muted">파트너 계정</p>
+        {partnerLoading ? (
+          <p className="mt-2 text-sm text-muted">불러오는 중…</p>
+        ) : partner ? (
+          <p className="mt-2 text-sm">
+            {partner.display_name ?? "(이름 없음)"}
+            <span className="ml-2 text-muted">
+              {partner.email ?? "(이메일 없음)"}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            아직 파트너가 합류하지 않았어요. 위 초대코드를 공유해 보세요.
+          </p>
+        )}
       </div>
     </div>
   );

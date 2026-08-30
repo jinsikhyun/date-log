@@ -210,9 +210,13 @@ alter table public.couples add column if not exists start_date date;
 create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   display_name text,
+  email        text, -- 가입 이메일 (설정 페이지 "파트너 계정" 표시용)
   couple_id    uuid references public.couples(id) on delete set null,
   created_at   timestamptz not null default now()
 );
+alter table public.profiles add column if not exists email text;
+update public.profiles p set email = u.email
+  from auth.users u where u.id = p.id and (p.email is null or p.email = '');
 
 alter table public.places         add column if not exists couple_id uuid references public.couples(id);
 alter table public.memories       add column if not exists couple_id uuid references public.couples(id);

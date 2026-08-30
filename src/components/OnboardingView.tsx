@@ -24,11 +24,12 @@ async function upsertMyProfile(
   userId: string,
   displayName: string,
   coupleId: string,
+  email: string | null,
 ) {
   const { error } = await supabase
     .from("profiles")
     .upsert(
-      { id: userId, display_name: displayName, couple_id: coupleId },
+      { id: userId, display_name: displayName, couple_id: coupleId, email },
       { onConflict: "id" },
     );
   if (error) throw new Error(error.message);
@@ -110,7 +111,7 @@ export function OnboardingView() {
       }
       if (!couple) throw new Error("초대코드 생성에 실패했어요. 다시 시도해 주세요.");
 
-      await upsertMyProfile(user.id, createName.trim(), couple.id);
+      await upsertMyProfile(user.id, createName.trim(), couple.id, user.email ?? null);
       await refreshProfile();
       setCreatedCode(couple.invite_code);
     } catch (err) {
@@ -140,7 +141,7 @@ export function OnboardingView() {
         setJoining(false);
         return;
       }
-      await upsertMyProfile(user.id, joinName.trim(), couple.id);
+      await upsertMyProfile(user.id, joinName.trim(), couple.id, user.email ?? null);
       await refreshProfile();
       // 하드 이동: proxy 가 새 프로필(커플 연결됨)로 다시 판단하도록
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
