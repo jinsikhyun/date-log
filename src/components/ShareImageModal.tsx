@@ -62,19 +62,26 @@ export function ShareImageModal({
     useShareImage(cardRef, filename, shareTitle);
   const [open, setOpen] = useState(false);
 
+  // reset() 은 "닫을 때"만 호출한다. openModal 에서 부르면 openModal 이
+  // (드물게) 한 틱에 두 번 불릴 때 capturingRef 가 초기화돼 캡처가 두 번 돈다.
   const openModal = () => {
-    if (open) return; // 이미 열려 있으면 무시 (중복 캡처 방지)
-    reset(); // 이전 미리보기 정리 후 새로 캡처
+    if (open) return;
     setOpen(true);
-    void capture();
+    void capture(); // 내부 capturingRef 가드가 한 틱 이중호출도 막는다
   };
-  const closeModal = () => setOpen(false);
+  const closeModal = () => {
+    setOpen(false);
+    reset();
+  };
 
   // Esc 닫기 + body 스크롤 잠금
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        reset();
+      }
     };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
@@ -83,7 +90,7 @@ export function ShareImageModal({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open]);
+  }, [open, reset]);
 
   return (
     <>
