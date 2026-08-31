@@ -66,7 +66,7 @@ export function PlaceTagBadges({
           className={`flex items-center rounded-full font-bold text-amber-600 shadow-sm ${pill}`}
         >
           <CrownMini className={icon} />
-          우리 단골
+          단골
         </span>
       )}
       {names.map((name, i) => (

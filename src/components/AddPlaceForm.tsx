@@ -444,7 +444,7 @@ export function AddPlaceForm({
                 : "bg-white text-stone-500 ring-border hover:text-amber-600"
             }`}
           >
-            우리 단골
+            단골
           </button>
         </div>
       </div>
