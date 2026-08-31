@@ -27,6 +27,7 @@ import { NearbySimilar } from "@/components/NearbySimilar";
 import { SharePlaceButton } from "@/components/SharePlaceButton";
 import { DirectionsButton } from "@/components/DirectionsButton";
 import { PlaceTagBadges } from "@/components/PlaceTagBadges";
+import { Lightbox } from "@/components/Lightbox";
 import {
   AddPlaceForm,
   placeFormInput,
@@ -67,6 +68,7 @@ export function PlaceDetail({ id }: { id: number }) {
     Record<number, MemoryReply[]>
   >({});
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(id)) {
@@ -348,12 +350,19 @@ export function PlaceDetail({ id }: { id: number }) {
         <header className="overflow-hidden rounded-3xl bg-card ring-1 ring-border/70">
           <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
             {place.image_url && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={place.image_url}
-                alt={place.name}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => setPhotoOpen(true)}
+                aria-label="대표 사진 크게 보기"
+                className="group absolute inset-0 block cursor-zoom-in"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={place.image_url}
+                  alt={place.name}
+                  className="h-full w-full object-cover transition duration-200 group-hover:brightness-90"
+                />
+              </button>
             )}
             <span
               className={`absolute left-5 top-5 z-[1] rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
@@ -367,6 +376,12 @@ export function PlaceDetail({ id }: { id: number }) {
               isRegular={place.is_regular}
               size="md"
             />
+            {photoOpen && place.image_url && (
+              <Lightbox
+                urls={[place.image_url]}
+                onClose={() => setPhotoOpen(false)}
+              />
+            )}
           </div>
           <div className="flex flex-col gap-3 p-6 sm:p-8">
             <h1 className="text-2xl font-bold">{place.name}</h1>
