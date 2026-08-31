@@ -32,6 +32,18 @@ export function addedByLabel(name: string | null): string | null {
   return name ? `${withSubjectParticle(name)} 추가함` : null;
 }
 
+/** 장소명 + 주소의 구/동 정도로 네이버 "이미지" 탭 검색 URL */
+export function naverImageSearchUrl(name: string, address: string): string {
+  const region = (address || "")
+    .split(/\s+/)
+    .filter((t) => /(구|동|읍|면)$/.test(t))
+    .slice(0, 2);
+  const q = [name, ...region].filter(Boolean).join(" ");
+  return `https://search.naver.com/search.naver?where=image&query=${encodeURIComponent(
+    q,
+  )}`;
+}
+
 // 위시리스트 "누가 가고 싶어해요?" 선택지는 이제 커플 profiles 에서 실시간으로
 // 불러온다 (AuthProvider.coupleMembers + "둘다"). 하드코딩 목록은 제거됨.
 

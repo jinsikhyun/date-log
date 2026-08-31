@@ -1,39 +1,72 @@
 import Link from "next/link";
 import { type Place, addedByLabel, categoryStyle } from "@/lib/places";
 import { StarRating } from "@/components/StarRating";
+import { CategoryIconTile } from "@/components/CategoryIconTile";
 
 export function PlaceCard({ place }: { place: Place }) {
   const visited = place.first_visit_date
     ? place.first_visit_date.split("-").join(".")
     : null;
 
+  // ── 사진 없는 카드: 컴팩트한 가로형 (아이콘 타일 → 네이버 이미지 검색) ──
+  if (!place.image_url) {
+    return (
+      <article className="group relative isolate flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border/70 transition duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-accent/10">
+        <Link
+          href={`/places/${place.id}`}
+          className="absolute inset-0 z-10"
+          aria-label={`${place.name} 상세 보기`}
+        />
+
+        <CategoryIconTile
+          category={place.category}
+          name={place.name}
+          address={place.address}
+        />
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span
+            className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryStyle(
+              place.category,
+            )}`}
+          >
+            {place.category}
+          </span>
+          <h2 className="truncate text-base font-bold leading-snug">
+            {place.name}
+          </h2>
+          <p className="truncate text-xs text-muted">{place.address}</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <StarRating rating={place.rating} />
+            {place.memory_count > 0 && (
+              <span className="text-[11px] font-semibold text-accent">
+                추억 {place.memory_count}개
+              </span>
+            )}
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  // ── 사진 있는 카드: 기존 세로형 (사진 위, 정보 아래) ──
   return (
     <article className="group relative isolate flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10">
-      {/* isolate: 카드 내부 z-10/z-20 이 카드 안에서만 겹치도록 stacking context 를 가둔다.
-          (안 그러면 z-20 배지 줄이 sticky 헤더(z-20)와 같은 층이라, 스크롤 시
-           카드가 헤더 밑을 지날 때 배지만 헤더 위로 삐져나와 보인다) */}
-      {/* 카드 전체를 상세 페이지 링크로 (네이버지도 링크는 위에 z-20 로 띄움) */}
+      {/* isolate: 카드 내부 z-10/z-20 이 카드 안에서만 겹치도록 stacking context 를 가둔다. */}
       <Link
         href={`/places/${place.id}`}
         className="absolute inset-0 z-10"
         aria-label={`${place.name} 상세 보기`}
       />
 
-      {/* 대표 사진 — 없으면 회색 placeholder */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
-        {place.image_url ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={place.image_url}
-            alt={place.name}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-stone-400">
-            사진 준비 중
-          </span>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={place.image_url}
+          alt={place.name}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
         <span
           className={`absolute left-4 top-4 z-[1] rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
             place.category,
