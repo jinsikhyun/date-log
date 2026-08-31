@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/components/AuthProvider";
 
-function HeartMini({ className = "" }: { className?: string }) {
+export function HeartMini({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -15,7 +15,7 @@ function HeartMini({ className = "" }: { className?: string }) {
   );
 }
 
-function CrownMini({ className = "" }: { className?: string }) {
+export function CrownMini({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"

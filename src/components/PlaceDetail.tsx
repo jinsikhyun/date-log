@@ -26,8 +26,13 @@ import { type Reaction, REACTION_COLUMNS } from "@/lib/reactions";
 import { NearbySimilar } from "@/components/NearbySimilar";
 import { SharePlaceButton } from "@/components/SharePlaceButton";
 import { DirectionsButton } from "@/components/DirectionsButton";
-import { PlaceTagBadges } from "@/components/PlaceTagBadges";
+import {
+  PlaceTagBadges,
+  HeartMini,
+  CrownMini,
+} from "@/components/PlaceTagBadges";
 import { Lightbox } from "@/components/Lightbox";
+import { useAuth } from "@/components/AuthProvider";
 import {
   AddPlaceForm,
   placeFormInput,
@@ -55,6 +60,7 @@ function memoryToInput(m: Memory): NewMemoryInput {
 
 export function PlaceDetail({ id }: { id: number }) {
   const router = useRouter();
+  const { coupleMembers } = useAuth();
   const [place, setPlace] = useState<Place | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +75,7 @@ export function PlaceDetail({ id }: { id: number }) {
   >({});
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [favError, setFavError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!Number.isFinite(id)) {
@@ -249,6 +256,45 @@ export function PlaceDetail({ id }: { id: number }) {
     [id],
   );
 
+  // 픽/단골 토글 — 낙관적 업데이트 후 Supabase 반영, 실패 시 롤백.
+  const toggleFavorite = useCallback(
+    async (
+      target: { kind: "member"; memberId: string } | { kind: "regular" },
+    ) => {
+      if (!place) return;
+      setFavError(null);
+
+      const prevFav = place.favorite_by ?? [];
+      const prevReg = place.is_regular;
+      const patch: { favorite_by?: string[]; is_regular?: boolean } =
+        target.kind === "regular"
+          ? { is_regular: !prevReg }
+          : {
+              favorite_by: prevFav.includes(target.memberId)
+                ? prevFav.filter((x) => x !== target.memberId)
+                : [...prevFav, target.memberId],
+            };
+
+      setPlace((p) => (p ? { ...p, ...patch } : p));
+
+      const { data, error: upErr } = await supabase
+        .from("places")
+        .update(patch)
+        .eq("id", id)
+        .select("id");
+
+      if (upErr || !data || data.length === 0) {
+        setPlace((p) =>
+          p ? { ...p, favorite_by: prevFav, is_regular: prevReg } : p,
+        );
+        setFavError(
+          upErr ? "저장하지 못했어요. 다시 시도해 주세요." : POLICY_HINT,
+        );
+      }
+    },
+    [place, id],
+  );
+
   const handleDeletePlace = useCallback(async () => {
     if (!place) return;
     const ok = window.confirm(
@@ -392,6 +438,48 @@ export function PlaceDetail({ id }: { id: number }) {
                   .join(" · ")}
               </p>
             )}
+
+            {/* 픽/단골 컨트롤 — 배경/테두리 없는 텍스트 버튼. 표시는 사진 위 뱃지가 담당. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {coupleMembers
+                .filter((m) => m.display_name?.trim())
+                .map((m) => {
+                  const on = (place.favorite_by ?? []).includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() =>
+                        toggleFavorite({ kind: "member", memberId: m.id })
+                      }
+                      aria-pressed={on}
+                      className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
+                        on ? "text-accent" : "text-muted hover:text-accent"
+                      }`}
+                    >
+                      <HeartMini className="h-4 w-4" />
+                      {m.display_name}
+                    </button>
+                  );
+                })}
+              <button
+                type="button"
+                onClick={() => toggleFavorite({ kind: "regular" })}
+                aria-pressed={place.is_regular}
+                className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
+                  place.is_regular
+                    ? "text-amber-600"
+                    : "text-muted hover:text-amber-600"
+                }`}
+              >
+                <CrownMini className="h-4 w-4" />
+                단골
+              </button>
+            </div>
+            {favError && (
+              <p className="text-xs font-medium text-red-600">{favError}</p>
+            )}
+
             <p className="text-sm text-muted">{place.address}</p>
             {place.description && (
               <p className="text-sm leading-relaxed text-foreground/80">
