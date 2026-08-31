@@ -64,7 +64,7 @@ export function statusBadgeClass(status: string): string {
   return "bg-stone-100 text-stone-500";
 }
 
-/** wanted_by_ids → 카드 뱃지에 쓸 이름들. members 는 useAuth().coupleMembers. */
+/** wanted_by_ids → 이름 배열. members 는 useAuth().coupleMembers. */
 export function wantedByNames(
   ids: string[] | null | undefined,
   members: { id: string; display_name: string | null }[],
@@ -72,6 +72,17 @@ export function wantedByNames(
   return (ids ?? [])
     .map((id) => members.find((m) => m.id === id)?.display_name?.trim())
     .filter((n): n is string => !!n);
+}
+
+/** wanted_by_ids → 위시리스트 카드 한 줄 문구. 예: "진식이 가고 싶어해요" / "둘 다 가고 싶어해요". */
+export function wantedByLabelFromIds(
+  ids: string[] | null | undefined,
+  members: { id: string; display_name: string | null }[],
+): string | null {
+  const names = wantedByNames(ids, members);
+  if (names.length === 0) return null;
+  if (names.length >= 2) return "둘 다 가고 싶어해요";
+  return `${withSubjectParticle(names[0])} 가고 싶어해요`;
 }
 
 // ── 즐겨찾기(픽/단골) 보조 필터 ───────────────────────────────

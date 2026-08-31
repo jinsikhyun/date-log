@@ -9,7 +9,7 @@ import {
   categoryStyle,
   naverImageSearchUrl,
   placeInputToRow,
-  wantedByNames,
+  wantedByLabelFromIds,
 } from "@/lib/places";
 import {
   AddPlaceForm,
@@ -17,6 +17,7 @@ import {
   type NewPlaceInput,
 } from "@/components/AddPlaceForm";
 import { useAuth } from "@/components/AuthProvider";
+import { useCategories } from "@/components/CategoriesProvider";
 
 const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
@@ -33,24 +34,39 @@ const tabClass = (active: boolean) =>
 
 export function WishlistView() {
   const { coupleMembers } = useAuth();
+  const { orderNames } = useCategories();
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   // "다녀왔어요" 전환용. 세부 수정·삭제는 장소 상세(/places/[id])에서.
   const [visiting, setVisiting] = useState<Place | null>(null);
-  // 필터: null = 전체, 아니면 그 사람 id 가 wanted_by_ids 에 든 것만.
-  const [wishFilter, setWishFilter] = useState<string | null>(null);
+  // 주 필터: 카테고리 탭 (null = 전체). 보조 필터: "{이름} wish" 칩 (여러 개 = OR).
+  const [catFilter, setCatFilter] = useState<string | null>(null);
+  const [wishFilterIds, setWishFilterIds] = useState<string[]>([]);
 
   const wishMembers = coupleMembers.filter((m) => m.display_name?.trim());
 
+  const categories = useMemo(
+    () => orderNames(places.map((p) => p.category)),
+    [places, orderNames],
+  );
+  const effectiveCat =
+    catFilter && categories.includes(catFilter) ? catFilter : null;
+
   const visible = useMemo(
     () =>
-      wishFilter
-        ? places.filter((p) => (p.wanted_by_ids ?? []).includes(wishFilter))
-        : places,
-    [places, wishFilter],
+      places
+        .filter((p) => !effectiveCat || p.category === effectiveCat)
+        .filter(
+          (p) =>
+            wishFilterIds.length === 0 ||
+            wishFilterIds.some((id) => (p.wanted_by_ids ?? []).includes(id)),
+        ),
+    [places, effectiveCat, wishFilterIds],
   );
+
+  const filtered = effectiveCat !== null || wishFilterIds.length > 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -165,7 +181,7 @@ export function WishlistView() {
           <p className="mt-1.5 text-sm text-muted">
             {loading
               ? "불러오는 중…"
-              : wishFilter
+              : filtered
                 ? `${visible.length}곳 · 전체 ${places.length}곳`
                 : `위시리스트 ${places.length}곳`}
           </p>
@@ -194,28 +210,62 @@ export function WishlistView() {
         </div>
       )}
 
-      {!loading && places.length > 0 && wishMembers.length > 0 && (
-        <div className="mb-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          <button
-            type="button"
-            onClick={() => setWishFilter(null)}
-            aria-pressed={wishFilter === null}
-            className={tabClass(wishFilter === null)}
-          >
-            전체
-          </button>
-          {wishMembers.map((m) => (
+      {!loading && places.length > 0 && (
+        <>
+          {/* 주 필터: 카테고리 탭 (홈과 같은 큰 스타일) */}
+          <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             <button
-              key={m.id}
               type="button"
-              onClick={() => setWishFilter(m.id)}
-              aria-pressed={wishFilter === m.id}
-              className={tabClass(wishFilter === m.id)}
+              onClick={() => setCatFilter(null)}
+              aria-pressed={effectiveCat === null}
+              className={tabClass(effectiveCat === null)}
             >
-              {m.display_name} wish
+              전체
             </button>
-          ))}
-        </div>
+            {categories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCatFilter(c)}
+                aria-pressed={effectiveCat === c}
+                className={tabClass(effectiveCat === c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          {/* 보조 필터: "{이름} wish" 작은 칩 (여러 개 = OR, 카테고리와는 AND) */}
+          {wishMembers.length > 0 && (
+            <div className="mb-6 -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pt-1.5 pb-1">
+              <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted/60">
+                누가
+              </span>
+              {wishMembers.map((m) => {
+                const on = wishFilterIds.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setWishFilterIds((cur) =>
+                        on ? cur.filter((x) => x !== m.id) : [...cur, m.id],
+                      )
+                    }
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition-colors ${
+                      on
+                        ? "bg-accent/10 text-accent ring-accent/40"
+                        : "bg-transparent text-muted/80 ring-border hover:text-accent"
+                    }`}
+                  >
+                    {m.display_name} wish
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {loading ? (
@@ -239,7 +289,10 @@ export function WishlistView() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((place) => {
-            const wishNames = wantedByNames(place.wanted_by_ids, coupleMembers);
+            const wishLabel = wantedByLabelFromIds(
+              place.wanted_by_ids,
+              coupleMembers,
+            );
             return (
               <article
                 key={place.id}
@@ -273,17 +326,10 @@ export function WishlistView() {
                     {place.name}
                   </Link>
                   <p className="text-sm text-muted">{place.address}</p>
-                  {wishNames.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {wishNames.map((n) => (
-                        <span
-                          key={n}
-                          className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent"
-                        >
-                          {n} wish
-                        </span>
-                      ))}
-                    </div>
+                  {wishLabel && (
+                    <span className="self-start rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                      {wishLabel}
+                    </span>
                   )}
                   <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     <button
