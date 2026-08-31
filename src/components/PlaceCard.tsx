@@ -40,11 +40,6 @@ export function PlaceCard({ place }: { place: Place }) {
           >
             {place.category}
           </span>
-          {addedByLabel(place.added_by) && (
-            <span className="absolute right-4 top-4 z-[1] rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-              {addedByLabel(place.added_by)}
-            </span>
-          )}
         </div>
       ) : (
         // 사진 없음 — 같은 크기의 placeholder(카테고리 색 + 아이콘).
@@ -66,21 +61,18 @@ export function PlaceCard({ place }: { place: Place }) {
           <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
             {place.category}
           </span>
-          {addedByLabel(place.added_by) && (
-            <span className="absolute right-4 top-4 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-              {addedByLabel(place.added_by)}
-            </span>
-          )}
         </a>
       )}
 
       <div className="flex flex-1 flex-col gap-2 p-5">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-lg font-bold leading-snug">{place.name}</h2>
-          {visited && (
-            <span className="shrink-0 text-xs text-muted">{visited}</span>
-          )}
-        </div>
+        <h2 className="text-lg font-bold leading-snug">{place.name}</h2>
+        {(visited || addedByLabel(place.added_by)) && (
+          <p className="text-xs text-muted">
+            {[visited, addedByLabel(place.added_by)]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
         <p className="text-sm text-muted">{place.address}</p>
         {place.description && (
           <p className="line-clamp-2 text-sm text-foreground/75">

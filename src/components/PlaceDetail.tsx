@@ -363,18 +363,15 @@ export function PlaceDetail({ id }: { id: number }) {
             </span>
           </div>
           <div className="flex flex-col gap-3 p-6 sm:p-8">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h1 className="text-2xl font-bold">{place.name}</h1>
-              {visited && (
-                <span className="text-sm text-muted">첫 방문 {visited}</span>
-              )}
-            </div>
-            <p className="text-sm text-muted">{place.address}</p>
-            {addedByLabel(place.added_by) && (
-              <span className="w-fit rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
-                {addedByLabel(place.added_by)}
-              </span>
+            <h1 className="text-2xl font-bold">{place.name}</h1>
+            {(visited || addedByLabel(place.added_by)) && (
+              <p className="text-xs text-muted">
+                {[visited, addedByLabel(place.added_by)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             )}
+            <p className="text-sm text-muted">{place.address}</p>
             {place.description && (
               <p className="text-sm leading-relaxed text-foreground/80">
                 {place.description}
