@@ -51,11 +51,10 @@ export function PlaceTagBadges({
 
   if (names.length === 0 && !isRegular) return null;
 
+  // 카테고리 태그(px-3 py-1 text-xs)와 비슷한 크기
   const pill =
-    size === "sm"
-      ? "gap-0.5 px-1.5 py-0.5 text-[9px]"
-      : "gap-1 px-2 py-1 text-[11px]";
-  const icon = size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3";
+    size === "sm" ? "gap-1 px-3 py-1 text-xs" : "gap-1.5 px-3 py-1.5 text-sm";
+  const icon = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   const bg = { background: "rgba(255,255,255,0.92)" };
 
   return (
