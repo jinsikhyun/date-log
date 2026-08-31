@@ -21,7 +21,8 @@ export interface Place {
   lat: number | null; // 위도 (장소 검색 자동완성으로 채워짐). 없으면 지도가 주소를 지오코딩.
   lng: number | null; // 경도
   status: PlaceStatus; // 'visited'(다녀온 곳) | 'wishlist'(가고 싶은 곳)
-  wanted_by: string | null; // '나' | '여자친구' | '둘다' — wishlist 에서만
+  wanted_by: string | null; // (구) 단일값. 참고용. 이제 wanted_by_ids 사용
+  wanted_by_ids: string[]; // 이 위시를 원하는 커플 구성원 profile id (0~2) — 독립 토글
   added_by: string | null; // 등록한 사람 ('진식' / '지민')
   favorite_by: string[]; // 이 장소를 pick 한 profiles.id (0~2개) — wanted_by 와 별개
   is_regular: boolean; // 우리 단골
@@ -63,22 +64,14 @@ export function statusBadgeClass(status: string): string {
   return "bg-stone-100 text-stone-500";
 }
 
-/** wanted_by 값 → 카드에 보여줄 문구 */
-export function wantedByLabel(v: string | null): string | null {
-  switch (v) {
-    case "둘다":
-      return "둘 다 가고 싶어해요";
-    // 구 값 (마이그레이션 전 데이터 대비)
-    case "나":
-      return "내가 가고 싶어해요";
-    case "여자친구":
-      return "여자친구가 가고 싶어해요";
-    case null:
-    case "":
-      return null;
-    default:
-      return `${withSubjectParticle(v)} 가고 싶어해요`; // 커플 구성원 이름 (받침 처리)
-  }
+/** wanted_by_ids → 카드 뱃지에 쓸 이름들. members 는 useAuth().coupleMembers. */
+export function wantedByNames(
+  ids: string[] | null | undefined,
+  members: { id: string; display_name: string | null }[],
+): string[] {
+  return (ids ?? [])
+    .map((id) => members.find((m) => m.id === id)?.display_name?.trim())
+    .filter((n): n is string => !!n);
 }
 
 // ── 즐겨찾기(픽/단골) 보조 필터 ───────────────────────────────
@@ -119,7 +112,7 @@ export interface PlaceRowInput {
   lat: string;
   lng: string;
   status: PlaceStatus;
-  wanted_by: string;
+  wanted_by_ids: string[]; // wishlist 에서 이 위시를 원하는 커플 구성원 id (독립 토글)
   added_by: string; // 현재 선택된 사용자 이름 (폼 필드 아님, 저장 시 자동 주입)
 }
 // favorite_by(픽) / is_regular(단골) 는 이 폼에서 다루지 않는다.
@@ -138,7 +131,8 @@ export function placeInputToRow(input: PlaceRowInput) {
     lng: input.lng ? Number(input.lng) : null,
     status: input.status,
     added_by: input.added_by || null,
-    wanted_by: input.status === "wishlist" ? input.wanted_by || null : null,
+    wanted_by_ids:
+      input.status === "wishlist" ? input.wanted_by_ids ?? [] : [],
     rating: lite || !input.rating ? null : Number(input.rating),
     first_visit_date: lite ? null : input.first_visit_date || null,
     description: lite ? null : input.description.trim() || null,

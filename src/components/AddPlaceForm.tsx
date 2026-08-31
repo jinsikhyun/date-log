@@ -20,7 +20,7 @@ export interface NewPlaceInput {
   lat: string; // 카카오 장소검색으로 채워지는 위도/경도. 빈 문자열이면 지도가 주소를 지오코딩.
   lng: string;
   status: PlaceStatus; // '다녀온 곳' | '가고 싶은 곳'
-  wanted_by: string; // wishlist 일 때 '나'/'여자친구'/'둘다', 아니면 ""
+  wanted_by_ids: string[]; // wishlist 일 때 이 위시를 원하는 커플 구성원 id (독립 토글)
   added_by: string; // 저장 시 현재 선택된 사용자로 자동 주입 (폼 필드 아님)
 }
 
@@ -37,7 +37,7 @@ const EMPTY: NewPlaceInput = {
   lat: "",
   lng: "",
   status: "visited",
-  wanted_by: "",
+  wanted_by_ids: [],
   added_by: "",
 };
 
@@ -61,7 +61,7 @@ export function placeFormInput(p: {
   lat: number | null;
   lng: number | null;
   status?: string | null;
-  wanted_by?: string | null;
+  wanted_by_ids?: string[] | null;
 }): NewPlaceInput {
   return {
     name: p.name,
@@ -76,7 +76,7 @@ export function placeFormInput(p: {
     lat: p.lat != null ? String(p.lat) : "",
     lng: p.lng != null ? String(p.lng) : "",
     status: p.status === "wishlist" ? "wishlist" : "visited",
-    wanted_by: p.wanted_by ?? "",
+    wanted_by_ids: p.wanted_by_ids ?? [],
     added_by: "", // 저장 시 현재 사용자로 덮어씀
   };
 }
@@ -96,16 +96,7 @@ export function AddPlaceForm({
 }) {
   const { authorName, coupleMembers } = useAuth();
   const { categories } = useCategories();
-  // "누가 가고 싶어해요?" 옵션 = 우리 커플 두 사람 이름 (하드코딩 X) + "둘다"
-  // 두 사람 이름이 같아도 옵션/키가 안 겹치게 중복 제거.
-  const wantedByOptions = [
-    ...new Set(
-      coupleMembers
-        .map((m) => m.display_name?.trim())
-        .filter((n): n is string => !!n),
-    ),
-    "둘다",
-  ];
+  const wishMembers = coupleMembers.filter((m) => m.display_name?.trim());
   const base = initial ?? { ...EMPTY, status: initialStatus ?? "visited" };
   const [form, setForm] = useState<NewPlaceInput>(base);
   const [error, setError] = useState<string | null>(null);
@@ -396,27 +387,35 @@ export function AddPlaceForm({
       </div>
 
       {form.status === "wishlist" && (
-        <div className="flex flex-col gap-1 sm:col-span-2">
-          <label className={labelClass} htmlFor="pf-wanted-by">
-            가고 싶은 픽 — 누가 가고 싶어해요?
-          </label>
-          <select
-            id="pf-wanted-by"
-            className={fieldClass}
-            value={form.wanted_by}
-            onChange={(e) => set("wanted_by", e.target.value)}
-          >
-            <option value="">선택 안 함</option>
-            {wantedByOptions.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-            {/* 저장돼 있던 값이 지금 옵션에 없어도 유실 방지 */}
-            {form.wanted_by && !wantedByOptions.includes(form.wanted_by) && (
-              <option value={form.wanted_by}>{form.wanted_by}</option>
-            )}
-          </select>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className={labelClass}>누가 원해요?</span>
+          <div className="flex flex-wrap gap-2">
+            {wishMembers.map((m) => {
+              const on = form.wanted_by_ids.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    set(
+                      "wanted_by_ids",
+                      on
+                        ? form.wanted_by_ids.filter((x) => x !== m.id)
+                        : [...form.wanted_by_ids, m.id],
+                    )
+                  }
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${
+                    on
+                      ? "bg-accent/10 text-accent ring-accent/50"
+                      : "bg-white text-stone-500 ring-border hover:text-accent"
+                  }`}
+                >
+                  {m.display_name} wish
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

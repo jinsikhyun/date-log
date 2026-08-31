@@ -64,7 +64,7 @@ const blankRow = (over: Partial<PlaceRowInput>): PlaceRowInput => ({
   lat: "",
   lng: "",
   status: "visited",
-  wanted_by: "",
+  wanted_by_ids: [],
   added_by: "",
   ...over,
 });

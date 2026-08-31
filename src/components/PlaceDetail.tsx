@@ -40,7 +40,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -417,11 +417,13 @@ export function PlaceDetail({ id }: { id: number }) {
             >
               {place.category}
             </span>
-            <PlaceTagBadges
-              favoriteBy={place.favorite_by}
-              isRegular={place.is_regular}
-              size="md"
-            />
+            {place.status === "visited" && (
+              <PlaceTagBadges
+                favoriteBy={place.favorite_by}
+                isRegular={place.is_regular}
+                size="md"
+              />
+            )}
             {photoOpen && place.image_url && (
               <Lightbox
                 urls={[place.image_url]}
@@ -439,45 +441,49 @@ export function PlaceDetail({ id }: { id: number }) {
               </p>
             )}
 
-            {/* 픽/단골 컨트롤 — 배경/테두리 없는 텍스트 버튼. 표시는 사진 위 뱃지가 담당. */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              {coupleMembers
-                .filter((m) => m.display_name?.trim())
-                .map((m) => {
-                  const on = (place.favorite_by ?? []).includes(m.id);
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() =>
-                        toggleFavorite({ kind: "member", memberId: m.id })
-                      }
-                      aria-pressed={on}
-                      className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
-                        on ? "text-accent" : "text-muted hover:text-accent"
-                      }`}
-                    >
-                      <HeartMini className="h-4 w-4" />
-                      {m.display_name}
-                    </button>
-                  );
-                })}
-              <button
-                type="button"
-                onClick={() => toggleFavorite({ kind: "regular" })}
-                aria-pressed={place.is_regular}
-                className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
-                  place.is_regular
-                    ? "text-amber-600"
-                    : "text-muted hover:text-amber-600"
-                }`}
-              >
-                <CrownMini className="h-4 w-4" />
-                단골
-              </button>
-            </div>
-            {favError && (
-              <p className="text-xs font-medium text-red-600">{favError}</p>
+            {/* 픽/단골 컨트롤 — 다녀온 곳에서만. 배경/테두리 없는 텍스트 버튼. */}
+            {place.status === "visited" && (
+              <>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  {coupleMembers
+                    .filter((m) => m.display_name?.trim())
+                    .map((m) => {
+                      const on = (place.favorite_by ?? []).includes(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() =>
+                            toggleFavorite({ kind: "member", memberId: m.id })
+                          }
+                          aria-pressed={on}
+                          className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
+                            on ? "text-accent" : "text-muted hover:text-accent"
+                          }`}
+                        >
+                          <HeartMini className="h-4 w-4" />
+                          {m.display_name}
+                        </button>
+                      );
+                    })}
+                  <button
+                    type="button"
+                    onClick={() => toggleFavorite({ kind: "regular" })}
+                    aria-pressed={place.is_regular}
+                    className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
+                      place.is_regular
+                        ? "text-amber-600"
+                        : "text-muted hover:text-amber-600"
+                    }`}
+                  >
+                    <CrownMini className="h-4 w-4" />
+                    단골
+                  </button>
+                </div>
+                {favError && (
+                  <p className="text-xs font-medium text-red-600">{favError}</p>
+                )}
+              </>
             )}
 
             <p className="text-sm text-muted">{place.address}</p>

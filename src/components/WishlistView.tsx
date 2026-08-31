@@ -5,43 +5,51 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import {
   type Place,
-  type FavoriteFilter,
-  EMPTY_FAVORITE_FILTER,
-  favoriteFilterActive,
-  matchesFavoriteFilter,
   categoryIcon,
   categoryStyle,
   naverImageSearchUrl,
   placeInputToRow,
-  wantedByLabel,
+  wantedByNames,
 } from "@/lib/places";
 import {
   AddPlaceForm,
   placeFormInput,
   type NewPlaceInput,
 } from "@/components/AddPlaceForm";
-import { PlaceTagBadges } from "@/components/PlaceTagBadges";
-import { FavoriteFilterChips } from "@/components/FavoriteFilterChips";
+import { useAuth } from "@/components/AuthProvider";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
+const tabClass = (active: boolean) =>
+  `shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+    active
+      ? "bg-accent text-white shadow-sm"
+      : "bg-card text-muted ring-1 ring-border hover:text-accent"
+  }`;
+
 export function WishlistView() {
+  const { coupleMembers } = useAuth();
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   // "다녀왔어요" 전환용. 세부 수정·삭제는 장소 상세(/places/[id])에서.
   const [visiting, setVisiting] = useState<Place | null>(null);
-  // 즐겨찾기(픽/단골) 보조 필터. 위시리스트엔 카테고리 탭이 없어 이게 유일한 필터.
-  const [favFilter, setFavFilter] = useState<FavoriteFilter>(EMPTY_FAVORITE_FILTER);
+  // 필터: null = 전체, 아니면 그 사람 id 가 wanted_by_ids 에 든 것만.
+  const [wishFilter, setWishFilter] = useState<string | null>(null);
+
+  const wishMembers = coupleMembers.filter((m) => m.display_name?.trim());
 
   const visible = useMemo(
-    () => places.filter((p) => matchesFavoriteFilter(p, favFilter)),
-    [places, favFilter],
+    () =>
+      wishFilter
+        ? places.filter((p) => (p.wanted_by_ids ?? []).includes(wishFilter))
+        : places,
+    [places, wishFilter],
   );
 
   useEffect(() => {
@@ -56,12 +64,12 @@ export function WishlistView() {
       if (cancelled) return;
       if (error) {
         console.error("[wishlist] 조회 실패:", error);
-        const missingCol = /column .*status.* does not exist/i.test(
+        const missingCol = /column .*(status|wanted_by_ids).* does not exist/i.test(
           error.message,
         );
         setLoadError(
           missingCol
-            ? "status 컬럼이 아직 없어요. supabase/add-wishlist-columns.sql 을 Supabase SQL Editor 에서 실행하세요."
+            ? "필요한 컬럼이 아직 없어요. supabase/migrate-wanted-by-to-ids.sql 을 Supabase SQL Editor 에서 실행하세요."
             : `가고 싶은 곳을 불러오지 못했어요: ${error.message}`,
         );
       } else {
@@ -157,7 +165,7 @@ export function WishlistView() {
           <p className="mt-1.5 text-sm text-muted">
             {loading
               ? "불러오는 중…"
-              : favoriteFilterActive(favFilter)
+              : wishFilter
                 ? `${visible.length}곳 · 전체 ${places.length}곳`
                 : `위시리스트 ${places.length}곳`}
           </p>
@@ -186,8 +194,28 @@ export function WishlistView() {
         </div>
       )}
 
-      {!loading && places.length > 0 && (
-        <FavoriteFilterChips value={favFilter} onChange={setFavFilter} />
+      {!loading && places.length > 0 && wishMembers.length > 0 && (
+        <div className="mb-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <button
+            type="button"
+            onClick={() => setWishFilter(null)}
+            aria-pressed={wishFilter === null}
+            className={tabClass(wishFilter === null)}
+          >
+            전체
+          </button>
+          {wishMembers.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setWishFilter(m.id)}
+              aria-pressed={wishFilter === m.id}
+              className={tabClass(wishFilter === m.id)}
+            >
+              {m.display_name} wish
+            </button>
+          ))}
+        </div>
       )}
 
       {loading ? (
@@ -211,7 +239,7 @@ export function WishlistView() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((place) => {
-            const label = wantedByLabel(place.wanted_by);
+            const wishNames = wantedByNames(place.wanted_by_ids, coupleMembers);
             return (
               <article
                 key={place.id}
@@ -235,11 +263,6 @@ export function WishlistView() {
                   <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
                     {place.category}
                   </span>
-                  <PlaceTagBadges
-                    favoriteBy={place.favorite_by}
-                    isRegular={place.is_regular}
-                    size="sm"
-                  />
                 </a>
 
                 <div className="flex flex-1 flex-col gap-2 p-5">
@@ -250,10 +273,17 @@ export function WishlistView() {
                     {place.name}
                   </Link>
                   <p className="text-sm text-muted">{place.address}</p>
-                  {label && (
-                    <span className="self-start rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
-                      {label}
-                    </span>
+                  {wishNames.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {wishNames.map((n) => (
+                        <span
+                          key={n}
+                          className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent"
+                        >
+                          {n} wish
+                        </span>
+                      ))}
+                    </div>
                   )}
                   <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     <button

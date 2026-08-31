@@ -28,7 +28,8 @@ create table if not exists public.places (
   lat              double precision,
   lng              double precision,
   status           text not null default 'visited', -- 'visited' | 'wishlist'
-  wanted_by        text,                             -- 커플 구성원 display_name | '둘다' | null (wishlist 전용, CHECK 없음)
+  wanted_by        text,                             -- (구) 단일값. 참고용으로 남김. 이제 wanted_by_ids 사용
+  wanted_by_ids    uuid[] not null default '{}',      -- 이 위시를 원하는 커플 구성원 profile id (0~2), 독립 토글
   added_by         text,                             -- 등록한 사람 (로그인 사용자 display_name)
   memory_count     integer not null default 0,
   created_at       timestamptz not null default now()
@@ -42,6 +43,8 @@ alter table public.places add column if not exists lat double precision; -- 카�
 alter table public.places add column if not exists lng double precision; -- 카카오 장소검색 경도
 alter table public.places add column if not exists status text not null default 'visited';
 alter table public.places add column if not exists wanted_by text;
+-- 위시 "누가 원해요" 를 배열로 (migrate-wanted-by-to-ids.sql 참고)
+alter table public.places add column if not exists wanted_by_ids uuid[] not null default '{}';
 alter table public.places drop constraint if exists places_status_check;
 alter table public.places add constraint places_status_check check (status in ('visited', 'wishlist', 'course_only'));
 -- 코스 전용 장소: 이 코스가 삭제되면 함께 삭제 (add-course-only-places.sql 참고)
