@@ -259,7 +259,7 @@ export function WishlistView() {
                         : "bg-transparent text-muted/80 ring-border hover:text-accent"
                     }`}
                   >
-                    {m.display_name} wish
+                    {m.display_name}
                   </button>
                 );
               })}

@@ -411,7 +411,7 @@ export function AddPlaceForm({
                       : "bg-white text-stone-500 ring-border hover:text-accent"
                   }`}
                 >
-                  {m.display_name} wish
+                  {m.display_name}
                 </button>
               );
             })}
