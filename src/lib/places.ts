@@ -81,6 +81,30 @@ export function wantedByLabel(v: string | null): string | null {
   }
 }
 
+// ── 즐겨찾기(픽/단골) 보조 필터 ───────────────────────────────
+// 카테고리 탭(주 필터)과 AND 로 결합되는 보조 토글. 켜진 토글끼리는 OR.
+export interface FavoriteFilter {
+  favoriteBy: string[]; // 토글된 profiles.id
+  regular: boolean; // "단골" 토글
+}
+
+export const EMPTY_FAVORITE_FILTER: FavoriteFilter = {
+  favoriteBy: [],
+  regular: false,
+};
+
+export function favoriteFilterActive(f: FavoriteFilter): boolean {
+  return f.favoriteBy.length > 0 || f.regular;
+}
+
+/** 켜진 토글 중 하나라도 해당하면 통과(OR). 아무것도 안 켜졌으면 전부 통과. */
+export function matchesFavoriteFilter(place: Place, f: FavoriteFilter): boolean {
+  if (!favoriteFilterActive(f)) return true;
+  if (f.regular && place.is_regular) return true;
+  const fav = place.favorite_by ?? [];
+  return f.favoriteBy.some((id) => fav.includes(id));
+}
+
 // 장소 추가/수정 폼 값(전부 문자열) → places 테이블 row.
 export interface PlaceRowInput {
   name: string;

@@ -7,8 +7,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PlaceCard } from "@/components/PlaceCard";
 import { AddPlaceForm, type NewPlaceInput } from "@/components/AddPlaceForm";
 import { supabase } from "@/lib/supabase/client";
-import { type Place, placeInputToRow } from "@/lib/places";
+import {
+  type Place,
+  type FavoriteFilter,
+  EMPTY_FAVORITE_FILTER,
+  favoriteFilterActive,
+  matchesFavoriteFilter,
+  placeInputToRow,
+} from "@/lib/places";
 import { useCategories } from "@/components/CategoriesProvider";
+import { FavoriteFilterChips } from "@/components/FavoriteFilterChips";
 import { NearbyPanel } from "@/components/NearbyPanel";
 
 
@@ -55,6 +63,8 @@ export function HomeView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // 카테고리(주 필터)와 AND 로 결합되는 보조 필터. URL 이 아닌 로컬 상태.
+  const [favFilter, setFavFilter] = useState<FavoriteFilter>(EMPTY_FAVORITE_FILTER);
 
   // 뷰(피드/지도) + 카테고리 필터는 URL 쿼리에 둔다 → 로고(href="/") 클릭이 확실히 초기화됨
   const view: ViewMode = searchParams.get("view") === "map" ? "map" : "feed";
@@ -200,10 +210,11 @@ export function HomeView() {
 
   const visiblePlaces = useMemo(
     () =>
-      effectiveCategory
+      (effectiveCategory
         ? places.filter((p) => p.category === effectiveCategory)
-        : places,
-    [places, effectiveCategory],
+        : places
+      ).filter((p) => matchesFavoriteFilter(p, favFilter)),
+    [places, effectiveCategory, favFilter],
   );
 
   return (
@@ -214,8 +225,8 @@ export function HomeView() {
           <p className="mt-1.5 text-sm text-muted">
             {loading
               ? "불러오는 중…"
-              : effectiveCategory
-                ? `'${effectiveCategory}' ${visiblePlaces.length}곳 · 전체 ${places.length}곳`
+              : effectiveCategory || favoriteFilterActive(favFilter)
+                ? `${visiblePlaces.length}곳 · 전체 ${places.length}곳`
                 : `지금까지 ${places.length}곳 · 함께 만든 추억 ${totalMemories}개`}
           </p>
         </div>
@@ -284,6 +295,10 @@ export function HomeView() {
         </div>
       )}
 
+      {!loading && places.length > 0 && (
+        <FavoriteFilterChips value={favFilter} onChange={setFavFilter} />
+      )}
+
       {showForm && (
         <AddPlaceForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} />
       )}
@@ -310,7 +325,9 @@ export function HomeView() {
           </p>
         ) : visiblePlaces.length === 0 ? (
           <p className="py-16 text-center text-sm text-muted">
-            ‘{effectiveCategory}’ 카테고리에 아직 장소가 없어요.
+            {favoriteFilterActive(favFilter)
+              ? "이 조건에 맞는 장소가 없어요."
+              : `‘${effectiveCategory}’ 카테고리에 아직 장소가 없어요.`}
           </p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

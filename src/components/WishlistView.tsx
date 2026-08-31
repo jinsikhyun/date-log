@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import {
   type Place,
+  type FavoriteFilter,
+  EMPTY_FAVORITE_FILTER,
+  favoriteFilterActive,
+  matchesFavoriteFilter,
   categoryIcon,
   categoryStyle,
   naverImageSearchUrl,
@@ -17,6 +21,7 @@ import {
   type NewPlaceInput,
 } from "@/components/AddPlaceForm";
 import { PlaceTagBadges } from "@/components/PlaceTagBadges";
+import { FavoriteFilterChips } from "@/components/FavoriteFilterChips";
 
 const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
@@ -31,6 +36,13 @@ export function WishlistView() {
   const [adding, setAdding] = useState(false);
   // "다녀왔어요" 전환용. 세부 수정·삭제는 장소 상세(/places/[id])에서.
   const [visiting, setVisiting] = useState<Place | null>(null);
+  // 즐겨찾기(픽/단골) 보조 필터. 위시리스트엔 카테고리 탭이 없어 이게 유일한 필터.
+  const [favFilter, setFavFilter] = useState<FavoriteFilter>(EMPTY_FAVORITE_FILTER);
+
+  const visible = useMemo(
+    () => places.filter((p) => matchesFavoriteFilter(p, favFilter)),
+    [places, favFilter],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +155,11 @@ export function WishlistView() {
         <div>
           <h1 className="text-xl font-bold sm:text-2xl">가고 싶은 곳</h1>
           <p className="mt-1.5 text-sm text-muted">
-            {loading ? "불러오는 중…" : `위시리스트 ${places.length}곳`}
+            {loading
+              ? "불러오는 중…"
+              : favoriteFilterActive(favFilter)
+                ? `${visible.length}곳 · 전체 ${places.length}곳`
+                : `위시리스트 ${places.length}곳`}
           </p>
         </div>
         <button
@@ -170,6 +186,10 @@ export function WishlistView() {
         </div>
       )}
 
+      {!loading && places.length > 0 && (
+        <FavoriteFilterChips value={favFilter} onChange={setFavFilter} />
+      )}
+
       {loading ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -184,9 +204,13 @@ export function WishlistView() {
           아직 가고 싶은 곳이 없어요. “장소 추가”에서 <b>가고 싶은 곳</b>으로
           담아보세요.
         </p>
+      ) : visible.length === 0 ? (
+        <p className="rounded-3xl bg-card p-12 text-center text-sm text-muted ring-1 ring-border/70">
+          이 조건에 맞는 장소가 없어요.
+        </p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {places.map((place) => {
+          {visible.map((place) => {
             const label = wantedByLabel(place.wanted_by);
             return (
               <article

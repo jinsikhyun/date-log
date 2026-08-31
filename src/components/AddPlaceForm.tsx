@@ -403,9 +403,12 @@ export function AddPlaceForm({
         />
       </div>
 
-      {/* 즐겨찾기 태그 — wishlist 의 wanted_by 와 완전 별개, 여러 개 동시 적용 가능 */}
+      {/* 즐겨찾기 태그 — wishlist 의 wanted_by("가고 싶은 픽")와 완전 별개, 여러 개 동시 적용 가능 */}
       <div className="flex flex-col gap-1.5 sm:col-span-2">
         <span className={labelClass}>즐겨찾기 태그</span>
+        <span className="-mt-1 text-xs text-muted">
+          카드·상세 사진 위에 표시돼요. “가고 싶은 픽”과는 별개예요.
+        </span>
         <div className="flex flex-wrap gap-2">
           {coupleMembers
             .filter((m) => m.display_name?.trim())
@@ -452,7 +455,7 @@ export function AddPlaceForm({
       {form.status === "wishlist" && (
         <div className="flex flex-col gap-1 sm:col-span-2">
           <label className={labelClass} htmlFor="pf-wanted-by">
-            누가 가고 싶어해요?
+            가고 싶은 픽 — 누가 가고 싶어해요?
           </label>
           <select
             id="pf-wanted-by"
