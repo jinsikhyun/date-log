@@ -56,9 +56,13 @@ export function PlaceTagBadges({
     size === "sm" ? "gap-1 px-3 py-1 text-xs" : "gap-1.5 px-3 py-1.5 text-sm";
   const icon = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   const bg = { background: "rgba(255,255,255,0.92)" };
+  // 카테고리 태그와 같은 인셋(카드 left-4/top-4, 상세 left-5/top-5)에 맞춰 우상단 정렬
+  const inset = size === "sm" ? "right-4 top-4" : "right-5 top-5";
 
   return (
-    <div className="pointer-events-none absolute right-3 top-3 z-[1] flex flex-col items-end gap-1">
+    <div
+      className={`pointer-events-none absolute z-[1] flex flex-col items-end gap-1 ${inset}`}
+    >
       {isRegular && (
         <span
           style={bg}
