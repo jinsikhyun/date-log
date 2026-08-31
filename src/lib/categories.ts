@@ -44,6 +44,33 @@ export function colorClass(color: string): string {
   return COLOR_CLASSES[color] ?? COLOR_CLASSES[DEFAULT_COLOR];
 }
 
+// Archive Teal 핸드오프의 확정 카테고리 색 (이름 기준, 정확한 hex).
+// bg = 칩 배경, text = 칩 글자색 (= currentColor → 지도 핀 테두리색).
+// ⚠️ 아래 클래스 문자열은 Tailwind 가 스캔하도록 리터럴로 나열 (동적 조합 금지).
+export const CANON_CATEGORY_TAG: Record<string, string> = {
+  맛집: "bg-[#E3ECE8] text-[#36585A]",
+  카페: "bg-[#F2E9D8] text-[#7A5F31]",
+  술집: "bg-[#F3E2DC] text-[#8B5143]",
+  바: "bg-[#EAE4EF] text-[#5F4A79]",
+  사진: "bg-[#DFE8EC] text-[#3B6076]",
+  전시: "bg-[#E7E4D8] text-[#6B6432]",
+  기타: "bg-[#ECE7DC] text-[#68635C]",
+};
+
+// 핸드오프 확정 카테고리 hex (공유 카드/회고 막대 등 인라인 색 매핑용)
+export const CANON_CATEGORY_HEX: Record<
+  string,
+  { bg: string; fg: string; pin: string }
+> = {
+  맛집: { bg: "#E3ECE8", fg: "#36585A", pin: "#36585A" },
+  카페: { bg: "#F2E9D8", fg: "#7A5F31", pin: "#A68452" },
+  술집: { bg: "#F3E2DC", fg: "#8B5143", pin: "#B06A55" },
+  바: { bg: "#EAE4EF", fg: "#5F4A79", pin: "#7E6699" },
+  사진: { bg: "#DFE8EC", fg: "#3B6076", pin: "#55809A" },
+  전시: { bg: "#E7E4D8", fg: "#6B6432", pin: "#8E8646" },
+  기타: { bg: "#ECE7DC", fg: "#68635C", pin: "#9A9287" },
+};
+
 // 테이블이 없거나 로드 전일 때 쓰는 기본 카테고리 (id 음수 = 합성)
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: -1, name: "맛집", color: "orange", icon: "🍽️", sort_order: 10 },
@@ -62,9 +89,12 @@ export function setCategoryRegistry(cats: Category[]): void {
   registry = cats.length > 0 ? cats : DEFAULT_CATEGORIES;
 }
 
-/** 카테고리 태그 색상 클래스 (레지스트리 기반) */
+/** 카테고리 태그 색상 클래스. 확정 7종은 핸드오프 hex, 그 외는 레지스트리 색. */
 export function categoryStyle(name: string): string {
-  return colorClass(registry.find((c) => c.name === name)?.color ?? DEFAULT_COLOR);
+  return (
+    CANON_CATEGORY_TAG[name] ??
+    colorClass(registry.find((c) => c.name === name)?.color ?? DEFAULT_COLOR)
+  );
 }
 
 /** 카테고리 아이콘 이모지 (레지스트리 기반) */

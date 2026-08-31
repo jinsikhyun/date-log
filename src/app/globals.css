@@ -1,30 +1,79 @@
 @import "tailwindcss";
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css");
 
-/* 따뜻한 색감의 팔레트 (지금은 라이트 모드만) */
+/* ── Archive Teal 팔레트 (라이트 모드 전용) ──────────────────
+   design_handoff_datelog_archive_teal 기준. 기존 코랄 → 티일 전면 교체. */
 :root {
-  --background: #fbf6f0;
-  --foreground: #3c332b;
-  --card: #ffffff;
-  --muted: #8a7d70;
-  --accent: #e0785c;
-  --border: #efe4d7;
+  --background: #f6eee1; /* --paper: 페이지 배경 */
+  --foreground: #302e2b; /* --ink: 본문 제목 */
+  --card: #ffffff; /* 순수 카드 배경 */
+  --surface: #fffcf5; /* --card: 앱 프레임/서피스 */
+  --sidebar: #f0e8da; /* 사이드바, 모바일 탭바 */
+
+  --muted: #68635c; /* --muted: 비활성 내비 */
+  --muted-2: #7c766c; /* 보조 설명 */
+  --muted-3: #a79e90; /* 날짜, 최약 텍스트 */
+
+  --accent: #36585a; /* --teal: 브랜드 중심색, primary, 활성, pick */
+  --accent-hover: #29484a; /* --teal-hover */
+  --accent-soft: #e3ece8; /* --teal-soft: 활성 내비/accent 칩 배경 */
+  --accent-border: #9cb1ac; /* --teal-border: 카드 hover 보더 */
+
+  --ink-hover: #22201e; /* 다크 버튼 hover */
+  --amber: #a68452; /* 별점, 보조 강조 */
+  --regular-bg: #c9a46a; /* 단골 뱃지 배경 */
+  --regular-fg: #46381c; /* 단골 뱃지 글자 */
+
+  --border: #ded6c8; /* --line: 기본 보더 */
+  --border-strong: #d6cdbc; /* 프레임 외곽 */
+  --border-dashed: #cfc5b4; /* 위시카드 점선 */
+
+  /* 사진 플레이스홀더 크림 스트라이프 */
+  --photo-placeholder: repeating-linear-gradient(
+    135deg,
+    #f1e9da 0 9px,
+    #e8dfcd 9px 18px
+  );
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+
   --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-muted-3: var(--muted-3);
+
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-border: var(--accent-border);
+
+  --color-ink-hover: var(--ink-hover);
+  --color-amber: var(--amber);
+  --color-regular-bg: var(--regular-bg);
+  --color-regular-fg: var(--regular-fg);
+
   --color-border: var(--border);
-  --font-sans: var(--font-geist-sans), "Apple SD Gothic Neo", "Pretendard",
-    ui-sans-serif, system-ui, sans-serif;
+  --color-border-strong: var(--border-strong);
+  --color-border-dashed: var(--border-dashed);
+
+  --font-sans: "Pretendard Variable", Pretendard, var(--font-geist-sans),
+    "Apple SD Gothic Neo", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* 사진 없는 장소용 크림 스트라이프 플레이스홀더 */
+.photo-placeholder {
+  background-image: var(--photo-placeholder);
 }
 
 /* /recap 레이스 러너 바운스 */

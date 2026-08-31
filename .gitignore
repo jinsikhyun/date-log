@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 디자인 핸드오프 번들 / 아카이브 (참고용, 소스 아님)
+design_handoff_*/
+Date.log*.zip
+Date.log*.pdf
+Design*.pdf
+Design*.zip
+*.dc.html

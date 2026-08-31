@@ -82,7 +82,7 @@ export function CourseMap({ stops }: { stops: MapStop[] }) {
       lineRef.current = new kakao.maps.Polyline({
         path,
         strokeWeight: 4,
-        strokeColor: "#e0785c",
+        strokeColor: "#36585a",
         strokeOpacity: 0.9,
         strokeStyle: "solid",
         map,

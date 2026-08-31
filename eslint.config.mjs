@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 디자인 핸드오프 번들 (참고용, 빌드 대상 아님)
+    "design_handoff_*/**",
   ]),
 ]);
 

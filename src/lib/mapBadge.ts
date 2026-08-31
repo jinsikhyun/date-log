@@ -81,7 +81,7 @@ export function placeInfoContent(name: string, category: string): string {
   return (
     `<div style="padding:8px 12px;font-size:13px;line-height:1.5;white-space:nowrap;">` +
     `<strong style="font-weight:700;">${escapeHtml(name)}</strong><br/>` +
-    `<span style="color:#8a7d70;">${escapeHtml(category)}</span>` +
+    `<span style="color:#7c766c;">${escapeHtml(category)}</span>` +
     `</div>`
   );
 }

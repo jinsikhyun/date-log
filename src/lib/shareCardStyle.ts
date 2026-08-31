@@ -1,20 +1,21 @@
 // 공유 카드(ShareCard / CourseShareCard) 공용 스타일 토큰.
 // ⚠️ html2canvas 가 Tailwind v4 의 oklch() 색을 못 읽으므로 공유 카드는
 //    Tailwind 색 클래스를 안 쓰고 전부 인라인 hex 로만 스타일링한다.
-import { categoryColorName } from "@/lib/categories";
+import { CANON_CATEGORY_HEX, categoryColorName } from "@/lib/categories";
 
 /** 공유 카드 고정 폭(px). 캡처 영역이 뷰포트를 물려받지 않도록 항상 이 값으로 고정. */
 export const CARD_W = 400;
 
+// Archive Teal
 export const SC = {
   cardBg: "#ffffff",
-  fg: "#3c332b",
-  fgSoft: "#5c5148",
-  muted: "#8a7d70",
-  accent: "#e0785c",
-  border: "#efe4d7",
-  accentTint: "#fbe9e3",
-  font: '"Apple SD Gothic Neo", "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  fg: "#302e2b",
+  fgSoft: "#4a463f",
+  muted: "#7c766c",
+  accent: "#36585a",
+  border: "#ded6c8",
+  accentTint: "#e3ece8",
+  font: '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
 } as const;
 
 // 카테고리 색 이름 → (배경, 글자) hex. (Tailwind 100/700 근사값)
@@ -40,5 +41,7 @@ const TAG_HEX: Record<string, { bg: string; fg: string }> = {
 };
 
 export function catTag(category: string): { bg: string; fg: string } {
-  return TAG_HEX[categoryColorName(category)] ?? { bg: SC.accentTint, fg: "#b7532f" };
+  const canon = CANON_CATEGORY_HEX[category];
+  if (canon) return { bg: canon.bg, fg: canon.fg };
+  return TAG_HEX[categoryColorName(category)] ?? { bg: SC.accentTint, fg: SC.accent };
 }
