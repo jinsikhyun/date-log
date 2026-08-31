@@ -1,54 +1,92 @@
-// 상단 사이트 이름 + 탭 메뉴. 전부 실제 라우트로 연결.
-// 카테고리 필터(맛집/카페…)는 홈 화면 안의 탭에서 처리한다.
+// 공통 셸: 데스크탑 좌측 사이드바 + 모바일 상단바/하단 탭바.
+// (레이아웃에서 <div className="lg:pl-[248px]"> 안, {children} 앞에 렌더)
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { NotificationBell } from "@/components/NotificationBell";
-import { withConjunctionParticle, withSubjectParticle } from "@/lib/korean";
+import { daysTogether } from "@/lib/recap";
+import {
+  hasBatchim,
+  withConjunctionParticle,
+  withSubjectParticle,
+} from "@/lib/korean";
 
-const tabClass = (active: boolean) =>
-  `shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-    active
-      ? "bg-accent text-white shadow-sm"
-      : "bg-card text-muted ring-1 ring-border hover:text-accent hover:ring-accent/40"
-  }`;
+type NavKey = "home" | "wishlist" | "courses" | "memories" | "recap";
 
-function HeartIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-      className={`h-3 w-3 ${className}`}
-    >
-      <path d="M12 21s-6.716-4.297-9.428-7.01C.86 12.278.86 9.34 2.572 7.63a4.83 4.83 0 0 1 6.828 0L12 10.229l2.6-2.6a4.83 4.83 0 0 1 6.828 6.83C18.716 16.702 12 21 12 21z" />
-    </svg>
-  );
+const NAV: {
+  href: string;
+  label: string;
+  short: string;
+  key: NavKey;
+}[] = [
+  { href: "/", label: "다녀온 곳", short: "다녀온", key: "home" },
+  { href: "/wishlist", label: "가고 싶은 곳", short: "위시", key: "wishlist" },
+  { href: "/courses", label: "데이트 코스", short: "코스", key: "courses" },
+  { href: "/memories", label: "추억", short: "추억", key: "memories" },
+  { href: "/recap", label: "우리의 기록", short: "기록", key: "recap" },
+];
+
+function navActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/" || pathname.startsWith("/places");
+  if (href === "/courses") return pathname.startsWith("/courses");
+  return pathname === href;
 }
 
-function ChevronDown({ open }: { open: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={`h-3 w-3 shrink-0 transition-transform duration-200 ${
-        open ? "rotate-180" : ""
-      }`}
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
+function NavIcon({ name, className = "" }: { name: NavKey; className?: string }) {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+    className,
+  };
+  switch (name) {
+    case "home":
+      return (
+        <svg {...common}>
+          <path d="M3 10.5 12 3l9 7.5" />
+          <path d="M5 9.5V21h14V9.5" />
+        </svg>
+      );
+    case "wishlist":
+      return (
+        <svg {...common}>
+          <path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+        </svg>
+      );
+    case "courses":
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="19" r="2" />
+          <circle cx="18" cy="5" r="2" />
+          <path d="M8 19h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h6" />
+        </svg>
+      );
+    case "memories":
+      return (
+        <svg {...common}>
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      );
+    case "recap":
+      return (
+        <svg {...common}>
+          <path d="M3 3v18h18" />
+          <rect x="7" y="11" width="3" height="6" />
+          <rect x="13" y="7" width="3" height="10" />
+        </svg>
+      );
+  }
 }
 
-function GearIcon() {
+function SettingsIcon({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -58,7 +96,7 @@ function GearIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="h-4 w-4 shrink-0"
+      className={className}
     >
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 15a1.65 1.65 0 0 0-1.51-1H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 3.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.15.36.5.6.9.6H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -66,7 +104,7 @@ function GearIcon() {
   );
 }
 
-function LogoutIcon() {
+function LogoutIcon({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -76,7 +114,7 @@ function LogoutIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="h-4 w-4 shrink-0"
+      className={className}
     >
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
@@ -85,103 +123,23 @@ function LogoutIcon() {
   );
 }
 
-/** 우측 상단 계정 배지 + 드롭다운 (설정 / 로그아웃) */
-function AccountMenu({
-  meLabel,
-  partnerName,
-  onSignOut,
-}: {
-  meLabel: string;
-  partnerName: string | null;
-  onSignOut: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  // 바깥 클릭(탭·로고 클릭 포함) / Esc 로 닫기. 메뉴 항목은 각자 onClick 에서 닫는다.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const rightLabel = partnerName ?? "파트너 초대";
-
-  return (
-    <div ref={boxRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 py-1 pl-1 pr-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/15"
-      >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-white">
-          <HeartIcon className="h-2.5 w-2.5" />
-        </span>
-        <span className="max-w-[170px] truncate">
-          {meLabel} <span className="text-accent/40">·</span> {rightLabel}
-        </span>
-        <ChevronDown open={open} />
-      </button>
-
-      <div
-        role="menu"
-        className={`absolute right-0 top-full z-40 mt-1.5 w-40 origin-top-right overflow-hidden rounded-xl border border-border bg-white py-1 shadow-lg transition duration-150 ${
-          open
-            ? "scale-100 opacity-100"
-            : "pointer-events-none scale-95 opacity-0"
-        }`}
-      >
-        <Link
-          href="/settings"
-          role="menuitem"
-          onClick={() => setOpen(false)}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 transition-colors hover:bg-stone-50 hover:text-accent"
-        >
-          <GearIcon />
-          설정
-        </Link>
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            setOpen(false);
-            onSignOut();
-          }}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground/80 transition-colors hover:bg-stone-50 hover:text-accent"
-        >
-          <LogoutIcon />
-          로그아웃
-        </button>
-      </div>
-    </div>
-  );
-}
+const wordmarkStyle = (top: number): React.CSSProperties => ({
+  mixBlendMode: "multiply",
+  position: "relative",
+  top,
+});
 
 export function Header() {
   const pathname = usePathname();
   const {
     user: authUser,
+    profile,
     displayName,
     coupleMembers,
     ready: authReady,
     signOut,
   } = useAuth();
 
-  // 커플 구성원 두 명(created_at 오름차순) → A, B. 이름으로 부제목을 만든다.
   const names = coupleMembers
     .map((m) => m.display_name)
     .filter((n): n is string => !!n && n.trim().length > 0);
@@ -190,65 +148,208 @@ export function Header() {
       ? `${withConjunctionParticle(names[0])} ${withSubjectParticle(names[1])} 함께 걸은 곳`
       : "우리가 함께 걸은 곳";
 
-  // 파트너 = 같은 커플에서 나 자신이 아닌 프로필
-  const partner = coupleMembers.find((m) => m.id !== authUser?.id) ?? null;
-  const partnerName = partner?.display_name?.trim() || null;
+  const meLabel = displayName || authUser?.email || "나";
+  const meInitial = meLabel.trim().charAt(0).toUpperCase() || "·";
+
+  // 관계 시작일 → D+
+  const [startDate, setStartDate] = useState<string | null>(null);
+  useEffect(() => {
+    if (!authReady || !profile?.couple_id) return;
+    let cancelled = false;
+    supabase
+      .from("couples")
+      .select("start_date")
+      .eq("id", profile.couple_id)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled) setStartDate((data?.start_date as string | null) ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, profile?.couple_id]);
+  const days = startDate ? daysTogether(startDate) : null;
+
+  // 내비 카운트 (라우트 이동마다 갱신)
+  const [counts, setCounts] = useState<Partial<Record<NavKey, number>>>({});
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
+    (async () => {
+      const [home, wishlist, courses, memories] = await Promise.all([
+        supabase
+          .from("places")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "visited"),
+        supabase
+          .from("places")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "wishlist")
+          .eq("via_course", false),
+        supabase.from("courses").select("id", { count: "exact", head: true }),
+        supabase.from("memories").select("id", { count: "exact", head: true }),
+      ]);
+      if (cancelled) return;
+      setCounts({
+        home: home.count ?? 0,
+        wishlist: wishlist.count ?? 0,
+        courses: courses.count ?? 0,
+        memories: memories.count ?? 0,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser, pathname]);
+
+  const loggedIn = authReady && !!authUser;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-5 sm:px-8">
-        <div className="flex items-baseline gap-3">
-          <Link
-            href="/"
-            className="text-2xl font-extrabold tracking-tight transition-colors hover:text-accent"
-          >
-            date.log
+    <>
+      {/* ── 데스크탑 사이드바 ─────────────────────────────── */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col gap-7 border-r border-border bg-sidebar px-5 py-7 lg:flex">
+        <div>
+          <Link href="/" aria-label="date.log 홈">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand-wordmark.png"
+              alt="date.log — our private archive"
+              width={168}
+              className="w-[168px] max-w-none"
+              style={wordmarkStyle(-4)}
+            />
           </Link>
-          <span className="text-sm text-muted">{subtitle}</span>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {authReady &&
-              (authUser ? (
-                <>
-                  <NotificationBell />
-                  <AccountMenu
-                    meLabel={displayName || authUser.email || "나"}
-                    partnerName={partnerName}
-                    onSignOut={() => void signOut()}
-                  />
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
-                >
-                  로그인
-                </Link>
-              ))}
-          </div>
+          <p className="mt-1 text-xs text-muted-2">{subtitle}</p>
         </div>
 
-        <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          <Link href="/" className={tabClass(pathname === "/")}>
-            전체
-          </Link>
-          <Link href="/wishlist" className={tabClass(pathname === "/wishlist")}>
-            가고싶은 곳
-          </Link>
-          <Link
-            href="/courses"
-            className={tabClass(pathname.startsWith("/courses"))}
-          >
-            데이트코스
-          </Link>
-          <Link href="/memories" className={tabClass(pathname === "/memories")}>
-            추억
-          </Link>
-          <Link href="/recap" className={tabClass(pathname === "/recap")}>
-            우리의 기록
-          </Link>
+        {loggedIn ? (
+          <>
+            <nav className="flex flex-col gap-1">
+              {NAV.map((item) => {
+                const active = navActive(pathname, item.href);
+                const c = counts[item.key];
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm transition-colors ${
+                      active
+                        ? "bg-accent-soft font-bold text-accent"
+                        : "font-medium text-muted hover:bg-black/[0.03]"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        active ? "bg-accent" : "bg-[#c8bfae]"
+                      }`}
+                    />
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {c != null && (
+                      <span className="text-[11px] font-medium text-muted-3">
+                        {c}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="mt-auto flex flex-col gap-3">
+              <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+                <p className="text-[11px] font-medium text-muted-2">
+                  함께 걸은 지
+                </p>
+                <p className="text-3xl font-extrabold tracking-[-0.03em] text-foreground">
+                  {days != null ? `${days}일` : "—"}
+                </p>
+                {startDate && (
+                  <p className="text-[11px] text-muted-3">
+                    {startDate.replace(/-/g, ".")}부터
+                  </p>
+                )}
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11px] font-bold text-foreground/70">
+                    {meInitial}
+                  </span>
+                  <span className="truncate text-[11px] text-muted-2">
+                    {meLabel}
+                    {hasBatchim(meLabel) ? "으로" : "로"} 보는 중
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 text-muted">
+                <NotificationBell />
+                <Link
+                  href="/settings"
+                  aria-label="설정"
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/[0.04] hover:text-accent"
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  aria-label="로그아웃"
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/[0.04] hover:text-accent"
+                >
+                  <LogoutIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </aside>
+
+      {/* ── 모바일 상단바 ─────────────────────────────────── */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
+        <Link href="/" aria-label="date.log 홈" className="flex flex-col">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand-wordmark.png"
+            alt="date.log"
+            width={104}
+            className="w-[104px] max-w-none"
+            style={wordmarkStyle(-3)}
+          />
+          <span className="mt-0.5 text-[11px] text-muted-2">{subtitle}</span>
+        </Link>
+        {loggedIn && (
+          <div className="flex items-center gap-1 text-muted">
+            <NotificationBell />
+            <Link
+              href="/settings"
+              aria-label="설정"
+              className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/[0.04] hover:text-accent"
+            >
+              <SettingsIcon className="h-[18px] w-[18px]" />
+            </Link>
+          </div>
+        )}
+      </header>
+
+      {/* ── 모바일 하단 탭바 ─────────────────────────────── */}
+      {loggedIn && (
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-sidebar lg:hidden">
+          {NAV.map((item) => {
+            const active = navActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors ${
+                  active ? "text-accent" : "text-[#948c80]"
+                }`}
+              >
+                <NavIcon name={item.key} className="h-[17px] w-[17px]" />
+                {item.short}
+              </Link>
+            );
+          })}
         </nav>
-      </div>
-    </header>
+      )}
+    </>
   );
 }

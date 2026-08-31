@@ -35,8 +35,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full bg-background text-foreground">
         <AuthProvider>
           <CategoriesProvider>
-            <Header />
-            {children}
+            {/* 공통 셸: 데스크탑은 좌측 248px 사이드바만큼 패딩, 모바일은 하단 탭바만큼 */}
+            <div className="min-h-screen lg:pl-[248px]">
+              <Header />
+              <div className="pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
+                {children}
+              </div>
+            </div>
           </CategoriesProvider>
         </AuthProvider>
       </body>
