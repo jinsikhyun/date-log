@@ -16,6 +16,7 @@ import {
   placeInputToRow,
 } from "@/lib/places";
 import { useCategories } from "@/components/CategoriesProvider";
+import { CategoryChips } from "@/components/CategoryChips";
 import { FavoriteFilterChips } from "@/components/FavoriteFilterChips";
 import { NearbyPanel } from "@/components/NearbyPanel";
 
@@ -42,13 +43,6 @@ const PLACE_COLUMNS =
 const PLACE_LIST_SELECT = `${PLACE_COLUMNS}, memories(count)`;
 
 type PlaceListRow = Place & { memories?: { count: number }[] };
-
-const tabClass = (active: boolean) =>
-  `shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-    active
-      ? "bg-accent text-white shadow-sm"
-      : "bg-card text-muted ring-1 ring-border hover:text-accent"
-  }`;
 
 function withMemoryCount(row: PlaceListRow): Place {
   const { memories, ...rest } = row;
@@ -219,10 +213,12 @@ export function HomeView() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold sm:text-2xl">우리가 다녀온 곳</h1>
-          <p className="mt-1.5 text-sm text-muted">
+          <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
+            우리가 다녀온 곳
+          </h1>
+          <p className="mt-1 text-sm text-muted-2">
             {loading
               ? "불러오는 중…"
               : effectiveCategory || favoriteFilterActive(favFilter)
@@ -258,7 +254,7 @@ export function HomeView() {
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background"
+            className="rounded-full bg-foreground px-5 py-[11px] text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
           >
             {showForm ? "폼 닫기" : "장소 추가"}
           </button>
@@ -266,33 +262,19 @@ export function HomeView() {
       </div>
 
       {!loading && places.length > 0 && (
-        <div className="mb-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          <button
-            type="button"
-            onClick={() => setParams({ cat: null })}
-            aria-pressed={effectiveCategory === null}
-            className={tabClass(effectiveCategory === null)}
-          >
-            전체
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setParams({ cat: c })}
-              aria-pressed={effectiveCategory === c}
-              className={tabClass(effectiveCategory === c)}
-            >
-              {c}
-            </button>
-          ))}
+        <CategoryChips
+          className="mb-4"
+          categories={categories}
+          active={effectiveCategory}
+          onSelect={(c) => setParams({ cat: c })}
+        >
           <Link
             href="/categories"
             className="ml-1 shrink-0 self-center whitespace-nowrap text-xs font-medium text-muted transition-colors hover:text-accent"
           >
             카테고리 관리
           </Link>
-        </div>
+        </CategoryChips>
       )}
 
       {!loading && places.length > 0 && (

@@ -1,7 +1,12 @@
 import { withSubjectParticle } from "@/lib/korean";
 
 // 카테고리 색/아이콘/정렬은 categories.ts (DB 관리)로 이동. 기존 import 호환용 재노출.
-export { categoryStyle, categoryIcon, orderCategories } from "@/lib/categories";
+export {
+  categoryStyle,
+  categoryIcon,
+  categoryPin,
+  orderCategories,
+} from "@/lib/categories";
 
 export type PlaceStatus = "visited" | "wishlist" | "course_only";
 

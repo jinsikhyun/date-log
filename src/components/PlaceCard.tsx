@@ -9,15 +9,20 @@ import {
 import { StarRating } from "@/components/StarRating";
 import { PlaceTagBadges } from "@/components/PlaceTagBadges";
 
+const CARD =
+  "group relative isolate flex flex-col overflow-hidden rounded-[20px] bg-card ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]";
+const CAT_CHIP =
+  "absolute left-3.5 top-3.5 z-[1] rounded-full px-3 py-1 text-[11px] font-semibold";
+
 export function PlaceCard({ place }: { place: Place }) {
   const visited = place.first_visit_date
     ? place.first_visit_date.split("-").join(".")
     : null;
+  const addedBy = addedByLabel(place.added_by);
 
   return (
-    <article className="group relative isolate flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10">
-      {/* isolate: 카드 내부 z-10/z-20 이 카드 안에서만 겹치도록 stacking context 를 가둔다. */}
-      {/* 카드 전체를 상세 페이지 링크로 (placeholder/네이버지도 링크는 위에 z-20 로 띄움) */}
+    <article className={CARD}>
+      {/* 카드 전체를 상세 링크로 (placeholder/외부링크는 위에 z-20 로) */}
       <Link
         href={`/places/${place.id}`}
         className="absolute inset-0 z-10"
@@ -25,8 +30,7 @@ export function PlaceCard({ place }: { place: Place }) {
       />
 
       {place.image_url ? (
-        // 사진 있음 — 기존 세로형 그대로
-        <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
+        <div className="relative h-44 overflow-hidden bg-[#e6decf]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={place.image_url}
@@ -34,11 +38,7 @@ export function PlaceCard({ place }: { place: Place }) {
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"
           />
-          <span
-            className={`absolute left-4 top-4 z-[1] rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(
-              place.category,
-            )}`}
-          >
+          <span className={`${CAT_CHIP} ${categoryStyle(place.category)}`}>
             {place.category}
           </span>
           <PlaceTagBadges
@@ -48,8 +48,7 @@ export function PlaceCard({ place }: { place: Place }) {
           />
         </div>
       ) : (
-        // 사진 없음 — 같은 크기의 placeholder(카테고리 색 + 아이콘).
-        // 이 영역만 클릭 시 네이버 이미지 검색 (카드 전체 클릭 = 상세, 로 전파 안 되게 stopPropagation)
+        // 사진 없음 — 크림 스트라이프 placeholder. 클릭 시 네이버 이미지 검색(새 탭).
         <a
           href={naverImageSearchUrl(place.name, place.address)}
           target="_blank"
@@ -57,14 +56,15 @@ export function PlaceCard({ place }: { place: Place }) {
           onClick={(e) => e.stopPropagation()}
           aria-label={`${place.name} 네이버 이미지 검색`}
           title="네이버 이미지 검색"
-          className={`relative z-20 flex aspect-[4/3] cursor-pointer items-center justify-center transition hover:brightness-105 ${categoryStyle(
-            place.category,
-          )}`}
+          className="photo-placeholder relative z-20 flex h-44 cursor-pointer items-center justify-center transition hover:brightness-[0.98]"
         >
-          <span className="text-6xl" aria-hidden>
+          <span className="text-5xl opacity-70" aria-hidden>
             {categoryIcon(place.category)}
           </span>
-          <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
+          <span
+            className={`${CAT_CHIP} bg-white/85 text-foreground/70`}
+            style={{ zIndex: 1 }}
+          >
             {place.category}
           </span>
           <PlaceTagBadges
@@ -75,37 +75,32 @@ export function PlaceCard({ place }: { place: Place }) {
         </a>
       )}
 
-      <div className="flex flex-1 flex-col gap-2 p-5">
-        <h2 className="text-lg font-bold leading-snug">{place.name}</h2>
-        {(visited || addedByLabel(place.added_by)) && (
-          <p className="text-xs text-muted">
-            {[visited, addedByLabel(place.added_by)]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        )}
-        <p className="text-sm text-muted">{place.address}</p>
+      <div className="flex flex-1 flex-col gap-[7px] px-[18px] pb-[18px] pt-4">
+        <div className="flex items-baseline gap-2">
+          <h2 className="min-w-0 flex-1 truncate text-base font-bold leading-snug">
+            {place.name}
+          </h2>
+          {visited && (
+            <span className="shrink-0 text-[11px] text-muted-3">{visited}</span>
+          )}
+        </div>
+        <p className="text-xs text-muted-2">{place.address}</p>
         {place.description && (
-          <p className="line-clamp-2 text-sm text-foreground/75">
+          <p className="line-clamp-2 text-[13px] leading-[1.6] text-[#4a463f]">
             {place.description}
           </p>
         )}
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <StarRating rating={place.rating} />
-          <div className="relative z-20 flex items-center gap-2">
-            {place.naver_map_link && (
-              <a
-                href={place.naver_map_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
-              >
-                네이버지도
-              </a>
+          <div className="relative z-20 flex items-center gap-1.5">
+            {addedBy && (
+              <span className="rounded-full bg-background px-2.5 py-1 text-[11px] font-medium text-muted-2">
+                {addedBy}
+              </span>
             )}
-            <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
-              추억 {place.memory_count}개
+            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent">
+              추억 {place.memory_count}
             </span>
           </div>
         </div>

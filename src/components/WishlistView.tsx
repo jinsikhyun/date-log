@@ -18,19 +18,13 @@ import {
 } from "@/components/AddPlaceForm";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
+import { CategoryChips } from "@/components/CategoryChips";
 
 const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
-
-const tabClass = (active: boolean) =>
-  `shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-    active
-      ? "bg-accent text-white shadow-sm"
-      : "bg-card text-muted ring-1 ring-border hover:text-accent"
-  }`;
 
 export function WishlistView() {
   const { coupleMembers } = useAuth();
@@ -175,10 +169,12 @@ export function WishlistView() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold sm:text-2xl">가고 싶은 곳</h1>
-          <p className="mt-1.5 text-sm text-muted">
+          <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
+            가고 싶은 곳
+          </h1>
+          <p className="mt-1 text-sm text-muted-2">
             {loading
               ? "불러오는 중…"
               : filtered
@@ -189,7 +185,7 @@ export function WishlistView() {
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background"
+          className="rounded-full bg-foreground px-5 py-[11px] text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
         >
           {adding ? "폼 닫기" : "가고 싶은 곳 추가"}
         </button>
@@ -212,33 +208,18 @@ export function WishlistView() {
 
       {!loading && places.length > 0 && (
         <>
-          {/* 주 필터: 카테고리 탭 (홈과 같은 큰 스타일) */}
-          <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            <button
-              type="button"
-              onClick={() => setCatFilter(null)}
-              aria-pressed={effectiveCat === null}
-              className={tabClass(effectiveCat === null)}
-            >
-              전체
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCatFilter(c)}
-                aria-pressed={effectiveCat === c}
-                className={tabClass(effectiveCat === c)}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          {/* 주 필터: 카테고리 칩 (홈과 동일) */}
+          <CategoryChips
+            className="mb-3"
+            categories={categories}
+            active={effectiveCat}
+            onSelect={setCatFilter}
+          />
 
-          {/* 보조 필터: "{이름} wish" 작은 칩 (여러 개 = OR, 카테고리와는 AND) */}
+          {/* 보조 필터: "누가" wish 작은 칩 (여러 개 = OR, 카테고리와는 AND) */}
           {wishMembers.length > 0 && (
-            <div className="mb-6 -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pt-1.5 pb-1">
-              <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted/60">
+            <div className="mb-5 -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pt-1 pb-1">
+              <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-3">
                 누가
               </span>
               {wishMembers.map((m) => {
@@ -255,8 +236,8 @@ export function WishlistView() {
                     }
                     className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition-colors ${
                       on
-                        ? "bg-accent/10 text-accent ring-accent/40"
-                        : "bg-transparent text-muted/80 ring-border hover:text-accent"
+                        ? "bg-accent-soft text-accent ring-accent/30"
+                        : "bg-transparent text-muted-2 ring-border hover:text-accent"
                     }`}
                   >
                     {m.display_name}
@@ -269,25 +250,25 @@ export function WishlistView() {
       )}
 
       {loading ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-72 animate-pulse rounded-3xl bg-stone-200/70"
+              className="h-64 animate-pulse rounded-[20px] bg-[#efe7d6]"
             />
           ))}
         </div>
       ) : places.length === 0 && !loadError ? (
-        <p className="rounded-3xl bg-card p-12 text-center text-sm text-muted ring-1 ring-border/70">
+        <p className="rounded-[20px] bg-card p-12 text-center text-sm text-muted-2 ring-1 ring-border">
           아직 가고 싶은 곳이 없어요. “장소 추가”에서 <b>가고 싶은 곳</b>으로
           담아보세요.
         </p>
       ) : visible.length === 0 ? (
-        <p className="rounded-3xl bg-card p-12 text-center text-sm text-muted ring-1 ring-border/70">
+        <p className="rounded-[20px] bg-card p-12 text-center text-sm text-muted-2 ring-1 ring-border">
           이 조건에 맞는 장소가 없어요.
         </p>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {visible.map((place) => {
             const wishLabel = wantedByLabelFromIds(
               place.wanted_by_ids,
@@ -296,9 +277,9 @@ export function WishlistView() {
             return (
               <article
                 key={place.id}
-                className="flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70"
+                className="flex flex-col overflow-hidden rounded-[20px] border border-dashed border-border-dashed bg-card transition-colors hover:border-accent"
               >
-                {/* 사진 자리 placeholder — 클릭 시 네이버 이미지 검색 (새 탭) */}
+                {/* 미방문 placeholder — 클릭 시 네이버 이미지 검색 (새 탭) */}
                 <a
                   href={naverImageSearchUrl(place.name, place.address)}
                   target="_blank"
@@ -306,44 +287,46 @@ export function WishlistView() {
                   onClick={(e) => e.stopPropagation()}
                   aria-label={`${place.name} 네이버 이미지 검색`}
                   title="네이버 이미지 검색"
-                  className={`relative flex aspect-[4/3] cursor-pointer items-center justify-center transition hover:brightness-105 ${categoryStyle(
-                    place.category,
-                  )}`}
+                  className="photo-placeholder relative flex h-36 cursor-pointer items-center justify-center transition hover:brightness-[0.98]"
                 >
-                  <span className="text-6xl" aria-hidden>
+                  <span className="text-5xl opacity-70" aria-hidden>
                     {categoryIcon(place.category)}
                   </span>
-                  <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
+                  <span
+                    className={`absolute left-3.5 top-3.5 rounded-full px-3 py-1 text-[11px] font-semibold ${categoryStyle(
+                      place.category,
+                    )}`}
+                  >
                     {place.category}
                   </span>
                 </a>
 
-                <div className="flex flex-1 flex-col gap-2 p-5">
+                <div className="flex flex-1 flex-col gap-1.5 px-[18px] pb-[18px] pt-4">
                   <Link
                     href={`/places/${place.id}`}
-                    className="text-lg font-bold leading-snug transition-colors hover:text-accent"
+                    className="text-[17px] font-bold leading-snug transition-colors hover:text-accent"
                   >
                     {place.name}
                   </Link>
-                  <p className="text-sm text-muted">{place.address}</p>
+                  <p className="text-xs text-muted-2">{place.address}</p>
                   {wishLabel && (
-                    <span className="self-start rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                    <span className="mt-0.5 self-start rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent">
                       {wishLabel}
                     </span>
                   )}
-                  <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => setVisiting(place)}
-                      className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background"
+                      className="text-[13px] font-bold text-accent transition-colors hover:text-accent-hover"
                     >
-                      다녀왔어요
+                      다녀왔어요 →
                     </button>
                     <Link
                       href={`/places/${place.id}`}
-                      className="text-xs font-medium text-muted transition-colors hover:text-accent"
+                      className="text-xs font-medium text-muted-3 transition-colors hover:text-accent"
                     >
-                      수정·삭제 →
+                      수정·삭제
                     </Link>
                   </div>
                 </div>
@@ -353,7 +336,7 @@ export function WishlistView() {
         </div>
       )}
 
-      <p className="mt-8 text-xs text-muted">
+      <p className="mt-8 text-xs text-muted-3">
         전환한 장소는{" "}
         <Link href="/" className="underline hover:text-accent">
           홈 “다녀온 곳”

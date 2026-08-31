@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function CoursesPage() {
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
+    <main className="mx-auto max-w-5xl px-6 py-7 sm:px-10 sm:py-8">
       <CoursesView />
     </main>
   );
