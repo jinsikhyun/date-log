@@ -313,7 +313,7 @@ export function HomeView() {
             ‘{effectiveCategory}’ 카테고리에 아직 장소가 없어요.
           </p>
         ) : (
-          <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {visiblePlaces.map((place) => (
               <PlaceCard key={place.id} place={place} />
             ))}

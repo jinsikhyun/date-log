@@ -5,7 +5,9 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import {
   type Place,
+  categoryIcon,
   categoryStyle,
+  naverImageSearchUrl,
   placeInputToRow,
   wantedByLabel,
 } from "@/lib/places";
@@ -14,7 +16,6 @@ import {
   placeFormInput,
   type NewPlaceInput,
 } from "@/components/AddPlaceForm";
-import { CategoryIconTile } from "@/components/CategoryIconTile";
 
 const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
@@ -169,11 +170,11 @@ export function WishlistView() {
       )}
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
-              className="h-24 animate-pulse rounded-3xl bg-stone-200/70"
+              className="h-72 animate-pulse rounded-3xl bg-stone-200/70"
             />
           ))}
         </div>
@@ -183,45 +184,52 @@ export function WishlistView() {
           담아보세요.
         </p>
       ) : (
-        <div className="grid items-start gap-3 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {places.map((place) => {
             const label = wantedByLabel(place.wanted_by);
             return (
               <article
                 key={place.id}
-                className="flex items-start gap-3 rounded-2xl bg-card p-3 ring-1 ring-border/70"
+                className="flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70"
               >
-                <CategoryIconTile
-                  category={place.category}
-                  name={place.name}
-                  address={place.address}
-                />
-
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span
-                    className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryStyle(
-                      place.category,
-                    )}`}
-                  >
+                {/* 사진 자리 placeholder — 클릭 시 네이버 이미지 검색 (새 탭) */}
+                <a
+                  href={naverImageSearchUrl(place.name, place.address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`${place.name} 네이버 이미지 검색`}
+                  title="네이버 이미지 검색"
+                  className={`relative flex aspect-[4/3] cursor-pointer items-center justify-center transition hover:brightness-105 ${categoryStyle(
+                    place.category,
+                  )}`}
+                >
+                  <span className="text-6xl" aria-hidden>
+                    {categoryIcon(place.category)}
+                  </span>
+                  <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
                     {place.category}
                   </span>
+                </a>
+
+                <div className="flex flex-1 flex-col gap-2 p-5">
                   <Link
                     href={`/places/${place.id}`}
-                    className="truncate text-base font-bold leading-snug transition-colors hover:text-accent"
+                    className="text-lg font-bold leading-snug transition-colors hover:text-accent"
                   >
                     {place.name}
                   </Link>
-                  <p className="truncate text-xs text-muted">{place.address}</p>
+                  <p className="text-sm text-muted">{place.address}</p>
                   {label && (
-                    <span className="w-fit rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+                    <span className="self-start rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
                       {label}
                     </span>
                   )}
-                  <div className="mt-1 flex items-center justify-between gap-2">
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => setVisiting(place)}
-                      className="rounded-full bg-foreground px-3.5 py-1 text-xs font-semibold text-background"
+                      className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background"
                     >
                       다녀왔어요
                     </button>
