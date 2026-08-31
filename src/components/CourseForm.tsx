@@ -66,6 +66,8 @@ const blankRow = (over: Partial<PlaceRowInput>): PlaceRowInput => ({
   status: "visited",
   wanted_by: "",
   added_by: "",
+  favorite_by: [],
+  is_regular: false,
   ...over,
 });
 

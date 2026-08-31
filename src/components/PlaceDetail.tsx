@@ -26,6 +26,7 @@ import { type Reaction, REACTION_COLUMNS } from "@/lib/reactions";
 import { NearbySimilar } from "@/components/NearbySimilar";
 import { SharePlaceButton } from "@/components/SharePlaceButton";
 import { DirectionsButton } from "@/components/DirectionsButton";
+import { PlaceTagBadges } from "@/components/PlaceTagBadges";
 import {
   AddPlaceForm,
   placeFormInput,
@@ -33,7 +34,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -361,6 +362,11 @@ export function PlaceDetail({ id }: { id: number }) {
             >
               {place.category}
             </span>
+            <PlaceTagBadges
+              favoriteBy={place.favorite_by}
+              isRegular={place.is_regular}
+              size="md"
+            />
           </div>
           <div className="flex flex-col gap-3 p-6 sm:p-8">
             <h1 className="text-2xl font-bold">{place.name}</h1>

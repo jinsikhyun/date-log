@@ -23,6 +23,8 @@ export interface Place {
   status: PlaceStatus; // 'visited'(다녀온 곳) | 'wishlist'(가고 싶은 곳)
   wanted_by: string | null; // '나' | '여자친구' | '둘다' — wishlist 에서만
   added_by: string | null; // 등록한 사람 ('진식' / '지민')
+  favorite_by: string[]; // 이 장소를 pick 한 profiles.id (0~2개) — wanted_by 와 별개
+  is_regular: boolean; // 우리 단골
   memory_count: number;
   created_at: string;
 }
@@ -95,6 +97,8 @@ export interface PlaceRowInput {
   status: PlaceStatus;
   wanted_by: string;
   added_by: string; // 현재 선택된 사용자 이름 (폼 필드 아님, 저장 시 자동 주입)
+  favorite_by: string[]; // pick 한 profiles.id
+  is_regular: boolean; // 우리 단골
 }
 
 /** 폼 입력을 DB row 로. wishlist/course_only 면 방문 전용 필드(별점/방문일/한줄평/사진)는 비운다. */
@@ -110,6 +114,8 @@ export function placeInputToRow(input: PlaceRowInput) {
     lng: input.lng ? Number(input.lng) : null,
     status: input.status,
     added_by: input.added_by || null,
+    favorite_by: input.favorite_by ?? [],
+    is_regular: !!input.is_regular,
     wanted_by: input.status === "wishlist" ? input.wanted_by || null : null,
     rating: lite || !input.rating ? null : Number(input.rating),
     first_visit_date: lite ? null : input.first_visit_date || null,

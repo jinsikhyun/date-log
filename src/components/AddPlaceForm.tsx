@@ -22,6 +22,8 @@ export interface NewPlaceInput {
   status: PlaceStatus; // '다녀온 곳' | '가고 싶은 곳'
   wanted_by: string; // wishlist 일 때 '나'/'여자친구'/'둘다', 아니면 ""
   added_by: string; // 저장 시 현재 선택된 사용자로 자동 주입 (폼 필드 아님)
+  favorite_by: string[]; // pick 한 profiles.id (wanted_by 와 별개)
+  is_regular: boolean; // 우리 단골
 }
 
 const EMPTY: NewPlaceInput = {
@@ -39,6 +41,8 @@ const EMPTY: NewPlaceInput = {
   status: "visited",
   wanted_by: "",
   added_by: "",
+  favorite_by: [],
+  is_regular: false,
 };
 
 const RATING_CHOICES = ["5", "4.5", "4", "3.5", "3", "2.5", "2", "1.5", "1", "0.5"];
@@ -62,6 +66,8 @@ export function placeFormInput(p: {
   lng: number | null;
   status?: string | null;
   wanted_by?: string | null;
+  favorite_by?: string[] | null;
+  is_regular?: boolean | null;
 }): NewPlaceInput {
   return {
     name: p.name,
@@ -78,6 +84,8 @@ export function placeFormInput(p: {
     status: p.status === "wishlist" ? "wishlist" : "visited",
     wanted_by: p.wanted_by ?? "",
     added_by: "", // 저장 시 현재 사용자로 덮어씀
+    favorite_by: p.favorite_by ?? [],
+    is_regular: p.is_regular ?? false,
   };
 }
 
@@ -393,6 +401,52 @@ export function AddPlaceForm({
           onChange={(e) => set("naver_map_link", e.target.value)}
           placeholder="https://naver.me/..."
         />
+      </div>
+
+      {/* 즐겨찾기 태그 — wishlist 의 wanted_by 와 완전 별개, 여러 개 동시 적용 가능 */}
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <span className={labelClass}>즐겨찾기 태그</span>
+        <div className="flex flex-wrap gap-2">
+          {coupleMembers
+            .filter((m) => m.display_name?.trim())
+            .map((m) => {
+              const on = form.favorite_by.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    set(
+                      "favorite_by",
+                      on
+                        ? form.favorite_by.filter((x) => x !== m.id)
+                        : [...form.favorite_by, m.id],
+                    )
+                  }
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${
+                    on
+                      ? "bg-accent/10 text-accent ring-accent/50"
+                      : "bg-white text-stone-500 ring-border hover:text-accent"
+                  }`}
+                >
+                  {m.display_name} pick
+                </button>
+              );
+            })}
+          <button
+            type="button"
+            aria-pressed={form.is_regular}
+            onClick={() => set("is_regular", !form.is_regular)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${
+              form.is_regular
+                ? "bg-amber-100 text-amber-700 ring-amber-300"
+                : "bg-white text-stone-500 ring-border hover:text-amber-600"
+            }`}
+          >
+            우리 단골
+          </button>
+        </div>
       </div>
 
       {form.status === "wishlist" && (

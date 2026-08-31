@@ -16,9 +16,10 @@ import {
   placeFormInput,
   type NewPlaceInput,
 } from "@/components/AddPlaceForm";
+import { PlaceTagBadges } from "@/components/PlaceTagBadges";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -210,6 +211,11 @@ export function WishlistView() {
                   <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
                     {place.category}
                   </span>
+                  <PlaceTagBadges
+                    favoriteBy={place.favorite_by}
+                    isRegular={place.is_regular}
+                    size="sm"
+                  />
                 </a>
 
                 <div className="flex flex-1 flex-col gap-2 p-5">

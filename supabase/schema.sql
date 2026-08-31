@@ -51,6 +51,9 @@ create index if not exists places_owning_course_idx on public.places (owning_cou
 -- (drop-wanted-by-check.sql 참고)
 alter table public.places drop constraint if exists places_wanted_by_check;
 alter table public.places add column if not exists added_by text;
+-- 즐겨찾기 태그 (add-favorite-tags.sql)
+alter table public.places add column if not exists favorite_by uuid[] not null default '{}';
+alter table public.places add column if not exists is_regular boolean not null default false;
 alter table public.places add column if not exists kakao_map_link text;
 alter table public.places add column if not exists via_course boolean not null default false;
 update public.places set status = 'visited' where status is null or status = '';

@@ -7,6 +7,7 @@ import {
   naverImageSearchUrl,
 } from "@/lib/places";
 import { StarRating } from "@/components/StarRating";
+import { PlaceTagBadges } from "@/components/PlaceTagBadges";
 
 export function PlaceCard({ place }: { place: Place }) {
   const visited = place.first_visit_date
@@ -40,6 +41,11 @@ export function PlaceCard({ place }: { place: Place }) {
           >
             {place.category}
           </span>
+          <PlaceTagBadges
+            favoriteBy={place.favorite_by}
+            isRegular={place.is_regular}
+            size="sm"
+          />
         </div>
       ) : (
         // 사진 없음 — 같은 크기의 placeholder(카테고리 색 + 아이콘).
@@ -61,6 +67,11 @@ export function PlaceCard({ place }: { place: Place }) {
           <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-foreground/80">
             {place.category}
           </span>
+          <PlaceTagBadges
+            favoriteBy={place.favorite_by}
+            isRegular={place.is_regular}
+            size="sm"
+          />
         </a>
       )}
 
