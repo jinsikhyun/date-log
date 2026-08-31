@@ -37,7 +37,7 @@ export function FavoriteFilterChips({
     });
 
   return (
-    <div className="mb-6 -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1">
+    <div className="mb-6 -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pt-1.5 pb-1">
       <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted/60">
         즐겨찾기
       </span>
