@@ -208,8 +208,8 @@ export function Header() {
     <>
       {/* ── 데스크탑 사이드바 ─────────────────────────────── */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col gap-7 border-r border-border bg-sidebar px-5 py-7 lg:flex">
-        <div>
-          <Link href="/" aria-label="date.log 홈">
+        <div className="w-[168px]">
+          <Link href="/" aria-label="date.log 홈" className="block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand-wordmark.png"
@@ -219,7 +219,9 @@ export function Header() {
               style={wordmarkStyle(-4)}
             />
           </Link>
-          <p className="mt-1 text-xs text-muted-2">{subtitle}</p>
+          <p className="mt-1 text-center text-xs leading-snug text-muted-2">
+            {subtitle}
+          </p>
         </div>
 
         {loggedIn ? (
@@ -304,7 +306,11 @@ export function Header() {
 
       {/* ── 모바일 상단바 ─────────────────────────────────── */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
-        <Link href="/" aria-label="date.log 홈" className="flex flex-col">
+        <Link
+          href="/"
+          aria-label="date.log 홈"
+          className="flex flex-col items-center"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand-wordmark.png"
@@ -313,7 +319,9 @@ export function Header() {
             className="w-[104px] max-w-none"
             style={wordmarkStyle(-3)}
           />
-          <span className="mt-0.5 text-[11px] text-muted-2">{subtitle}</span>
+          <span className="mt-0.5 text-[10px] leading-tight text-muted-2">
+            {subtitle}
+          </span>
         </Link>
         {loggedIn && (
           <div className="flex items-center gap-1 text-muted">
