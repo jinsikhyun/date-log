@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
 const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
@@ -101,6 +102,8 @@ export function LoginForm() {
       >
         {busy ? "로그인 중…" : "로그인"}
       </button>
+
+      <GoogleAuthButton />
 
       <p className="text-center text-xs text-muted">
         계정이 없나요?{" "}
