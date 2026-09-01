@@ -330,15 +330,15 @@ export function PlaceDetail({ id }: { id: number }) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-56 animate-pulse rounded-3xl bg-stone-200/70" />
-        <div className="h-24 animate-pulse rounded-3xl bg-stone-200/70" />
+        <div className="h-56 animate-pulse rounded-[20px] bg-[#efe7d6]" />
+        <div className="h-24 animate-pulse rounded-[20px] bg-[#efe7d6]" />
       </div>
     );
   }
 
   if (error || !place) {
     return (
-      <div className="rounded-3xl bg-card p-10 text-center ring-1 ring-border/70">
+      <div className="rounded-[20px] bg-card p-10 text-center ring-1 ring-border">
         <p className="text-sm text-muted">{error ?? "장소를 찾을 수 없어요."}</p>
         <Link
           href="/"
@@ -368,7 +368,7 @@ export function PlaceDetail({ id }: { id: number }) {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="rounded-full bg-stone-100 px-3.5 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200"
+              className="rounded-full bg-background px-3.5 py-1.5 text-sm font-medium text-muted-2 transition-colors hover:brightness-95"
             >
               수정
             </button>
@@ -393,7 +393,7 @@ export function PlaceDetail({ id }: { id: number }) {
           onCancel={() => setEditing(false)}
         />
       ) : (
-        <header className="overflow-hidden rounded-3xl bg-card ring-1 ring-border/70">
+        <header className="overflow-hidden rounded-[20px] bg-card ring-1 ring-border">
           <div className="relative aspect-[16/7] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
             {place.image_url && (
               <button
@@ -432,7 +432,7 @@ export function PlaceDetail({ id }: { id: number }) {
             )}
           </div>
           <div className="flex flex-col gap-3 p-6 sm:p-8">
-            <h1 className="text-2xl font-bold">{place.name}</h1>
+            <h1 className="text-2xl font-extrabold tracking-[-0.02em]">{place.name}</h1>
             {(visited || addedByLabel(place.added_by)) && (
               <p className="text-xs text-muted">
                 {[visited, addedByLabel(place.added_by)]
@@ -499,7 +499,7 @@ export function PlaceDetail({ id }: { id: number }) {
                   href={place.naver_map_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
+                  className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-2 transition-colors hover:brightness-95"
                 >
                   네이버지도에서 보기
                 </a>
@@ -509,7 +509,7 @@ export function PlaceDetail({ id }: { id: number }) {
                   href={place.kakao_map_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
+                  className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-2 transition-colors hover:brightness-95"
                 >
                   카카오맵에서 보기
                 </a>
@@ -520,7 +520,7 @@ export function PlaceDetail({ id }: { id: number }) {
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"
+                className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-2 transition-colors hover:brightness-95"
               >
                 구글지도에서 보기
               </a>
@@ -560,7 +560,7 @@ export function PlaceDetail({ id }: { id: number }) {
         )}
 
         {memories.length === 0 && !showMemoryForm ? (
-          <p className="rounded-3xl bg-card p-10 text-center text-sm text-muted ring-1 ring-border/70">
+          <p className="rounded-[20px] bg-card p-10 text-center text-sm text-muted-2 ring-1 ring-border">
             아직 추억이 없어요, 첫 이야기를 남겨보세요.
           </p>
         ) : memories.length > 0 ? (
@@ -576,7 +576,7 @@ export function PlaceDetail({ id }: { id: number }) {
                     onCancel={() => setEditingMemoryId(null)}
                   />
                 ) : (
-                  <article className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
+                  <article className="rounded-[20px] bg-card p-5 ring-1 ring-border">
                     <div className="flex flex-wrap items-center gap-2">
                       <time className="text-sm font-semibold text-accent">
                         {dot(m.date)}

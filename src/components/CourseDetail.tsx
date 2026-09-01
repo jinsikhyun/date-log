@@ -61,7 +61,7 @@ function Connector({
         )}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-full bg-stone-100 px-2 py-0.5 font-medium text-stone-600 transition-colors hover:bg-stone-200"
+        className="rounded-full bg-background px-2 py-0.5 font-medium text-muted-2 transition-colors hover:brightness-95"
       >
         길찾기
       </a>
@@ -213,15 +213,15 @@ export function CourseDetail({ id }: { id: number }) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-24 animate-pulse rounded-3xl bg-stone-200/70" />
-        <div className="h-64 animate-pulse rounded-3xl bg-stone-200/70" />
+        <div className="h-24 animate-pulse rounded-[20px] bg-[#efe7d6]" />
+        <div className="h-64 animate-pulse rounded-[20px] bg-[#efe7d6]" />
       </div>
     );
   }
 
   if (error || !course) {
     return (
-      <div className="rounded-3xl bg-card p-10 text-center ring-1 ring-border/70">
+      <div className="rounded-[20px] bg-card p-10 text-center ring-1 ring-border">
         <p className="text-sm text-muted">{error ?? "코스를 찾을 수 없어요."}</p>
         <Link
           href="/courses"
@@ -270,7 +270,7 @@ export function CourseDetail({ id }: { id: number }) {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="rounded-full bg-stone-100 px-3.5 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200"
+              className="rounded-full bg-background px-3.5 py-1.5 text-sm font-medium text-muted-2 transition-colors hover:brightness-95"
             >
               수정
             </button>
@@ -295,9 +295,9 @@ export function CourseDetail({ id }: { id: number }) {
           onCancel={() => setEditing(false)}
         />
       ) : (
-        <header className="rounded-3xl bg-card p-6 ring-1 ring-border/70 sm:p-8">
+        <header className="rounded-[20px] bg-card p-6 ring-1 ring-border sm:p-8">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-bold">{course.title}</h1>
+            <h1 className="text-2xl font-extrabold tracking-[-0.02em]">{course.title}</h1>
             {stops.length > 0 && (
               <div className="shrink-0 pt-1">
                 <ShareCourseButton
@@ -327,7 +327,7 @@ export function CourseDetail({ id }: { id: number }) {
           {/* 동선 지도 */}
           {stops.length >= 2 &&
             (coordsLoading && mapStops.length < 2 ? (
-              <div className="flex h-[360px] items-center justify-center rounded-3xl bg-stone-200 text-sm text-muted sm:h-[440px]">
+              <div className="flex h-[360px] items-center justify-center rounded-[20px] bg-[#e6decf] text-sm text-muted-2 sm:h-[440px]">
                 동선 계산 중…
               </div>
             ) : mapStops.length >= 2 ? (
@@ -342,7 +342,7 @@ export function CourseDetail({ id }: { id: number }) {
           <section className="space-y-1">
             <h2 className="mb-3 text-lg font-bold">코스 순서</h2>
             {stops.length === 0 ? (
-              <p className="rounded-3xl bg-card p-10 text-center text-sm text-muted ring-1 ring-border/70">
+              <p className="rounded-[20px] bg-card p-10 text-center text-sm text-muted-2 ring-1 ring-border">
                 이 코스에 담긴 장소가 없어요. “수정”에서 장소를 추가해 보세요.
               </p>
             ) : (
@@ -350,7 +350,7 @@ export function CourseDetail({ id }: { id: number }) {
                 const p = s.places!;
                 return (
                   <Fragment key={p.id}>
-                    <article className="flex items-center gap-3 rounded-2xl bg-card p-4 ring-1 ring-border/70">
+                    <article className="flex items-center gap-3 rounded-2xl bg-card p-4 ring-1 ring-border">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
                         {i + 1}
                       </span>
