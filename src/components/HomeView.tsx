@@ -17,6 +17,7 @@ import {
 } from "@/lib/places";
 import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
+import { OnThisMonthBanner } from "@/components/OnThisMonthBanner";
 import { FavoriteFilterChips } from "@/components/FavoriteFilterChips";
 import { NearbyPanel } from "@/components/NearbyPanel";
 
@@ -260,6 +261,8 @@ export function HomeView() {
           </button>
         </div>
       </div>
+
+      {view === "feed" && <OnThisMonthBanner />}
 
       {!loading && places.length > 0 && (
         <CategoryChips
