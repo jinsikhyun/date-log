@@ -18,7 +18,7 @@ const snippet = (s: string) => {
 };
 
 /**
- * "1년 전 오늘" 회상 배너/카드.
+ * "작년 이맘때" 회상 배너/카드.
  * 기준 = "작년의 이번 달"(정확한 같은 날짜가 아니라 그 달 전체) 에 방문 기록
  * (places.first_visit_date) 또는 추억(memories.date) 이 있는 장소.
  * 후보 중 하루 단위 시드로 하나 선택. 후보가 없으면 아무것도 렌더하지 않음.
@@ -162,7 +162,7 @@ export function OnThisMonthBanner({
         }`}
       >
         <span className="text-[11px] font-bold tracking-[0.08em] text-white/60">
-          1년 전 오늘
+          작년 이맘때
         </span>
         <p
           className={
@@ -171,7 +171,7 @@ export function OnThisMonthBanner({
               : "text-lg font-extrabold leading-snug sm:text-xl"
           }
         >
-          작년 오늘, 둘은 {recall.name}에 있었어요.
+          작년 이맘때, 둘은 {recall.name}에 있었어요.
         </p>
         {recall.subtitle && (
           <p
