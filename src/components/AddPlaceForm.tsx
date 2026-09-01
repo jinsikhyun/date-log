@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type PlaceStatus } from "@/lib/places";
 import { uploadPhoto } from "@/lib/photos";
-import { ensureKakaoLoaded } from "@/lib/kakao";
+import { ensureKakaoLoaded, geocode, keywordSearchFirst } from "@/lib/kakao";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 
@@ -246,8 +246,20 @@ export function AddPlaceForm({
 
     setSaving(true);
     try {
+      // 좌표가 비어 있으면 저장 시점에 채운다 (주소 → 지오코딩, 실패 시 장소명 검색).
+      // 이게 있어야 코스 동선 지도가 이 장소를 나중에 못 그리는 일이 없다.
+      let { lat, lng } = form;
+      if ((!lat || !lng) && form.address.trim()) {
+        const hit =
+          (await geocode(form.address).catch(() => null)) ??
+          (await keywordSearchFirst(form.name).catch(() => null));
+        if (hit) {
+          lat = String(hit.lat);
+          lng = String(hit.lng);
+        }
+      }
       // added_by 는 폼 입력이 아니라 현재 로그인한 사용자의 이름으로 자동
-      await onSubmit({ ...form, added_by: authorName });
+      await onSubmit({ ...form, lat, lng, added_by: authorName });
       setForm(base);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");

@@ -2,6 +2,9 @@
 // autoload=false + libraries=services 로 한 번만 삽입하고, kakao.maps.load 까지 끝나면 resolve.
 
 const SDK_SCRIPT_ID = "kakao-maps-sdk";
+// SDK 스크립트는 200 으로 내려오는데 kakao.maps.load 콜백이 안 오는 경우
+// (도메인 미등록 등) 무한 대기하지 않도록 상한을 둔다.
+const LOAD_TIMEOUT_MS = 12_000;
 
 let loadPromise: Promise<void> | null = null;
 
@@ -15,20 +18,39 @@ export function ensureKakaoLoaded(appKey: string): Promise<void> {
       return;
     }
 
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(
+        new Error(
+          "카카오맵 SDK 로드가 시간 초과됐어요 (도메인 미등록 / 네트워크 확인).",
+        ),
+      );
+    }, LOAD_TIMEOUT_MS);
+
+    const done = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (err) reject(err);
+      else resolve();
+    };
+
     const finish = () => {
       if (!window.kakao?.maps) {
-        reject(new Error("window.kakao.maps 를 찾을 수 없습니다."));
+        done(new Error("window.kakao.maps 를 찾을 수 없습니다."));
         return;
       }
       window.kakao.maps.load(() => {
         if (!window.kakao.maps.services) {
-          reject(
+          done(
             new Error(
               "services 라이브러리를 찾을 수 없습니다 (SDK URL 의 libraries=services 확인).",
             ),
           );
         } else {
-          resolve();
+          done();
         }
       });
     };
@@ -44,7 +66,7 @@ export function ensureKakaoLoaded(appKey: string): Promise<void> {
     if (existing) {
       existing.addEventListener("load", finish);
       existing.addEventListener("error", () =>
-        reject(new Error("이미 삽입된 SDK 스크립트 로드에 실패했습니다.")),
+        done(new Error("이미 삽입된 SDK 스크립트 로드에 실패했습니다.")),
       );
       return;
     }
@@ -55,7 +77,7 @@ export function ensureKakaoLoaded(appKey: string): Promise<void> {
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
     script.addEventListener("load", finish);
     script.addEventListener("error", () =>
-      reject(
+      done(
         new Error(
           "SDK 스크립트를 내려받지 못했습니다 (네트워크 차단, 잘못된 앱키, 또는 도메인 미등록).",
         ),
@@ -99,6 +121,29 @@ function addressCandidates(raw: string): string[] {
     .replace(/\s*(지하\s*\d*\s*층|\d+\s*층|\d+\s*호).*$/, "")
     .trim();
   return cleaned && cleaned !== raw ? [raw, cleaned] : [raw];
+}
+
+/** 장소명으로 카카오 장소검색 → 첫 결과 좌표. 주소 지오코딩이 실패했을 때의 폴백. */
+export async function keywordSearchFirst(
+  query: string,
+): Promise<{ lat: number; lng: number } | null> {
+  if (!query.trim()) return null;
+  const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+  if (!appKey) return null;
+  await ensureKakaoLoaded(appKey);
+  const places = new window.kakao.maps.services.Places();
+  return new Promise((resolve) => {
+    places.keywordSearch(query.trim(), (data, status) => {
+      if (
+        status === window.kakao.maps.services.Status.OK &&
+        data.length > 0
+      ) {
+        resolve({ lat: parseFloat(data[0].y), lng: parseFloat(data[0].x) });
+      } else {
+        resolve(null);
+      }
+    });
+  });
 }
 
 /** 주소 문자열을 좌표로. 실패하면 null. */

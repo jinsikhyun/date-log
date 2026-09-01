@@ -16,7 +16,7 @@ import {
   statusBadgeClass,
   statusLabel,
 } from "@/lib/places";
-import { geocode } from "@/lib/kakao";
+import { geocode, keywordSearchFirst } from "@/lib/kakao";
 import { haversineKm } from "@/lib/courses";
 import { PlaceAutocompleteInput } from "@/components/PlaceAutocompleteInput";
 import { useAuth } from "@/components/AuthProvider";
@@ -298,6 +298,19 @@ export function CourseForm({
     const courseOnly = mode === "course_only";
     setNSaving(true);
     try {
+      // 좌표가 없으면 저장 전에 채운다 (주소 → 지오코딩, 실패 시 장소명 검색).
+      // 코스 동선 지도가 이 장소를 그릴 수 있도록.
+      let lat = nLat;
+      let lng = nLng;
+      if ((!lat || !lng) && nAddress.trim()) {
+        const hit =
+          (await geocode(nAddress).catch(() => null)) ??
+          (await keywordSearchFirst(nName).catch(() => null));
+        if (hit) {
+          lat = String(hit.lat);
+          lng = String(hit.lng);
+        }
+      }
       const { data, error: insErr } = await supabase
         .from("places")
         .insert({
@@ -306,8 +319,8 @@ export function CourseForm({
               name: nName,
               category: nCategory,
               address: nAddress,
-              lat: nLat,
-              lng: nLng,
+              lat,
+              lng,
               kakao_map_link: nKakao,
               status: courseOnly ? "course_only" : "wishlist",
               added_by: authorName,

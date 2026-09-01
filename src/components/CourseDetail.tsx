@@ -4,7 +4,11 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { geocode, kakaoDirectionsFromTo } from "@/lib/kakao";
+import {
+  geocode,
+  kakaoDirectionsFromTo,
+  keywordSearchFirst,
+} from "@/lib/kakao";
 import { categoryStyle, statusBadgeClass, statusLabel } from "@/lib/places";
 import {
   type CourseWithStops,
@@ -113,22 +117,23 @@ export function CourseDetail({ id }: { id: number }) {
       const stops = sortedStops(c);
       if (stops.length === 0) return;
       setCoordsLoading(true);
-      const entries = await Promise.all(
-        stops.map(async (s) => {
-          const p = s.places!;
-          if (p.lat != null && p.lng != null) {
-            return [p.id, { lat: p.lat, lng: p.lng }] as const;
-          }
-          try {
-            return [p.id, await geocode(p.address)] as const;
-          } catch {
-            return [p.id, null] as const;
-          }
-        }),
-      );
-      if (!cancelled) {
-        setCoords(new Map(entries));
-        setCoordsLoading(false);
+      try {
+        const entries = await Promise.all(
+          stops.map(async (s) => {
+            const p = s.places!;
+            if (p.lat != null && p.lng != null) {
+              return [p.id, { lat: p.lat, lng: p.lng }] as const;
+            }
+            // 주소 지오코딩 → 실패 시 장소명 검색 폴백
+            const hit =
+              (await geocode(p.address).catch(() => null)) ??
+              (await keywordSearchFirst(p.name).catch(() => null));
+            return [p.id, hit] as const;
+          }),
+        );
+        if (!cancelled) setCoords(new Map(entries));
+      } finally {
+        if (!cancelled) setCoordsLoading(false);
       }
     })();
 
@@ -324,17 +329,26 @@ export function CourseDetail({ id }: { id: number }) {
 
       {!editing && (
         <>
-          {/* 동선 지도 */}
+          {/* 동선 지도 — 좌표 있는 장소가 2곳 이상이면 그것만으로도 그린다 */}
           {stops.length >= 2 &&
             (coordsLoading && mapStops.length < 2 ? (
               <div className="flex h-[360px] items-center justify-center rounded-[20px] bg-[#e6decf] text-sm text-muted-2 sm:h-[440px]">
                 동선 계산 중…
               </div>
             ) : mapStops.length >= 2 ? (
-              <CourseMap stops={mapStops} />
+              <div className="space-y-2">
+                <CourseMap stops={mapStops} />
+                {mapStops.length < stops.length && (
+                  <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+                    일부 장소({stops.length - mapStops.length}곳)는 위치 정보가
+                    없어 동선에서 제외됐어요.
+                  </p>
+                )}
+              </div>
             ) : (
               <p className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-amber-200">
-                좌표를 찾은 장소가 부족해 동선을 그릴 수 없어요.
+                좌표를 찾은 장소가 부족해 동선을 그릴 수 없어요. 각 장소 상세에서
+                주소를 확인해 주세요.
               </p>
             ))}
 
