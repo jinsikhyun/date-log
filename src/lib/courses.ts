@@ -53,3 +53,19 @@ export function haversineKm(
 export function walkMinutes(km: number): number {
   return Math.max(1, Math.round((km / 4) * 60));
 }
+
+/** 좌표가 있는 연속 정거장들 사이 직선거리 합(km). 좌표 없는 구간은 건너뜀. */
+export function courseDistanceKm(stops: CourseStop[]): number {
+  let total = 0;
+  for (let i = 1; i < stops.length; i++) {
+    const a = stops[i - 1].places;
+    const b = stops[i].places;
+    if (a?.lat != null && a.lng != null && b?.lat != null && b.lng != null) {
+      total += haversineKm(
+        { lat: a.lat, lng: a.lng },
+        { lat: b.lat, lng: b.lng },
+      );
+    }
+  }
+  return total;
+}

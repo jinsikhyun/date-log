@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import {
   type CourseWithStops,
+  courseDistanceKm,
   sortedStops,
+  walkMinutes,
 } from "@/lib/courses";
+import { categoryStyle } from "@/lib/places";
 import { CourseForm, type CourseFormInput } from "@/components/CourseForm";
 
 const COURSE_LIST_SELECT =
@@ -16,10 +19,7 @@ const COURSE_LIST_SELECT =
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
-function coverImage(course: CourseWithStops): string | null {
-  const stops = sortedStops(course);
-  return stops.find((s) => s.places?.image_url)?.places?.image_url ?? null;
-}
+const fmtDate = (d: string) => d.slice(0, 10).replace(/-/g, ".");
 
 export function CoursesView() {
   const router = useRouter();
@@ -105,17 +105,19 @@ export function CoursesView() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold sm:text-2xl">데이트 코스</h1>
-          <p className="mt-1.5 text-sm text-muted">
+          <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
+            데이트 코스
+          </h1>
+          <p className="mt-1 text-sm text-muted-2">
             {loading ? "불러오는 중…" : `코스 ${courses.length}개`}
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background"
+          className="rounded-full bg-foreground px-5 py-[11px] text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
         >
           {showForm ? "폼 닫기" : "코스 만들기"}
         </button>
@@ -136,56 +138,83 @@ export function CoursesView() {
       )}
 
       {loading ? (
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-[22px] sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-56 animate-pulse rounded-3xl bg-stone-200/70"
+              className="h-56 animate-pulse rounded-[20px] bg-[#efe7d6]"
             />
           ))}
         </div>
       ) : courses.length === 0 && !loadError ? (
-        <p className="rounded-3xl bg-card p-12 text-center text-sm text-muted ring-1 ring-border/70">
+        <p className="rounded-[20px] bg-card p-12 text-center text-sm text-muted-2 ring-1 ring-border">
           아직 만든 코스가 없어요. “코스 만들기”로 첫 코스를 짜보세요.
         </p>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-[22px] sm:grid-cols-2">
           {courses.map((course) => {
-            const count = sortedStops(course).length;
-            const cover = coverImage(course);
+            const stops = sortedStops(course);
+            const km = courseDistanceKm(stops);
             return (
               <Link
                 key={course.id}
                 href={`/courses/${course.id}`}
-                className="group flex flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-border/70 transition duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10"
+                className="group flex flex-col gap-3 rounded-[20px] bg-card px-[26px] py-6 ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]"
               >
-                <div className="relative aspect-[16/9] overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300">
-                  {cover ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={cover}
-                      alt={course.title}
-                      loading="lazy"
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-stone-400">
-                      사진 준비 중
-                    </span>
-                  )}
-                  <span className="absolute left-4 top-4 z-[1] rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-foreground/80">
-                    장소 {count}곳
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col gap-1.5 p-5">
-                  <h2 className="text-lg font-bold leading-snug">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="min-w-0 flex-1 truncate text-[19px] font-extrabold tracking-[-0.01em]">
                     {course.title}
                   </h2>
-                  {course.concept && (
-                    <p className="line-clamp-2 text-sm text-foreground/75">
-                      {course.concept}
-                    </p>
+                  <span className="shrink-0 text-[11px] text-muted-3">
+                    {fmtDate(course.created_at)}
+                  </span>
+                </div>
+                {course.concept && (
+                  <p className="line-clamp-1 text-[13px] text-muted-2">
+                    {course.concept}
+                  </p>
+                )}
+
+                <ol className="flex flex-col gap-1.5">
+                  {stops.slice(0, 4).map((s, i) => (
+                    <li
+                      key={s.places!.id}
+                      className="flex items-center gap-2 text-[13px]"
+                    >
+                      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-background text-[10px] font-bold text-muted-2">
+                        {i + 1}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryStyle(
+                          s.places!.category,
+                        )}`}
+                      >
+                        {s.places!.category}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        {s.places!.name}
+                      </span>
+                    </li>
+                  ))}
+                  {stops.length > 4 && (
+                    <li className="pl-[26px] text-[11px] text-muted-3">
+                      +{stops.length - 4}곳 더
+                    </li>
                   )}
+                </ol>
+
+                <div className="mt-1 flex items-center justify-between gap-2 border-t border-background pt-3 text-[12px] font-medium text-muted-2">
+                  <span className="whitespace-nowrap">
+                    {km > 0 ? `총 ${km.toFixed(1)}km` : `장소 ${stops.length}곳`}
+                    {km > 0 && (
+                      <span className="ml-2 whitespace-nowrap">
+                        도보 {walkMinutes(km)}분
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-bold text-accent transition-colors group-hover:text-accent-hover">
+                    코스 열기 →
+                  </span>
                 </div>
               </Link>
             );
