@@ -41,7 +41,6 @@ export function useShareImage(
   );
 
   const capture = async () => {
-    console.log("[share] capture triggered", Date.now()); // TEMP: 중복호출 확인용
     if (capturingRef.current) return; // 이미 캡처했거나 캡처 중 → 무시
     capturingRef.current = true;
     setError(null);
@@ -66,7 +65,6 @@ export function useShareImage(
   };
 
   const download = () => {
-    console.log("[share] download triggered", Date.now()); // TEMP: 중복호출 확인용
     const now = Date.now();
     if (!blob || now - lastDownloadRef.current < 1000) return; // 1초 내 재호출 무시
     lastDownloadRef.current = now;
@@ -74,7 +72,6 @@ export function useShareImage(
   };
 
   const share = async () => {
-    console.log("[share] share triggered", Date.now()); // TEMP: 중복호출 확인용
     const now = Date.now();
     if (!blob || sharingRef.current || now - lastShareRef.current < 1500) return;
     lastShareRef.current = now;
