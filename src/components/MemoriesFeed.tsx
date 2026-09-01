@@ -133,22 +133,23 @@ export function MemoriesFeed() {
                   )}
                 </div>
 
-                {/* 본문 인용구 — 이 화면의 주인공 */}
-                <blockquote className="relative mt-4">
+                {/* 본문 인용구 — 이 화면의 주인공.
+                    따옴표는 텍스트 뒤 은은한 배경 장식(투명도 낮춤) + 본문은 살짝 들여쓰기. */}
+                <blockquote className="relative mt-6 pl-6">
                   <span
                     aria-hidden
-                    className="pointer-events-none absolute -left-1 -top-7 select-none font-serif text-[6rem] leading-none text-accent/10"
+                    className="pointer-events-none absolute -left-1 -top-8 select-none font-serif text-[4.5rem] leading-none text-accent/[0.07]"
                   >
                     &ldquo;
                   </span>
-                  <p className="relative text-[19px] leading-[1.7] text-foreground/90">
+                  <p className="relative text-[19px] leading-[1.75] text-foreground/90">
                     {m.content?.trim() || "(내용 없음)"}
                   </p>
                 </blockquote>
 
                 {/* 하단 메타 */}
                 {(m.mood_tag || photoCount > 0 || replyCount > 0) && (
-                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-2">
+                  <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-2">
                     {m.mood_tag && (
                       <span className="rounded-full bg-[#f1eadc] px-2 py-0.5 font-medium text-[#7a5f31]">
                         {m.mood_tag}
