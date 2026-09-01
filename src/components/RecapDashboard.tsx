@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { statusLabel } from "@/lib/places";
 import { daysTogether } from "@/lib/recap";
 import { useAuth } from "@/components/AuthProvider";
+import { OnThisMonthBanner } from "@/components/OnThisMonthBanner";
 import { withSubjectParticle } from "@/lib/korean";
 
 type PlaceRow = {
@@ -325,6 +326,9 @@ export function RecapDashboard() {
               }
             />
           </div>
+
+          {/* 1년 전 오늘 — 작년 이번 달 기록이 있으면 티일 카드, 없으면 안 뜸 */}
+          <OnThisMonthBanner variant="recap" />
 
           {/* 누가 더 많이 등록했을까 — 레이스 ({A} 티일 vs {B} 앰버) */}
           {runners.length > 0 && (

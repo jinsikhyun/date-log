@@ -18,12 +18,19 @@ const snippet = (s: string) => {
 };
 
 /**
- * 홈 상단 "1년 전 오늘" 회상 배너.
+ * "1년 전 오늘" 회상 배너/카드.
  * 기준 = "작년의 이번 달"(정확한 같은 날짜가 아니라 그 달 전체) 에 방문 기록
  * (places.first_visit_date) 또는 추억(memories.date) 이 있는 장소.
  * 후보 중 하루 단위 시드로 하나 선택. 후보가 없으면 아무것도 렌더하지 않음.
+ *
+ * variant "home"  = 홈 상단 가로 배너 (짙은 녹회색)
+ * variant "recap" = 우리의 기록 카드 (티일 채움, 큰 문장 + CTA — 핸드오프 §7)
  */
-export function OnThisMonthBanner() {
+export function OnThisMonthBanner({
+  variant = "home",
+}: {
+  variant?: "home" | "recap";
+}) {
   const [recall, setRecall] = useState<Recall | null>(null);
 
   useEffect(() => {
@@ -123,10 +130,16 @@ export function OnThisMonthBanner() {
 
   if (!recall) return null;
 
+  const recap = variant === "recap";
+  const solid = recap ? "#36585a" : "#2f3d3d"; // 티일 채움 vs 짙은 녹회색
+
   return (
     <Link
       href={`/places/${recall.id}`}
-      className="group relative mb-5 block overflow-hidden rounded-[20px] bg-[#2f3d3d] text-[#eff4f1] ring-1 ring-black/10"
+      className={`group relative block overflow-hidden rounded-[20px] text-[#eff4f1] ring-1 ring-black/10 ${
+        recap ? "h-full" : "mb-5"
+      }`}
+      style={{ background: solid }}
     >
       {recall.image_url && (
         <>
@@ -137,22 +150,43 @@ export function OnThisMonthBanner() {
             aria-hidden
             className="absolute inset-0 h-full w-full object-cover opacity-35"
           />
-          <div className="absolute inset-0 bg-[#2f3d3d]/75" />
+          <div
+            className="absolute inset-0"
+            style={{ background: `${solid}bf` }}
+          />
         </>
       )}
-      <div className="relative flex flex-col gap-1.5 px-6 py-5 sm:px-8 sm:py-6">
+      <div
+        className={`relative flex flex-col ${
+          recap ? "h-full gap-2 px-7 py-7" : "gap-1.5 px-6 py-5 sm:px-8 sm:py-6"
+        }`}
+      >
         <span className="text-[11px] font-bold tracking-[0.08em] text-white/60">
           1년 전 오늘
         </span>
-        <p className="text-lg font-extrabold leading-snug sm:text-xl">
+        <p
+          className={
+            recap
+              ? "text-[28px] font-extrabold leading-[1.35]"
+              : "text-lg font-extrabold leading-snug sm:text-xl"
+          }
+        >
           작년 오늘, 둘은 {recall.name}에 있었어요.
         </p>
         {recall.subtitle && (
-          <p className="line-clamp-2 text-[13px] leading-relaxed text-white/75">
+          <p
+            className={`line-clamp-2 leading-relaxed text-white/75 ${
+              recap ? "text-sm" : "text-[13px]"
+            }`}
+          >
             {recall.subtitle}
           </p>
         )}
-        <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-full bg-[#fffcf5] px-3.5 py-1.5 text-xs font-bold text-[#2f3d3d] transition-transform group-hover:translate-x-0.5">
+        <span
+          className={`inline-flex w-fit items-center gap-1 rounded-full bg-[#fffcf5] px-3.5 py-1.5 text-xs font-bold transition-transform group-hover:translate-x-0.5 ${
+            recap ? "mt-auto pt-0 text-[#36585a]" : "mt-1.5 text-[#2f3d3d]"
+          }`}
+        >
           그날 보러 가기 →
         </span>
       </div>
