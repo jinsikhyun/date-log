@@ -28,14 +28,14 @@ export interface Place {
   status: PlaceStatus; // 'visited'(다녀온 곳) | 'wishlist'(가고 싶은 곳)
   wanted_by: string | null; // (구) 단일값. 참고용. 이제 wanted_by_ids 사용
   wanted_by_ids: string[]; // 이 위시를 원하는 커플 구성원 profile id (0~2) — 독립 토글
-  added_by: string | null; // 등록한 사람 ('진식' / '지민')
+  added_by: string | null; // 등록한 사람 (커플 구성원 display_name)
   favorite_by: string[]; // 이 장소를 pick 한 profiles.id (0~2개) — wanted_by 와 별개
   is_regular: boolean; // 우리 단골
   memory_count: number;
   created_at: string;
 }
 
-/** "진식이 추가함" / "징구리가 추가함" — 받침에 따라 조사 처리. added_by 없으면 null. */
+/** "{이름}이/가 추가함" — 받침에 따라 조사 처리. added_by 없으면 null. */
 export function addedByLabel(name: string | null): string | null {
   return name ? `${withSubjectParticle(name)} 추가함` : null;
 }
@@ -79,7 +79,7 @@ export function wantedByNames(
     .filter((n): n is string => !!n);
 }
 
-/** wanted_by_ids → 위시리스트 카드 한 줄 문구. 예: "진식이 가고 싶어해요" / "둘 다 가고 싶어해요". */
+/** wanted_by_ids → 위시리스트 카드 한 줄 문구. 예: "{이름}이 가고 싶어해요" / "둘 다 가고 싶어해요". */
 export function wantedByLabelFromIds(
   ids: string[] | null | undefined,
   members: { id: string; display_name: string | null }[],

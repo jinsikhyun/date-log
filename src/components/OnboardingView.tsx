@@ -176,7 +176,7 @@ export function OnboardingView() {
             className={fieldClass}
             value={createName}
             onChange={(e) => setCreateName(e.target.value)}
-            placeholder="예: 진식"
+            placeholder="이름을 입력하세요"
           />
         </div>
         {createErr && (
@@ -206,7 +206,7 @@ export function OnboardingView() {
             className={fieldClass}
             value={joinName}
             onChange={(e) => setJoinName(e.target.value)}
-            placeholder="예: 지민"
+            placeholder="이름을 입력하세요"
           />
         </div>
         <div className="flex flex-col gap-1">

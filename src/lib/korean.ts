@@ -14,7 +14,7 @@ export function hasBatchim(value: string | null | undefined): boolean {
 
 /**
  * 주격 조사("이"/"가")를 붙인다.
- *   withSubjectParticle("지민") → "지민이"
+ *   withSubjectParticle("현성") → "현성이"
  *   withSubjectParticle("민호") → "민호가"
  */
 export function withSubjectParticle(name: string): string {
@@ -23,7 +23,7 @@ export function withSubjectParticle(name: string): string {
 
 /**
  * 접속 조사("와"/"과")를 붙인다.
- *   withConjunctionParticle("진식") → "진식과"
+ *   withConjunctionParticle("현성") → "현성과"
  *   withConjunctionParticle("수아") → "수아와"
  */
 export function withConjunctionParticle(name: string): string {

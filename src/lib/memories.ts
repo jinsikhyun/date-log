@@ -5,7 +5,7 @@ export interface Memory {
   date: string | null; // 'YYYY-MM-DD'
   content: string | null;
   mood_tag: string | null;
-  author: string | null; // 작성한 사람 ('진식' / '지민')
+  author: string | null; // 작성한 사람 (커플 구성원 display_name)
   photo_urls: string[]; // 첨부 사진 public URL 목록 (place-photos 버킷). 없으면 []
   created_at: string;
 }
@@ -17,7 +17,7 @@ export const MEMORY_COLUMNS =
 export interface MemoryReply {
   id: number;
   memory_id: number;
-  author: string | null; // '진식' / '지민'
+  author: string | null; // 커플 구성원 display_name
   content: string | null;
   created_at: string;
 }
