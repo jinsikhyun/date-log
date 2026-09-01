@@ -55,7 +55,7 @@ function HighlightCard({
     </>
   );
 
-  const cls = "block rounded-2xl bg-card p-5 ring-1 ring-border/70";
+  const cls = "block rounded-[20px] bg-card p-5 ring-1 ring-border";
   return placeId != null ? (
     <Link
       href={`/places/${placeId}`}
@@ -221,37 +221,41 @@ export function RecapDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold sm:text-2xl">우리의 기록</h1>
-        <p className="mt-1.5 text-sm text-muted">숫자로 돌아보는 우리</p>
+        <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
+          우리의 기록
+        </h1>
+        <p className="mt-1 text-sm text-muted-2">숫자로 돌아보는 우리</p>
       </div>
 
-      {/* 함께한 지 N일째 */}
-      <div className="rounded-3xl bg-card p-8 text-center ring-1 ring-border/70">
+      {/* 함께한 지 N일째 — 티일 채움 히어로 */}
+      <div className="rounded-[20px] bg-accent p-8 text-center text-[#eff4f1]">
         {startDate === undefined ? (
-          <div className="mx-auto h-14 w-44 animate-pulse rounded-xl bg-stone-200/70" />
+          <div className="mx-auto h-14 w-44 animate-pulse rounded-xl bg-white/20" />
         ) : startDate === null ? (
           <>
-            <p className="text-sm font-medium text-muted">함께한 지</p>
-            <p className="mt-2 text-base font-bold text-foreground/80">
+            <p className="text-sm font-medium text-white/80">함께한 지</p>
+            <p className="mt-2 text-base font-bold">
               관계 시작일을 설정해주세요
             </p>
             <Link
               href="/settings"
-              className="mt-3 inline-block rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              className="mt-3 inline-block rounded-full bg-[#fffcf5] px-4 py-1.5 text-xs font-semibold text-accent transition-opacity hover:opacity-90"
             >
               설정에서 입력하기 →
             </Link>
           </>
         ) : (
           <>
-            <p className="text-sm font-medium text-muted">함께한 지</p>
-            <p className="mt-1 text-5xl font-extrabold text-accent sm:text-6xl">
+            <p className="text-sm font-medium text-white/80">함께한 지</p>
+            <p className="mt-1 text-[44px] font-extrabold tracking-[-0.03em] sm:text-6xl">
               {(days ?? 0).toLocaleString()}
-              <span className="ml-1 text-2xl font-bold text-foreground/80">
+              <span className="ml-1 text-2xl font-bold text-white/85">
                 일째
               </span>
             </p>
-            <p className="mt-2 text-xs text-muted">{fmtDate(startDate)}부터</p>
+            <p className="mt-2 text-xs text-white/70">
+              {fmtDate(startDate)}부터
+            </p>
           </>
         )}
       </div>
@@ -268,11 +272,11 @@ export function RecapDashboard() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="h-20 animate-pulse rounded-2xl bg-stone-200/70"
+                className="h-20 animate-pulse rounded-2xl bg-[#efe7d6]"
               />
             ))}
           </div>
-          <div className="h-40 animate-pulse rounded-3xl bg-stone-200/70" />
+          <div className="h-40 animate-pulse rounded-[20px] bg-[#efe7d6]" />
         </div>
       ) : stats ? (
         <>
@@ -288,10 +292,14 @@ export function RecapDashboard() {
             ).map(([label, n]) => (
               <div
                 key={label}
-                className="rounded-2xl bg-card p-4 text-center ring-1 ring-border/70"
+                className="rounded-2xl bg-card p-4 text-center ring-1 ring-border"
               >
-                <p className="text-2xl font-extrabold sm:text-3xl">{n}</p>
-                <p className="mt-1 text-xs font-medium text-muted">{label}</p>
+                <p className="text-[32px] font-extrabold leading-none tracking-[-0.03em]">
+                  {n}
+                </p>
+                <p className="mt-1.5 text-[11px] font-medium text-muted-2">
+                  {label}
+                </p>
               </div>
             ))}
           </div>
@@ -318,21 +326,23 @@ export function RecapDashboard() {
             />
           </div>
 
-          {/* 누가 더 많이 등록했을까 — 레이스 */}
+          {/* 누가 더 많이 등록했을까 — 레이스 ({A} 티일 vs {B} 앰버) */}
           {runners.length > 0 && (
-            <div className="rounded-3xl bg-card p-5 ring-1 ring-border/70 sm:p-6">
+            <div className="rounded-[20px] bg-card p-5 ring-1 ring-border sm:p-6">
               <p className="text-sm font-bold">누가 더 많이 등록했을까 🏃</p>
-              <p className="mt-0.5 text-[11px] text-muted">
+              <p className="mt-0.5 text-[11px] text-muted-2">
                 러너를 누르면 그 사람이 등록한 목록을 볼 수 있어요
               </p>
               <div className="mt-5 space-y-7">
-                {runners.map((name) => {
+                {runners.map((name, ri) => {
                   const count = stats.race[name] ?? 0;
                   const pct = 4 + (count / stats.max) * 86; // 4%~90%
                   const labelPct = Math.min(84, Math.max(16, pct));
+                  const runnerBg = ri === 0 ? "bg-accent" : "bg-amber";
+                  const ringCol = ri === 0 ? "ring-accent" : "ring-amber";
                   return (
                     <div key={name}>
-                      <div className="relative h-14 rounded-full bg-stone-100">
+                      <div className="relative h-14 rounded-full bg-[#efe7d6]">
                         <span
                           aria-hidden
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-xl"
@@ -346,9 +356,9 @@ export function RecapDashboard() {
                           }
                           aria-pressed={openRunner === name}
                           aria-label={`${name} 등록 목록 보기`}
-                          className={`absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-lg text-white shadow transition-shadow hover:shadow-lg ${
+                          className={`absolute top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg text-white shadow transition-shadow hover:shadow-lg ${runnerBg} ${
                             openRunner === name
-                              ? "ring-2 ring-accent ring-offset-2"
+                              ? `ring-2 ring-offset-2 ${ringCol}`
                               : ""
                           }`}
                           style={{
@@ -362,7 +372,7 @@ export function RecapDashboard() {
                       </div>
                       <div className="relative mt-1.5 h-4">
                         <p
-                          className="absolute -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-muted"
+                          className="absolute -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-muted-2"
                           style={{ left: `${labelPct}%` }}
                         >
                           {name} · {count}곳
@@ -374,7 +384,7 @@ export function RecapDashboard() {
               </div>
 
               {openRunner && (
-                <div className="mt-5 border-t border-border/60 pt-4">
+                <div className="mt-5 border-t border-border pt-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold">
                       {withSubjectParticle(openRunner)} 등록한 것
@@ -402,7 +412,7 @@ export function RecapDashboard() {
                             <li key={p.id}>
                               <Link
                                 href={`/places/${p.id}`}
-                                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-stone-50"
+                                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-background"
                               >
                                 <span className="min-w-0 flex-1 truncate font-medium">
                                   {p.name}
@@ -432,7 +442,7 @@ export function RecapDashboard() {
                               <li key={m.id}>
                                 <Link
                                   href={`/places/${m.place_id}`}
-                                  className="block rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-stone-50"
+                                  className="block rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-background"
                                 >
                                   <span className="line-clamp-1 text-foreground/85">
                                     {m.content?.trim() || "(내용 없음)"}
