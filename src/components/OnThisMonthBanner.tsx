@@ -184,7 +184,7 @@ export function OnThisMonthBanner({
         )}
         <span
           className={`inline-flex w-fit items-center gap-1 rounded-full bg-[#fffcf5] px-3.5 py-1.5 text-xs font-bold transition-transform group-hover:translate-x-0.5 ${
-            recap ? "mt-auto pt-0 text-[#36585a]" : "mt-1.5 text-[#2f3d3d]"
+            recap ? "mt-4 text-[#36585a]" : "mt-1.5 text-[#2f3d3d]"
           }`}
         >
           그날 보러 가기 →
