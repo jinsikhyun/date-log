@@ -158,3 +158,45 @@ export function orderNamesBy(
 export function orderCategories(names: Iterable<string>): string[] {
   return orderNamesBy(registry, names);
 }
+
+/**
+ * 위시리스트의 자유로운 세부 업종을 다녀온 곳의 공식 카테고리로 정규화한다.
+ * 공식 카테고리 이름과 이미 같으면 그대로 유지하고, 매핑할 수 없으면 기타(또는 첫 공식 분류).
+ */
+export function normalizeVisitedCategory(
+  source: string,
+  officialNames: Iterable<string>,
+): string {
+  const names = [...officialNames];
+  const original = source.trim();
+  if (!original) return "";
+  if (names.includes(original)) return original;
+
+  const rules: Array<{ target: string; pattern: RegExp }> = [
+    {
+      target: "맛집",
+      pattern:
+        /(한식|중식|일식|양식|분식|음식점|식당|레스토랑|국수|면요리|고기|구이|치킨|피자|햄버거|패스트푸드|뷔페|아시아음식|간식)/i,
+    },
+    {
+      target: "카페",
+      pattern: /(카페|커피|베이커리|디저트|제과|제빵|찻집|티룸)/i,
+    },
+    {
+      target: "술집",
+      pattern: /(술집|주점|포장마차|호프|이자카야|막걸리|맥주집|소주방)/i,
+    },
+    { target: "바", pattern: /(^|\s)(바|bar)($|\s)|와인바|칵테일/i },
+    { target: "사진", pattern: /(사진관|스튜디오|셀프사진|포토)/i },
+    { target: "전시", pattern: /(전시|미술관|박물관|갤러리|문화시설)/i },
+    { target: "쇼핑", pattern: /(쇼핑|백화점|시장|소품|편집숍|편집샵|상점)/i },
+    { target: "산책", pattern: /(산책|공원|정원|숲|둘레길)/i },
+  ];
+
+  const matched = rules.find(
+    ({ target, pattern }) => names.includes(target) && pattern.test(original),
+  );
+  if (matched) return matched.target;
+  if (names.includes("기타")) return "기타";
+  return names[0] ?? original;
+}

@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
+import { normalizeVisitedCategory } from "@/lib/categories";
 
 import { withPreferences } from "@/lib/preferences";
 
@@ -30,7 +31,7 @@ const POLICY_HINT =
 
 export function WishlistView() {
   const { coupleMembers } = useAuth();
-  const { orderNames } = useCategories();
+  const { categories: officialCategories, orderNames } = useCategories();
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -145,6 +146,10 @@ export function WishlistView() {
   );
 
   if (visiting) {
+    const visitedCategory = normalizeVisitedCategory(
+      visiting.category,
+      officialCategories.map((category) => category.name),
+    );
     return (
       <div className="space-y-5">
         <button
@@ -161,9 +166,17 @@ export function WishlistView() {
           <p className="mt-1.5 text-sm text-muted">
             별점·방문일·한줄평·사진을 채우고 저장하면 “다녀온 곳”으로 옮겨져요.
           </p>
+          {visitedCategory !== visiting.category && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent">
+              {visiting.category} → {visitedCategory}로 분류했어요
+            </p>
+          )}
         </div>
         <AddPlaceForm
-          initial={placeFormInput({ ...visiting, status: "visited" })}
+          initial={{
+            ...placeFormInput({ ...visiting, status: "visited" }),
+            category: visitedCategory,
+          }}
           submitLabel="다녀온 곳으로 저장"
           onSubmit={handleVisited}
           onCancel={() => setVisiting(null)}

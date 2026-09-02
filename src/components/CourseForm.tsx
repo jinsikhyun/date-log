@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import {
   categoryStyle,
+  naverMapSearchUrl,
   placeInputToRow,
   type PlaceRowInput,
   statusBadgeClass,
@@ -21,6 +22,7 @@ import { haversineKm } from "@/lib/courses";
 import { PlaceAutocompleteInput } from "@/components/PlaceAutocompleteInput";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
+import { GptMark } from "@/components/GptMark";
 
 export interface CourseFormInput {
   title: string;
@@ -384,7 +386,7 @@ export function CourseForm({
     }
   };
 
-  /** AI 추천 — 코스의 마지막 정거장을 기준점으로 가까운 후보를 찾고, 코스 전체 맥락으로 재정렬한다. */
+  /** AI 추천 — 코스의 마지막 장소를 기준점으로 가까운 후보를 찾고, 코스 전체 맥락으로 재정렬한다. */
   const loadAiRecommendations = useCallback(async () => {
     if (selected.length === 0) return;
     const origin = selected[selected.length - 1];
@@ -660,21 +662,33 @@ export function CourseForm({
             type="button"
             onClick={toggleAi}
             aria-expanded={aiOpen}
-            className="flex w-full items-center justify-between rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-accent"
+            className="group flex w-full items-center justify-between rounded-2xl border border-[#10a37f]/25 bg-[linear-gradient(110deg,#f0faf6_0%,#fffaf2_72%)] px-4 py-3 text-left shadow-[0_10px_24px_-22px_rgba(16,163,127,0.8)] transition duration-200 hover:border-[#10a37f]/45"
           >
-            <span>AI 추천 — 다음은 어디로 갈까요?</span>
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#10a37f] text-white shadow-sm">
+                <GptMark className="h-[18px] w-[18px]" />
+              </span>
+              <span>
+                <span className="block text-xs font-bold text-foreground sm:text-sm">
+                  AI 추천 · 다음은 어디로 갈까요?
+                </span>
+                <span className="mt-0.5 block text-[10px] font-medium text-[#39816f]">
+                  우리의 취향을 담은 추천 · GPT-5.6 Luna
+                </span>
+              </span>
+            </span>
             <span
               aria-hidden
-              className={`transition-transform ${aiOpen ? "rotate-180" : ""}`}
+              className={`ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/80 text-[10px] text-[#0d8065] ring-1 ring-[#10a37f]/15 transition-transform ${aiOpen ? "rotate-180" : ""}`}
             >
               ▾
             </span>
           </button>
 
           {aiOpen && (
-            <div className="rounded-xl border border-border bg-white p-3">
+            <div className="rounded-2xl border border-[#10a37f]/20 bg-[linear-gradient(180deg,#fbfffd_0%,#ffffff_26%)] p-3 shadow-[0_12px_28px_-26px_rgba(16,163,127,0.75)]">
               {aiLoading && (
-                <p className="text-xs text-muted">추천을 만드는 중…</p>
+                <p className="text-xs font-medium text-[#39816f]">✦ 코스에 어울리는 장소를 찾는 중…</p>
               )}
               {aiError && (
                 <p className="text-xs font-medium text-red-600">{aiError}</p>
@@ -693,7 +707,7 @@ export function CourseForm({
                       .map((r) => (
                         <li
                           key={r.kakaoPlaceId}
-                          className="flex flex-col gap-1 rounded-xl border border-border bg-stone-50 px-3 py-2"
+                          className="flex flex-col gap-2 rounded-xl border border-[#10a37f]/15 bg-white px-3 py-3 shadow-[0_8px_20px_-20px_rgba(16,163,127,0.8)]"
                         >
                           <div className="flex items-center gap-2">
                             <span
@@ -703,8 +717,8 @@ export function CourseForm({
                             >
                               {r.category}
                             </span>
-                            <span className="shrink-0 rounded-full bg-[#302e2b]/85 px-2 py-0.5 text-[10px] font-semibold text-white">
-                              AI
+                            <span className="shrink-0 rounded-full bg-[#10a37f] px-2 py-0.5 text-[10px] font-semibold text-white">
+                              ✦ AI
                             </span>
                             <span className="min-w-0 flex-1 truncate text-sm font-medium">
                               {r.name}
@@ -718,7 +732,16 @@ export function CourseForm({
                           <p className="text-xs leading-relaxed text-foreground/70">
                             {r.reason}
                           </p>
-                          <div className="flex justify-end">
+                          <div className="flex items-center justify-between gap-2">
+                            <a
+                              href={naverMapSearchUrl(r.name, r.address)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`${r.name} 네이버 지도 정보`}
+                              className="rounded-full bg-[#03C75A] px-3 py-1 text-[11px] font-semibold text-white transition hover:brightness-95"
+                            >
+                              정보 ↗
+                            </a>
                             <button
                               type="button"
                               onClick={() => void addAiCandidate(r)}

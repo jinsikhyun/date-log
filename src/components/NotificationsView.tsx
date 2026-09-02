@@ -11,6 +11,14 @@ import {
   relativeTime,
 } from "@/lib/notifications";
 
+const notificationEmoji = (message: string): string => {
+  if (message.includes("추억을 기록")) return "💌";
+  if (message.includes("가고 싶은 장소")) return "✨";
+  if (message.includes("댓글")) return "💬";
+  if (message.includes("코스")) return "🗺️";
+  return "📍";
+};
+
 export function NotificationsView() {
   const router = useRouter();
   const { user, ready } = useAuth();
@@ -146,10 +154,13 @@ export function NotificationsView() {
               >
                 <span
                   aria-hidden
-                  className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                    n.is_read ? "bg-transparent" : "bg-accent"
-                  }`}
-                />
+                  className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-base"
+                >
+                  {notificationEmoji(n.message)}
+                  {!n.is_read && (
+                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-white" />
+                  )}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span
                     className={`block text-sm leading-relaxed ${

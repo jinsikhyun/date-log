@@ -8,6 +8,7 @@ import {
 import { placeInputToRow, type Place } from "@/lib/places";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { GptMark } from "@/components/GptMark";
 
 // AI_RECOMMENDATION_HANDOFF.md §2·§3: 기본 3개, "더보기"로 최대 5개까지.
 // "더보기"는 새 API 호출 없이 이미 받아둔 결과 중 숨겨둔 2개를 더 보여주기만 한다.
@@ -32,7 +33,7 @@ interface AiRecommendation {
 }
 
 /**
- * 장소 상세의 "근처 다른 곳 보기" 아래에 붙는 실제 AI 추천 UI.
+ * 장소 상세 상단 정보 바로 아래에 붙는 실제 AI 추천 UI.
  * 기본 접힘 — 처음 펼칠 때만 카카오 후보 수집 + OpenAI 호출(유료)을 실행한다.
  */
 export function AiRecommendationSection({ place }: { place: Place }) {
@@ -172,25 +173,37 @@ export function AiRecommendationSection({ place }: { place: Place }) {
   });
 
   return (
-    <section>
+    <section id="ai-recommendations" aria-label="AI 장소 추천" className="scroll-mt-5">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between rounded-2xl bg-card px-5 py-3 text-sm font-medium text-muted ring-1 ring-border/70 transition-colors hover:text-accent"
+        className="group flex w-full items-center justify-between rounded-[22px] border border-[#10a37f]/25 bg-[linear-gradient(110deg,#f0faf6_0%,#fffaf2_72%)] px-5 py-4 text-left shadow-[0_10px_28px_-24px_rgba(16,163,127,0.75)] transition duration-200 hover:-translate-y-0.5 hover:border-[#10a37f]/45 hover:shadow-[0_16px_34px_-24px_rgba(16,163,127,0.85)]"
       >
-        <span>AI 추천 — 이런 곳은 어때요?</span>
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#10a37f] text-white shadow-sm">
+            <GptMark className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-foreground sm:text-[15px]">
+              AI 추천 · 이런 곳은 어때요?
+            </span>
+            <span className="mt-0.5 block text-[11px] font-medium text-[#39816f]">
+              우리의 취향을 담은 추천 · GPT-5.6 Luna
+            </span>
+          </span>
+        </span>
         <span
           aria-hidden
-          className={`text-xs transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/80 text-xs text-[#0d8065] ring-1 ring-[#10a37f]/15 transition-transform ${open ? "rotate-180" : ""}`}
         >
           ▾
         </span>
       </button>
 
       {open && (
-        <div className="mt-2 rounded-2xl bg-card p-5 ring-1 ring-border/70">
-          {loading && <p className="text-xs text-muted">추천을 만드는 중…</p>}
+        <div className="mt-3 rounded-[22px] border border-[#10a37f]/20 bg-[linear-gradient(180deg,#fbfffd_0%,#ffffff_24%)] p-5 shadow-[0_14px_34px_-30px_rgba(16,163,127,0.7)]">
+          {loading && <p className="text-xs font-medium text-[#39816f]">✦ 취향을 살펴보고 추천을 만드는 중…</p>}
           {error && (
             <p className="text-sm font-medium text-red-600">{error}</p>
           )}

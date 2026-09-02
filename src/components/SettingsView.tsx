@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { processImageToJpeg } from "@/lib/photos";
+import { Lightbox } from "@/components/Lightbox";
+import { CoupleCalendar } from "@/components/CoupleCalendar";
 
 export function SettingsView() {
   const router = useRouter();
@@ -20,8 +22,10 @@ export function SettingsView() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [partner, setPartner] = useState<
-    { display_name: string | null; email: string | null } | null
+    { display_name: string | null; email: string | null; avatar_path: string | null } | null
   >(null);
+  const [partnerAvatarUrl, setPartnerAvatarUrl] = useState<string | null>(null);
+  const [profilePhotoOpen, setProfilePhotoOpen] = useState<string | null>(null);
   const [partnerLoading, setPartnerLoading] = useState(true);
 
   // 관계 시작일
@@ -77,22 +81,32 @@ export function SettingsView() {
     // 파트너 = 같은 커플의 나 아닌 프로필 (혹시 여러 개여도 첫 명만)
     supabase
       .from("profiles")
-      .select("display_name, email")
+      .select("display_name, email, avatar_path")
       .eq("couple_id", profile.couple_id)
       .neq("id", user.id)
       .order("created_at", { ascending: true })
       .limit(1)
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (cancelled) return;
         const row = data?.[0];
+        const avatarPath = (row?.avatar_path as string | null) ?? null;
         setPartner(
           row
             ? {
                 display_name: (row.display_name as string | null) ?? null,
                 email: (row.email as string | null) ?? null,
+                avatar_path: avatarPath,
               }
             : null,
         );
+        setPartnerAvatarUrl(null);
+        if (avatarPath) {
+          const { data: signed } = await supabase.storage
+            .from("profile-avatars")
+            .createSignedUrl(avatarPath, 3600);
+          if (!cancelled) setPartnerAvatarUrl(signed?.signedUrl ?? null);
+        }
+        if (cancelled) return;
         setPartnerLoading(false);
       });
 
@@ -264,18 +278,33 @@ export function SettingsView() {
         )}
       </form>
 
+      {savedStartDate && <CoupleCalendar startDate={savedStartDate} />}
+
       <form onSubmit={saveProfile} className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
         <p className="text-xs font-medium text-muted">프로필 수정</p>
         <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
-          <label className="group relative mx-auto block h-24 w-24 shrink-0 cursor-pointer sm:mx-0">
-            <span className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-accent-soft text-3xl font-bold text-accent ring-4 ring-white shadow-md">
+          <div className="relative mx-auto h-24 w-24 shrink-0 sm:mx-0">
+            <button
+              type="button"
+              onClick={() => {
+                const url = avatarPreviewUrl || avatarUrl;
+                if (url) setProfilePhotoOpen(url);
+              }}
+              disabled={!(avatarPreviewUrl || avatarUrl)}
+              aria-label="내 프로필 사진 크게 보기"
+              className="block h-24 w-24 rounded-full disabled:cursor-default"
+            >
+            <span className={`flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-accent-soft text-3xl font-bold text-accent ring-4 ring-white shadow-md ${(avatarPreviewUrl || avatarUrl) ? "cursor-zoom-in transition hover:brightness-95" : ""}`}>
               {/* 비공개 Storage signed URL은 Next 이미지 최적화 프록시에 노출하지 않는다. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {(avatarPreviewUrl || avatarUrl) ? <img src={avatarPreviewUrl || avatarUrl || ""} alt="내 프로필" className="h-full w-full object-cover" /> : (profile.display_name?.trim().charAt(0) || "♡")}
             </span>
-            <span className="absolute bottom-0 right-0 rounded-full bg-accent px-2 py-1 text-[10px] font-bold text-white shadow">사진 변경</span>
-            <input type="file" accept="image/*,.heic,.heif" onChange={selectAvatar} disabled={profileBusy} className="sr-only" />
-          </label>
+            </button>
+            <label className="absolute bottom-0 right-0 cursor-pointer rounded-full bg-accent px-2 py-1 text-[10px] font-bold text-white shadow transition hover:bg-accent-hover">
+              사진 변경
+              <input type="file" accept="image/*,.heic,.heif" onChange={selectAvatar} disabled={profileBusy} className="sr-only" />
+            </label>
+          </div>
           <div className="min-w-0 flex-1 space-y-3">
             <label className="block text-xs font-medium text-muted">이름(별명)</label>
             <input value={name} onChange={(e)=>setName(e.target.value)} maxLength={30} required className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
@@ -293,18 +322,49 @@ export function SettingsView() {
         {partnerLoading ? (
           <p className="mt-2 text-sm text-muted">불러오는 중…</p>
         ) : partner ? (
-          <p className="mt-2 text-sm">
-            {partner.display_name ?? "(이름 없음)"}
-            <span className="ml-2 text-muted">
-              {partner.email ?? "(이메일 없음)"}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (partnerAvatarUrl) setProfilePhotoOpen(partnerAvatarUrl);
+              }}
+              disabled={!partnerAvatarUrl}
+              aria-label={`${partner.display_name ?? "파트너"} 프로필 사진 크게 보기`}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-soft text-lg font-bold text-accent ring-2 ring-white shadow-sm ${partnerAvatarUrl ? "cursor-zoom-in transition hover:brightness-95" : "cursor-default"}`}
+            >
+              {partnerAvatarUrl ? (
+                // 비공개 Storage signed URL은 브라우저에서 직접 표시한다.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={partnerAvatarUrl}
+                  alt={`${partner.display_name ?? "파트너"} 프로필`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                partner.display_name?.trim().charAt(0) || "♡"
+              )}
+            </button>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">
+                {partner.display_name ?? "(이름 없음)"}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-muted">
+                {partner.email ?? "(이메일 없음)"}
+              </span>
             </span>
-          </p>
+          </div>
         ) : (
           <p className="mt-2 text-sm text-muted">
             아직 파트너가 합류하지 않았어요. 위 초대코드를 공유해 보세요.
           </p>
         )}
       </div>
+      {profilePhotoOpen && (
+        <Lightbox
+          urls={[profilePhotoOpen]}
+          onClose={() => setProfilePhotoOpen(null)}
+        />
+      )}
     </div>
   );
 }

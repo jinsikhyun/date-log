@@ -554,6 +554,8 @@ export function PlaceDetail({ id }: { id: number }) {
         </header>
       )}
 
+      {place && <AiRecommendationSection place={place} />}
+
       {/* 우리의 추억 */}
       <section className="space-y-5">
         <div className="flex items-center justify-between gap-3">
@@ -657,7 +659,6 @@ export function PlaceDetail({ id }: { id: number }) {
       </section>
 
       <NearbySimilar place={place} />
-      <AiRecommendationSection place={place} />
     </div>
   );
 }

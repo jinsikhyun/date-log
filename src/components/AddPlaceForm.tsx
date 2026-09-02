@@ -7,6 +7,7 @@ import { ensureKakaoLoaded, geocode, keywordSearchFirst } from "@/lib/kakao";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 import { TagSelector } from "@/components/TagSelector";
+import { normalizeVisitedCategory } from "@/lib/categories";
 
 export interface NewPlaceInput {
   name: string;
@@ -216,6 +217,20 @@ export function AddPlaceForm({
   const set = <K extends keyof NewPlaceInput>(key: K, value: NewPlaceInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const setStatus = (status: PlaceStatus) => {
+    setForm((current) => ({
+      ...current,
+      status,
+      category:
+        status === "visited"
+          ? normalizeVisitedCategory(
+              current.category,
+              categories.map((category) => category.name),
+            )
+          : current.category,
+    }));
+  };
+
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return;
     setPhotoError(null);
@@ -288,7 +303,7 @@ export function AddPlaceForm({
           <button
             key={value}
             type="button"
-            onClick={() => set("status", value)}
+            onClick={() => setStatus(value)}
             aria-pressed={form.status === value}
             className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
               form.status === value
@@ -359,6 +374,7 @@ export function AddPlaceForm({
           ))}
           {/* 저장돼 있던 카테고리가 목록에서 사라졌어도 값 유지 */}
           {form.category &&
+            form.status === "wishlist" &&
             !categories.some((c) => c.name === form.category) && (
               <option value={form.category}>{form.category}</option>
             )}

@@ -4,7 +4,9 @@ import {
   categoryIcon,
   categoryStyle,
   naverImageSearchUrl,
+  naverMapSearchUrl,
 } from "@/lib/places";
+import { GptMark } from "@/components/GptMark";
 
 export interface AiRecommendedPlace {
   id: string;
@@ -73,7 +75,8 @@ export function AiRecommendationCard({
         >
           {place.category}
         </span>
-        <span className="absolute right-3 top-3 rounded-full bg-[#302e2b]/85 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#10a37f] px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm">
+          <GptMark className="h-3 w-3" />
           AI 추천
         </span>
       </div>
@@ -132,20 +135,18 @@ export function AiRecommendationCard({
                 {added ? "추가됨" : adding ? "추가 중…" : "+ 위시리스트"}
               </button>
             )}
-            {place.kakaoMapUrl && (
-              <a
-                href={place.kakaoMapUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-[#FEE500] px-3 py-1.5 text-[11px] font-semibold text-[#191919] transition hover:brightness-95"
-              >
-                Kakao Map
-              </a>
-            )}
+            <a
+              href={naverMapSearchUrl(place.name, place.address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${place.name} 네이버 지도 정보`}
+              className="rounded-full bg-[#03C75A] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-95"
+            >
+              정보 ↗
+            </a>
           </div>
         </div>
       </div>
     </article>
   );
 }
-

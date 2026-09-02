@@ -54,6 +54,12 @@ export function naverImageSearchUrl(name: string, address: string): string {
   )}`;
 }
 
+/** 장소명 + 주소로 네이버 지도 장소 검색 URL */
+export function naverMapSearchUrl(name: string, address: string): string {
+  const query = [name, address].filter(Boolean).join(" ");
+  return `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
+}
+
 // 위시리스트 "누가 가고 싶어해요?" 선택지는 이제 커플 profiles 에서 실시간으로
 // 불러온다 (AuthProvider.coupleMembers + "둘다"). 하드코딩 목록은 제거됨.
 

@@ -78,7 +78,7 @@ const CourseStopInputSchema = z.object({
 });
 const RequestBodySchema = z.object({
   // place_detail(기본): 장소 상세 페이지, place 자체가 추천 기준.
-  // course: place 는 마지막 정거장, courseStops 는 코스 전체 맥락이다.
+  // course: place 는 마지막 장소, courseStops 는 코스 전체 맥락이다.
   mode: z.enum(["place_detail", "course"]).optional(),
   place: z.object({
     name: ShortText,
@@ -228,16 +228,17 @@ export async function POST(req: NextRequest) {
   const system =
     mode === "course"
       ? [
-          "당신은 date.log 서비스의 데이트 코스 추천 도우미입니다. place 는 지금까지 담은 코스의 마지막 정거장이고, courseStops 는 코스 전체(순서대로)입니다.",
+          "당신은 date.log 서비스의 데이트 코스 추천 도우미입니다. place 는 지금까지 담은 코스의 마지막 장소이고, courseStops 는 코스 전체(순서대로)입니다.",
           ...commonRules,
           "",
           `다음 기준으로 candidates 를 평가해 최대 ${count}개까지 고르세요:`,
-          "- 동선·거리 50%: place(마지막 정거장) 기준 distanceMeters 가 가까울수록 좋습니다 — 코스 추천에서는 거리가 가장 중요한 기준입니다.",
+          "- 동선·거리 50%: place(마지막 장소) 기준 distanceMeters 가 가까울수록 좋습니다 — 코스 추천에서는 거리가 가장 중요한 기준입니다.",
           "- 코스 전체 컨셉 30%: courseStops 전체의 공통 분위기·카테고리 조합, 그리고 있다면 coupleFavoriteTags 와 어울리는지",
           "- 후보 구체성·적합성 20%: candidate.category 가 데이트 코스에 자연스럽게 이어질 구체적인 업종인지",
           "",
           "각 항목마다 courseStops 의 맥락과 candidate 의 실제 정보(카테고리, 주소, 거리)를 연결한",
           "한국어 1~2문장의 reason 을 쓰고, 거리·동선 근거를 짧게 포함하세요.",
+          "reason 에서는 '마지막 정거장'이라는 표현을 쓰지 말고 반드시 '마지막 장소'라고 표현하세요.",
         ].join("\n")
       : [
           "당신은 date.log 서비스의 장소 추천 도우미입니다.",
@@ -331,7 +332,8 @@ export async function POST(req: NextRequest) {
         lat: c.lat,
         lng: c.lng,
         distanceMeters: c.distanceMeters,
-        reason: pick.reason,
+        // 모델이 이전 표현을 답하더라도 사용자에게는 제품 용어인 "마지막 장소"로 통일한다.
+        reason: pick.reason.replaceAll("마지막 정거장", "마지막 장소"),
         matchedTags: pick.matchedTags,
         kakaoMapUrl: c.kakaoMapUrl ?? null,
       };
