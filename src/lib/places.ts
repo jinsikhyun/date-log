@@ -22,6 +22,7 @@ export interface Place {
   rating: number | null;
   first_visit_date: string | null; // 'YYYY-MM-DD'
   description: string | null;
+  tags: string[]; // 취향 태그 (AI_RECOMMENDATION_HANDOFF.md §6 확정 체계 + 사용자 직접 추가)
   image_url: string | null; // 대표 사진 (place-photos 버킷 public URL). 없으면 placeholder.
   lat: number | null; // 위도 (장소 검색 자동완성으로 채워짐). 없으면 지도가 주소를 지오코딩.
   lng: number | null; // 경도
@@ -131,6 +132,7 @@ export interface PlaceRowInput {
   status: PlaceStatus;
   wanted_by_ids: string[]; // wishlist 에서 이 위시를 원하는 커플 구성원 id (독립 토글)
   added_by: string; // 현재 선택된 사용자 이름 (폼 필드 아님, 저장 시 자동 주입)
+  tags: string[]; // 방문/위시 상태와 무관하게 저장 (취향 태그)
 }
 // favorite_by(픽) / is_regular(단골) 는 이 폼에서 다루지 않는다.
 // 장소 상세 페이지의 토글로만 켜고 끄며, 여기서 보내면 수정 저장 시 덮어써지므로 제외.
@@ -154,5 +156,6 @@ export function placeInputToRow(input: PlaceRowInput) {
     first_visit_date: lite ? null : input.first_visit_date || null,
     description: lite ? null : input.description.trim() || null,
     image_url: lite ? null : input.image_url.trim() || null,
+    tags: input.tags ?? [], // 방문/위시/코스전용 모두 취향 태그는 유지
   };
 }

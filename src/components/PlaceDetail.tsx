@@ -25,6 +25,7 @@ import { MemoryReplies } from "@/components/MemoryReplies";
 import { Reactions } from "@/components/Reactions";
 import { type Reaction, REACTION_COLUMNS } from "@/lib/reactions";
 import { NearbySimilar } from "@/components/NearbySimilar";
+import { AiRecommendationSection } from "@/components/AiRecommendationSection";
 import { SharePlaceButton } from "@/components/SharePlaceButton";
 import { DirectionsButton } from "@/components/DirectionsButton";
 import {
@@ -41,7 +42,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -99,10 +100,15 @@ export function PlaceDetail({ id }: { id: number }) {
       if (cancelled) return;
 
       if (placeRes.error || !placeRes.data) {
+        const missingTagsCol = /column .*tags.* does not exist/i.test(
+          placeRes.error?.message ?? "",
+        );
         setError(
           placeRes.error?.code === "PGRST116"
             ? "장소를 찾을 수 없어요."
-            : `장소를 불러오지 못했어요: ${placeRes.error?.message ?? "알 수 없는 오류"}`,
+            : missingTagsCol
+              ? "tags 컬럼이 아직 없어요. supabase/add-place-tags.sql 을 Supabase SQL Editor에서 실행하세요."
+              : `장소를 불러오지 못했어요: ${placeRes.error?.message ?? "알 수 없는 오류"}`,
         );
         setLoading(false);
         return;
@@ -491,6 +497,18 @@ export function PlaceDetail({ id }: { id: number }) {
                 {place.description}
               </p>
             )}
+            {!!place.tags?.length && (
+              <div className="flex flex-wrap gap-1.5">
+                {place.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <StarRating rating={place.rating} />
               {place.naver_map_link && (
@@ -639,6 +657,7 @@ export function PlaceDetail({ id }: { id: number }) {
       </section>
 
       <NearbySimilar place={place} />
+      <AiRecommendationSection place={place} />
     </div>
   );
 }

@@ -38,14 +38,34 @@ interface PickPlace {
   lat: number | null;
   lng: number | null;
   address: string;
+  tags: string[];
 }
 type Coord = { lat: number; lng: number };
 
+interface AiCourseRec {
+  kakaoPlaceId: string;
+  name: string;
+  category: string;
+  address: string;
+  lat: number;
+  lng: number;
+  distanceMeters: number | null;
+  reason: string;
+  matchedTags: string[];
+  kakaoMapUrl: string | null;
+}
+
 const NEAR_KM = 2; // "이 근처" 기준 반경
+const AI_INITIAL_COUNT = 3;
+const AI_MAX_COUNT = 5; // AI_RECOMMENDATION_HANDOFF.md §2
+
+function fmtDist(m: number): string {
+  return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`;
+}
 
 const EMPTY: CourseFormInput = { title: "", concept: "", placeIds: [] };
 
-const PICK_COLUMNS = "id, name, category, status, lat, lng, address";
+const PICK_COLUMNS = "id, name, category, status, lat, lng, address, tags";
 
 const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
@@ -66,6 +86,7 @@ const blankRow = (over: Partial<PlaceRowInput>): PlaceRowInput => ({
   status: "visited",
   wanted_by_ids: [],
   added_by: "",
+  tags: [],
   ...over,
 });
 
@@ -131,6 +152,14 @@ export function CourseForm({
   const [nWantedByIds, setNWantedByIds] = useState<string[]>([]);
   const [nSaving, setNSaving] = useState(false);
   const [nError, setNError] = useState<string | null>(null);
+
+  // AI 추천 (코스에 장소가 1개 이상일 때부터) — 기본 접힘, 명시적으로 펼칠 때만 호출(유료 API)
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiAll, setAiAll] = useState<AiCourseRec[] | null>(null);
+  const [aiShowAll, setAiShowAll] = useState(false);
+  const [aiAddingId, setAiAddingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -355,6 +384,134 @@ export function CourseForm({
     }
   };
 
+  /** AI 추천 — 코스의 마지막 정거장을 기준점으로 가까운 후보를 찾고, 코스 전체 맥락으로 재정렬한다. */
+  const loadAiRecommendations = useCallback(async () => {
+    if (selected.length === 0) return;
+    const origin = selected[selected.length - 1];
+    setAiLoading(true);
+    setAiError(null);
+    setAiShowAll(false);
+    try {
+      const coord = await resolveCoord(origin);
+      if (!coord) {
+        setAiError("마지막 장소의 좌표를 찾을 수 없어서 추천을 만들 수 없어요.");
+        return;
+      }
+      const candRes = await fetch("/api/kakao-candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: origin.category,
+          tags: origin.tags,
+          lat: coord.lat,
+          lng: coord.lng,
+          excludeAddress: origin.address,
+          radiusMeters: NEAR_KM * 1000,
+          limit: 12,
+        }),
+      });
+      const candJson = await candRes.json();
+      if (!candRes.ok) {
+        throw new Error(candJson?.error || "근처 후보를 가져오지 못했어요.");
+      }
+      const candidates = candJson.candidates ?? [];
+      if (candidates.length === 0) {
+        setAiAll([]);
+        return;
+      }
+
+      const recRes = await fetch("/api/ai-recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "course",
+          place: {
+            name: origin.name,
+            category: origin.category,
+            address: origin.address,
+            tags: origin.tags,
+            lat: coord.lat,
+            lng: coord.lng,
+          },
+          courseStops: selected.map((p) => ({
+            name: p.name,
+            category: p.category,
+            tags: p.tags,
+          })),
+          candidates,
+          count: AI_MAX_COUNT,
+        }),
+      });
+      const recJson = await recRes.json();
+      if (!recRes.ok) {
+        throw new Error(recJson?.error || "추천을 가져오지 못했어요.");
+      }
+      setAiAll(recJson.recommendations ?? []);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "추천을 가져오지 못했어요.");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [selected, resolveCoord]);
+
+  const toggleAi = () => {
+    setAiOpen((o) => !o);
+    if (!aiOpen && aiAll === null && !aiLoading) void loadAiRecommendations();
+  };
+
+  /** AI 추천 카드의 "+ 코스에 추가" — 새 장소로 저장(이번 코스에만) 후 바로 코스에 담는다. */
+  const addAiCandidate = async (rec: AiCourseRec) => {
+    if (!authorName) {
+      setAiError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
+      return;
+    }
+    setAiAddingId(rec.kakaoPlaceId);
+    setAiError(null);
+    try {
+      const { data, error: insErr } = await supabase
+        .from("places")
+        .insert({
+          ...placeInputToRow(
+            blankRow({
+              name: rec.name,
+              category: rec.category,
+              address: rec.address,
+              lat: String(rec.lat),
+              lng: String(rec.lng),
+              kakao_map_link: rec.kakaoMapUrl ?? "",
+              status: "course_only",
+              added_by: authorName,
+              // AI가 이 후보를 고른 근거(matchedTags)를 그대로 저장 — 다음 추천 때
+              // "커플이 선호해온 태그"로 다시 프롬프트에 들어가 취향을 좁혀준다.
+              tags: rec.matchedTags,
+            }),
+          ),
+          via_course: true,
+          owning_course_id: courseId ?? null,
+        })
+        .select(PICK_COLUMNS)
+        .single();
+      if (insErr) throw new Error(insErr.message);
+
+      const created = data as PickPlace;
+      setAllPlaces((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      addToCourse(created.id);
+      if (courseId == null) {
+        setCourseOnlyPending((prev) => [...prev, created.id]);
+      }
+      // 추가된 후보는 목록에서 지워서 중복 클릭을 막는다.
+      setAiAll((prev) => (prev ?? []).filter((r) => r.kakaoPlaceId !== rec.kakaoPlaceId));
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : "장소 저장에 실패했어요.",
+      );
+    } finally {
+      setAiAddingId(null);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -495,6 +652,112 @@ export function CourseForm({
           </ol>
         )}
       </div>
+
+      {/* AI 추천 — 코스에 장소가 1개 이상 담긴 시점부터. 기본 접힘. */}
+      {selected.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={toggleAi}
+            aria-expanded={aiOpen}
+            className="flex w-full items-center justify-between rounded-xl bg-stone-50 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-accent"
+          >
+            <span>AI 추천 — 다음은 어디로 갈까요?</span>
+            <span
+              aria-hidden
+              className={`transition-transform ${aiOpen ? "rotate-180" : ""}`}
+            >
+              ▾
+            </span>
+          </button>
+
+          {aiOpen && (
+            <div className="rounded-xl border border-border bg-white p-3">
+              {aiLoading && (
+                <p className="text-xs text-muted">추천을 만드는 중…</p>
+              )}
+              {aiError && (
+                <p className="text-xs font-medium text-red-600">{aiError}</p>
+              )}
+              {!aiLoading && !aiError && aiAll && aiAll.length === 0 && (
+                <p className="text-xs text-muted">
+                  주변에서 추천할 만한 새 장소를 찾지 못했어요.
+                </p>
+              )}
+
+              {aiAll && aiAll.length > 0 && (
+                <>
+                  <ul className="flex flex-col gap-2">
+                    {aiAll
+                      .slice(0, aiShowAll ? AI_MAX_COUNT : AI_INITIAL_COUNT)
+                      .map((r) => (
+                        <li
+                          key={r.kakaoPlaceId}
+                          className="flex flex-col gap-1 rounded-xl border border-border bg-stone-50 px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryStyle(
+                                r.category,
+                              )}`}
+                            >
+                              {r.category}
+                            </span>
+                            <span className="shrink-0 rounded-full bg-[#302e2b]/85 px-2 py-0.5 text-[10px] font-semibold text-white">
+                              AI
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                              {r.name}
+                            </span>
+                            {r.distanceMeters != null && (
+                              <span className="shrink-0 text-[11px] text-muted">
+                                {fmtDist(r.distanceMeters)}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs leading-relaxed text-foreground/70">
+                            {r.reason}
+                          </p>
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => void addAiCandidate(r)}
+                              disabled={aiAddingId === r.kakaoPlaceId}
+                              className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                            >
+                              {aiAddingId === r.kakaoPlaceId
+                                ? "추가 중…"
+                                : "+ 코스에 추가"}
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                  <div className="mt-2 flex items-center justify-center gap-2">
+                    {!aiShowAll && aiAll.length > AI_INITIAL_COUNT && (
+                      <button
+                        type="button"
+                        onClick={() => setAiShowAll(true)}
+                        className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-200"
+                      >
+                        더보기
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void loadAiRecommendations()}
+                      disabled={aiLoading}
+                      className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-200 disabled:opacity-60"
+                    >
+                      다시 추천받기
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 추가할 장소 (다녀온 곳 + 위시리스트 전부, 카테고리별 그룹) */}
       <div className="flex flex-col gap-3">

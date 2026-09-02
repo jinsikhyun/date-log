@@ -21,7 +21,14 @@ npm run dev                  # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL (`https://<ref>.supabase.co`, 경로 없이) | 브라우저 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon public 키 (RLS 로 보호되므로 공개돼도 됨) | 브라우저 |
 
-> `NEXT_PUBLIC_` 접두사가 붙은 값만 브라우저 번들에 인라인된다. service_role 키·OAuth Client Secret 등 서버 비밀값은 **이 저장소·환경변수 어디에도 두지 않는다** — 전부 Supabase 대시보드에서만 설정.
+서버 전용(AI 추천 기능, `src/app/api/*`) — `NEXT_PUBLIC_` 아니므로 브라우저 번들에 안 들어감:
+
+| 변수 | 설명 |
+|---|---|
+| `OPENAI_API_KEY` | platform.openai.com > API keys. 추천 이유·태그 생성에 사용 |
+| `KAKAO_REST_API_KEY` | 카카오 개발자 콘솔 > 앱 키 > REST API 키(JavaScript 키와 다름). 실제 장소 후보 검색에 사용 |
+
+> `NEXT_PUBLIC_` 접두사가 붙은 값만 브라우저 번들에 인라인된다. service_role 키·OAuth Client Secret 등은 **이 저장소·환경변수 어디에도 두지 않는다** — 전부 Supabase 대시보드에서만 설정. 위 서버 전용 키 2개는 이 앱이 직접 쓰는 값이라 `.env.local`(로컬)·Vercel 서버 환경변수(배포)에 등록한다.
 
 ## 데이터베이스 / 인증 (Supabase)
 
@@ -30,7 +37,8 @@ npm run dev                  # http://localhost:3000
    `add-couples-model.sql` → `add-couple-rls.sql` → `add-couple-start-date.sql` →
    `add-categories-table.sql` · `courses.sql` · `add-wishlist-columns.sql` ·
    `add-reactions.sql` · `add-notifications.sql` · `add-favorite-tags.sql` ·
-   `migrate-wanted-by-to-ids.sql` 등.
+   `migrate-wanted-by-to-ids.sql` · `add-place-tags.sql` ·
+   `add-ai-recommend-rate-limit.sql` 등.
 3. **Authentication → Providers**: Email 활성화 (Confirm email 켬). Google 을 쓰려면 Google provider 활성화 + Google Cloud OAuth 클라이언트 연결.
 4. **Authentication → URL Configuration → Redirect URLs** 에 콜백 경로 등록:
    ```
@@ -43,7 +51,7 @@ npm run dev                  # http://localhost:3000
 ## 배포 (Vercel)
 
 1. 이 저장소를 GitHub 에 push → Vercel New Project 로 import
-2. **Environment Variables** 에 위 3개 등록 (Production + Preview). `NEXT_PUBLIC_*` 는 빌드 시점에 필요하므로 배포 전에 설정
+2. **Environment Variables** 에 위 `NEXT_PUBLIC_*` 3개 + 서버 전용 2개(`OPENAI_API_KEY`, `KAKAO_REST_API_KEY`) 등록 (Production + Preview). `NEXT_PUBLIC_*` 는 빌드 시점에 필요하므로 배포 전에 설정
 3. Deploy → 발급 도메인 확인
 4. **카카오 콘솔 > 플랫폼 > Web** 에 그 도메인 추가 (안 하면 지도가 `domain mismatched`)
 5. **Supabase Redirect URLs** 에 `https://<도메인>/auth/callback` 추가

@@ -23,7 +23,7 @@ import { CategoryChips } from "@/components/CategoryChips";
 import { withPreferences } from "@/lib/preferences";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -79,10 +79,13 @@ export function WishlistView() {
         const missingCol = /column .*(status|wanted_by_ids).* does not exist/i.test(
           error.message,
         );
+        const missingTagsCol = /column .*tags.* does not exist/i.test(error.message);
         setLoadError(
-          missingCol
-            ? "필요한 컬럼이 아직 없어요. supabase/migrate-wanted-by-to-ids.sql 을 Supabase SQL Editor 에서 실행하세요."
-            : `가고 싶은 곳을 불러오지 못했어요: ${error.message}`,
+          missingTagsCol
+            ? "tags 컬럼이 아직 없어요. supabase/add-place-tags.sql 을 Supabase SQL Editor에서 실행하세요."
+            : missingCol
+              ? "필요한 컬럼이 아직 없어요. supabase/migrate-wanted-by-to-ids.sql 을 Supabase SQL Editor 에서 실행하세요."
+              : `가고 싶은 곳을 불러오지 못했어요: ${error.message}`,
         );
       } else {
         setPlaces(((data ?? []) as unknown as Place[]).map(withPreferences));

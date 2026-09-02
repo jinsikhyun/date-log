@@ -6,6 +6,7 @@ import { uploadPhoto } from "@/lib/photos";
 import { ensureKakaoLoaded, geocode, keywordSearchFirst } from "@/lib/kakao";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
+import { TagSelector } from "@/components/TagSelector";
 
 export interface NewPlaceInput {
   name: string;
@@ -16,6 +17,7 @@ export interface NewPlaceInput {
   rating: string; // 폼 값(문자열). 실제 변환은 부모(handleAdd)에서.
   first_visit_date: string;
   description: string;
+  tags: string[]; // 취향 태그 (선택 사항, 방문/위시 상태와 무관하게 저장)
   image_url: string; // 업로드 완료된 대표 사진 URL. 빈 문자열이면 사진 없음(선택 항목).
   lat: string; // 카카오 장소검색으로 채워지는 위도/경도. 빈 문자열이면 지도가 주소를 지오코딩.
   lng: string;
@@ -33,6 +35,7 @@ const EMPTY: NewPlaceInput = {
   rating: "",
   first_visit_date: "",
   description: "",
+  tags: [],
   image_url: "",
   lat: "",
   lng: "",
@@ -57,6 +60,7 @@ export function placeFormInput(p: {
   rating: number | null;
   first_visit_date: string | null;
   description: string | null;
+  tags?: string[] | null;
   image_url: string | null;
   lat: number | null;
   lng: number | null;
@@ -72,6 +76,7 @@ export function placeFormInput(p: {
     rating: p.rating != null ? String(p.rating) : "",
     first_visit_date: p.first_visit_date ?? "",
     description: p.description ?? "",
+    tags: p.tags ?? [],
     image_url: p.image_url ?? "",
     lat: p.lat != null ? String(p.lat) : "",
     lng: p.lng != null ? String(p.lng) : "",
@@ -395,6 +400,14 @@ export function AddPlaceForm({
           value={form.naver_map_link}
           onChange={(e) => set("naver_map_link", e.target.value)}
           placeholder="https://naver.me/..."
+        />
+      </div>
+
+      <div className="sm:col-span-2">
+        <TagSelector
+          category={form.category}
+          selected={form.tags}
+          onChange={(tags) => set("tags", tags)}
         />
       </div>
 
