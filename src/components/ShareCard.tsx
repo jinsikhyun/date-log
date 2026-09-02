@@ -9,7 +9,7 @@ function stars(r: number): string {
 }
 
 /**
- * 화면 밖에 숨겨두고 html2canvas 로 캡처하는 장소 공유 카드.
+ * 화면 밖에 숨겨두고 공유 PNG로 캡처하는 장소 공유 카드.
  * ⚠️ html2canvas 의 커스텀 폰트 line-height/baseline 오차 → 나란히 놓인 요소가 밀림.
  *    대응: 나란히 배치는 flex + alignItems:"center", 모든 텍스트에 절대값(px) lineHeight.
  */
@@ -23,6 +23,7 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
         style={{
           width: CARD_W,
           boxSizing: "border-box",
+          overflowWrap: "anywhere",
           fontFamily: SC.font,
           background: SC.cardBg,
           color: SC.fg,
@@ -136,6 +137,7 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
                 marginTop: 12,
                 fontSize: 14,
                 lineHeight: "22px",
+                whiteSpace: "pre-wrap",
                 color: SC.fgSoft,
               }}
             >

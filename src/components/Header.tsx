@@ -258,7 +258,11 @@ export function Header() {
             </nav>
 
             <div className="mt-auto flex flex-col gap-3">
-              <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+              <Link
+                href="/recap"
+                aria-label="우리의 기록 보기"
+                className="block rounded-2xl bg-card p-4 ring-1 ring-border transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-accent/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
                 <p className="text-[11px] font-medium text-muted-2">
                   함께 걸은 지
                 </p>
@@ -279,13 +283,13 @@ export function Header() {
                     {hasBatchim(meLabel) ? "으로" : "로"} 보는 중
                   </span>
                 </div>
-              </div>
+              </Link>
 
               <div className="flex items-center gap-1 text-muted">
                 <NotificationBell />
                 <Link
                   href="/settings"
-                  aria-label="설정"
+                  aria-label="계정 관리"
                   className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/[0.04] hover:text-accent"
                 >
                   <SettingsIcon className="h-4 w-4" />
@@ -328,7 +332,7 @@ export function Header() {
             <NotificationBell />
             <Link
               href="/settings"
-              aria-label="설정"
+              aria-label="계정 관리"
               className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/[0.04] hover:text-accent"
             >
               <SettingsIcon className="h-[18px] w-[18px]" />

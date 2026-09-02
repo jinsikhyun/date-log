@@ -9,30 +9,25 @@ const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
 const labelClass = "text-xs font-medium text-muted";
 
-// 헷갈리는 문자(0/O, 1/I) 제외
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-function genInviteCode(len = 6): string {
-  let s = "";
-  for (let i = 0; i < len; i++) {
-    s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  }
-  return s;
-}
-
-/** 내 profiles 행을 만들거나(couple_id 비어있으면) 갱신 */
-async function upsertMyProfile(
-  userId: string,
-  displayName: string,
-  coupleId: string,
-  email: string | null,
-) {
-  const { error } = await supabase
-    .from("profiles")
-    .upsert(
-      { id: userId, display_name: displayName, couple_id: coupleId, email },
-      { onConflict: "id" },
+/** 신원·초대코드·정원 검증과 연결을 DB의 단일 트랜잭션에서 처리한다. */
+async function connectCouple(displayName: string, inviteCode: string | null) {
+  const { data, error } = await supabase.rpc("connect_couple", {
+    p_display_name: displayName.trim(),
+    p_invite_code: inviteCode,
+  });
+  if (error) {
+    // 예전 직접 upsert 방식으로 폴백하면 보안 제한을 우회하게 되므로 금지.
+    throw new Error(
+      error.code === "PGRST202"
+        ? "커플 연결 기능을 준비 중이에요. 잠시 후 다시 시도해 주세요."
+        : error.message,
     );
-  if (error) throw new Error(error.message);
+  }
+  if (data?.error) throw new Error(data.error);
+  if (typeof data?.couple_id !== "string" || typeof data?.invite_code !== "string") {
+    throw new Error("연결 결과를 확인할 수 없어요. 다시 로그인해 주세요.");
+  }
+  return data as { couple_id: string; invite_code: string };
 }
 
 export function OnboardingView() {
@@ -65,7 +60,7 @@ export function OnboardingView() {
         <p className="mt-2 text-sm text-foreground/80">
           이 초대코드를 파트너에게 공유하세요:
         </p>
-        <p className="my-4 select-all rounded-2xl bg-accent/10 px-4 py-3 text-2xl font-extrabold tracking-widest text-accent">
+        <p className="my-4 break-all select-all rounded-2xl bg-accent/10 px-4 py-3 text-2xl font-extrabold tracking-widest text-accent">
           {createdCode}
         </p>
         <button
@@ -94,26 +89,9 @@ export function OnboardingView() {
     }
     setCreating(true);
     try {
-      // 초대코드는 unique — 충돌 나면 몇 번 재시도
-      let couple: { id: string; invite_code: string } | null = null;
-      for (let attempt = 0; attempt < 5 && !couple; attempt++) {
-        const code = genInviteCode();
-        const { data, error } = await supabase
-          .from("couples")
-          .insert({ invite_code: code })
-          .select("id, invite_code")
-          .single();
-        if (!error) {
-          couple = data as { id: string; invite_code: string };
-          break;
-        }
-        if (error.code !== "23505") throw new Error(error.message); // unique 위반이 아니면 진짜 오류
-      }
-      if (!couple) throw new Error("초대코드 생성에 실패했어요. 다시 시도해 주세요.");
-
-      await upsertMyProfile(user.id, createName.trim(), couple.id, user.email ?? null);
-      await refreshProfile();
+      const couple = await connectCouple(createName, null);
       setCreatedCode(couple.invite_code);
+      await refreshProfile();
     } catch (err) {
       setCreateErr(err instanceof Error ? err.message : "커플 생성에 실패했어요.");
     } finally {
@@ -130,18 +108,7 @@ export function OnboardingView() {
     }
     setJoining(true);
     try {
-      const { data: couple, error } = await supabase
-        .from("couples")
-        .select("id")
-        .eq("invite_code", joinCode.trim().toUpperCase())
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      if (!couple) {
-        setJoinErr("코드를 다시 확인해주세요.");
-        setJoining(false);
-        return;
-      }
-      await upsertMyProfile(user.id, joinName.trim(), couple.id, user.email ?? null);
+      await connectCouple(joinName, joinCode.trim().toUpperCase());
       await refreshProfile();
       // 하드 이동: proxy 가 새 프로필(커플 연결됨)로 다시 판단하도록
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -173,6 +140,8 @@ export function OnboardingView() {
           </label>
           <input
             id="ob-create-name"
+            maxLength={50}
+            required
             className={fieldClass}
             value={createName}
             onChange={(e) => setCreateName(e.target.value)}
@@ -184,7 +153,7 @@ export function OnboardingView() {
         )}
         <button
           type="submit"
-          disabled={creating}
+          disabled={creating || joining}
           className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
         >
           {creating ? "만드는 중…" : "커플 만들기"}
@@ -203,6 +172,8 @@ export function OnboardingView() {
           </label>
           <input
             id="ob-join-name"
+            maxLength={50}
+            required
             className={fieldClass}
             value={joinName}
             onChange={(e) => setJoinName(e.target.value)}
@@ -215,6 +186,8 @@ export function OnboardingView() {
           </label>
           <input
             id="ob-join-code"
+            maxLength={64}
+            required
             className={`${fieldClass} uppercase tracking-widest`}
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)}
@@ -227,7 +200,7 @@ export function OnboardingView() {
         )}
         <button
           type="submit"
-          disabled={joining}
+          disabled={joining || creating}
           className="rounded-full bg-foreground px-5 py-2 text-sm font-semibold text-background transition-opacity disabled:opacity-60"
         >
           {joining ? "합류 중…" : "합류하기"}

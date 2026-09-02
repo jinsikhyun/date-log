@@ -94,7 +94,7 @@ export function CourseForm({
   courseId?: number; // 수정 화면이면 이 코스의 id (course_only 장소를 바로 연결)
   submitLabel?: string;
 }) {
-  const { authorName } = useAuth();
+  const { authorName, coupleMembers } = useAuth();
   const { categories, orderNames } = useCategories();
   const base = initial ?? EMPTY;
   const [title, setTitle] = useState(base.title);
@@ -128,6 +128,7 @@ export function CourseForm({
   const [nLat, setNLat] = useState("");
   const [nLng, setNLng] = useState("");
   const [nKakao, setNKakao] = useState("");
+  const [nWantedByIds, setNWantedByIds] = useState<string[]>([]);
   const [nSaving, setNSaving] = useState(false);
   const [nError, setNError] = useState<string | null>(null);
 
@@ -281,6 +282,7 @@ export function CourseForm({
     setNLat("");
     setNLng("");
     setNKakao("");
+    setNWantedByIds([]);
     setNError(null);
   };
 
@@ -323,6 +325,7 @@ export function CourseForm({
               lng,
               kakao_map_link: nKakao,
               status: courseOnly ? "course_only" : "wishlist",
+              wanted_by_ids: courseOnly ? [] : nWantedByIds,
               added_by: authorName,
             }),
           ),
@@ -455,19 +458,9 @@ export function CourseForm({
                 key={p.id}
                 className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2"
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {p.name}
-                </span>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${categoryStyle(
-                    p.category,
-                  )}`}
-                >
-                  {p.category}
-                </span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${categoryStyle(p.category)}`}>{p.category}</span>
                 <StatusBadge status={p.status} />
                 <span className="flex shrink-0 items-center gap-1">
                   <button
@@ -623,6 +616,32 @@ export function CourseForm({
                 placeholder="서울 종로구 ..."
               />
             </div>
+            {coupleMembers.some((m) => m.display_name?.trim()) && (
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClass}>누가 가고 싶어요?</span>
+                <div className="flex flex-wrap gap-2">
+                  {coupleMembers.filter((m) => m.display_name?.trim()).map((m) => {
+                    const on = nWantedByIds.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setNWantedByIds((ids) =>
+                          on ? ids.filter((id) => id !== m.id) : [...ids, m.id]
+                        )}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${on ? "bg-accent/10 text-accent ring-accent/50" : "bg-white text-stone-500 ring-border hover:text-accent"}`}
+                      >
+                        {m.display_name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted">
+                  ‘가고 싶은 곳에 추가’할 때 표시와 ‘누가’ 필터에 반영돼요.
+                </p>
+              </div>
+            )}
             {nError && (
               <p className="text-xs font-medium text-red-600">{nError}</p>
             )}

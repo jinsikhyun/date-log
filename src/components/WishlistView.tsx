@@ -20,8 +20,10 @@ import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
 
+import { withPreferences } from "@/lib/preferences";
+
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -83,7 +85,7 @@ export function WishlistView() {
             : `가고 싶은 곳을 불러오지 못했어요: ${error.message}`,
         );
       } else {
-        setPlaces((data ?? []) as Place[]);
+        setPlaces(((data ?? []) as unknown as Place[]).map(withPreferences));
       }
       setLoading(false);
     })();
@@ -107,7 +109,7 @@ export function WishlistView() {
       );
     }
 
-    const saved = data as Place;
+    const saved = withPreferences(data as unknown as Place);
     setAdding(false);
     if (saved.status === "wishlist") {
       setPlaces((prev) => [saved, ...prev]);
@@ -128,7 +130,7 @@ export function WishlistView() {
         throw new Error(`저장이 반영되지 않았어요. ${POLICY_HINT}`);
       }
 
-      const saved = data[0] as Place;
+      const saved = withPreferences(data[0] as unknown as Place);
       setPlaces((prev) =>
         saved.status === "wishlist"
           ? prev.map((p) => (p.id === saved.id ? saved : p))

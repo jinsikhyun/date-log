@@ -96,7 +96,7 @@ export async function uploadPhoto(file: File): Promise<string> {
   if (error) {
     // 버킷/스토리지 정책이 없으면 여기서 RLS 위반으로 실패한다.
     throw new Error(
-      `업로드 실패: ${error.message} (supabase/storage_place_photos.sql 적용 여부를 확인해 주세요.)`,
+      `업로드 실패: ${error.message} (로그인 상태와 사진 저장소 권한을 확인해 주세요. 예전 공개 권한 SQL은 재실행하지 마세요.)`,
     );
   }
 

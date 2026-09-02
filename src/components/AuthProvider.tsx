@@ -13,15 +13,17 @@ import { supabase } from "@/lib/supabase/client";
 export interface Profile {
   id: string;
   display_name: string | null;
+  avatar_path: string | null;
   couple_id: string | null;
   created_at: string;
 }
 
-const PROFILE_COLUMNS = "id, display_name, couple_id, created_at";
+const PROFILE_COLUMNS = "id, display_name, avatar_path, couple_id, created_at";
 
 export interface CoupleMember {
   id: string;
   display_name: string | null;
+  avatar_path: string | null;
 }
 
 interface AuthCtx {
@@ -113,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     supabase
       .from("profiles")
-      .select("id, display_name")
+      .select("id, display_name, avatar_path")
       .eq("couple_id", cid)
       .order("created_at", { ascending: true })
       .then(({ data }) => {

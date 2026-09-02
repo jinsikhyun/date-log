@@ -32,6 +32,8 @@ export function useShareImage(
   const lastDownloadRef = useRef(0);
   const lastShareRef = useRef(0);
   const sharingRef = useRef(false);
+  const generationRef = useRef(0);
+  useEffect(() => () => { generationRef.current += 1; }, []);
 
   useEffect(
     () => () => {
@@ -43,12 +45,14 @@ export function useShareImage(
   const capture = async () => {
     if (capturingRef.current) return; // 이미 캡처했거나 캡처 중 → 무시
     capturingRef.current = true;
+    const generation = ++generationRef.current;
     setError(null);
     setPhase("capturing");
     try {
       const el = targetRef.current;
       if (!el) throw new Error("카드를 준비하지 못했어요.");
       const b = await captureElement(el);
+      if (generation !== generationRef.current) return;
       setBlob(b);
       setPreviewUrl((old) => {
         if (old) URL.revokeObjectURL(old);
@@ -56,6 +60,7 @@ export function useShareImage(
       });
       setPhase("ready");
     } catch (e) {
+      if (generation !== generationRef.current) return;
       console.error("[share] 캡처 실패:", e);
       setError(e instanceof Error ? e.message : "이미지를 만들지 못했어요.");
       setPhase("idle");
@@ -76,12 +81,15 @@ export function useShareImage(
     if (!blob || sharingRef.current || now - lastShareRef.current < 1500) return;
     lastShareRef.current = now;
     sharingRef.current = true;
+    const generation = generationRef.current;
     setPhase("sharing");
     setError(null);
     try {
       await shareImage(blob, filename);
+      if (generation !== generationRef.current) return;
       setPhase("ready");
     } catch (e) {
+      if (generation !== generationRef.current) return;
       if (e instanceof Error && e.name === "AbortError") {
         setPhase("ready"); // 사용자가 공유 시트를 닫음 — 오류 아님
       } else {
@@ -90,11 +98,12 @@ export function useShareImage(
         setPhase("ready");
       }
     } finally {
-      sharingRef.current = false;
+      if (generation === generationRef.current) sharingRef.current = false;
     }
   };
 
   const reset = useCallback(() => {
+    generationRef.current += 1;
     capturingRef.current = false;
     sharingRef.current = false;
     lastDownloadRef.current = 0;

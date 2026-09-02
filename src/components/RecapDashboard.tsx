@@ -371,7 +371,9 @@ export function RecapDashboard() {
                               "recap-runner-bounce 0.6s ease-in-out infinite",
                           }}
                         >
-                          🏃
+                          <span aria-hidden className="inline-block -scale-x-100">
+                            🏃
+                          </span>
                         </button>
                       </div>
                       <div className="relative mt-1.5 h-4">

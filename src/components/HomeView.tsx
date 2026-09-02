@@ -36,8 +36,10 @@ const KakaoMap = dynamic(
 
 type ViewMode = "feed" | "map";
 
+import { withPreferences } from "@/lib/preferences";
+
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at";
 
 // 목록 조회 시엔 memories(count) 를 임베딩해서 장소별 실제 추억 개수를 가져온다.
 const PLACE_LIST_SELECT = `${PLACE_COLUMNS}, memories(count)`;
@@ -46,7 +48,7 @@ type PlaceListRow = Place & { memories?: { count: number }[] };
 
 function withMemoryCount(row: PlaceListRow): Place {
   const { memories, ...rest } = row;
-  return { ...rest, memory_count: memories?.[0]?.count ?? 0 };
+  return withPreferences({ ...rest, memory_count: memories?.[0]?.count ?? 0 });
 }
 
 export function HomeView() {
@@ -171,7 +173,7 @@ export function HomeView() {
         );
       }
 
-      const saved = data as Place;
+      const saved = withPreferences(data as unknown as Place);
       setShowForm(false);
 
       if (saved.status === "wishlist") {

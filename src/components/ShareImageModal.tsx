@@ -144,6 +144,12 @@ export function ShareImageModal({
               )}
 
               <div className="mt-4 flex gap-2">
+                {error && !previewUrl && phase !== "capturing" && (
+                  <button type="button" onClick={() => void capture()}
+                    className="rounded-full bg-stone-100 px-4 py-2.5 text-sm font-semibold">
+                    다시 시도
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={download}

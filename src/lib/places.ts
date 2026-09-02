@@ -31,6 +31,7 @@ export interface Place {
   added_by: string | null; // 등록한 사람 (커플 구성원 display_name)
   favorite_by: string[]; // 이 장소를 pick 한 profiles.id (0~2개) — wanted_by 와 별개
   is_regular: boolean; // 우리 단골
+  place_preferences?: { user_id: string; kind: "pick" }[];
   memory_count: number;
   created_at: string;
 }

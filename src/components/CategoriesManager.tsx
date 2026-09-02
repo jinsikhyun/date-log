@@ -60,6 +60,19 @@ export function CategoriesManager() {
   const [eColor, setEColor] = useState(DEFAULT_COLOR);
   const [eErr, setEErr] = useState<string | null>(null);
 
+  // categories.id 는 GENERATED ALWAYS identity라 upsert에 기존 id를 보내면
+  // INSERT 경로 검사에서 실패한다. 순서 변경은 기존 행의 sort_order만 갱신한다.
+  const updateSortOrders = async (
+    changes: { id: number; sort_order: number }[],
+  ) => {
+    const results = await Promise.all(
+      changes.map(({ id, sort_order }) =>
+        supabase.from("categories").update({ sort_order }).eq("id", id),
+      ),
+    );
+    return results.find(({ error }) => error)?.error ?? null;
+  };
+
   const startEdit = (c: Category) => {
     setEditId(c.id);
     setEName(c.name);
@@ -80,12 +93,28 @@ export function CategoriesManager() {
       return;
     }
     setBusy(true);
-    const maxOrder = categories.reduce((m, c) => Math.max(m, c.sort_order), 0);
+    const etcIndex = categories.findIndex((c) => c.name === "기타");
+    const insertIndex = etcIndex >= 0 ? etcIndex : categories.length;
+    // 새 카테고리는 기본적으로 '기타' 바로 앞에 배치한다.
+    const nextOrder = (insertIndex + 1) * 10;
+    if (etcIndex >= 0) {
+      const shifted = categories.slice(insertIndex).map((c, i) => ({
+        id: c.id,
+        sort_order: nextOrder + (i + 1) * 10,
+      }));
+      const shiftError = await updateSortOrders(shifted);
+      if (shiftError) {
+        setBusy(false);
+        setNErr(`순서 준비 실패: ${shiftError.message}`);
+        await refetch();
+        return;
+      }
+    }
     const { error } = await supabase.from("categories").insert({
       name,
       icon: nIcon.trim() || DEFAULT_ICON,
       color: nColor,
-      sort_order: maxOrder + 10,
+      sort_order: nextOrder,
     });
     setBusy(false);
     if (error) {
@@ -98,6 +127,24 @@ export function CategoriesManager() {
     setNIcon(DEFAULT_ICON);
     setNColor("blue");
     setAdding(false);
+    await refetch();
+  };
+
+  const moveCategory = async (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= categories.length || busy) return;
+    const reordered = [...categories];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setBusy(true);
+    const error = await updateSortOrders(
+      reordered.map((c, i) => ({ id: c.id, sort_order: (i + 1) * 10 })),
+    );
+    setBusy(false);
+    if (error) {
+      window.alert(`순서를 바꾸지 못했어요: ${error.message}`);
+      await refetch();
+      return;
+    }
     await refetch();
   };
 
@@ -169,7 +216,7 @@ export function CategoriesManager() {
         <div>
           <h1 className="text-xl font-bold sm:text-2xl">카테고리 관리</h1>
           <p className="mt-1.5 text-sm text-muted">
-            장소를 분류하는 카테고리의 이름·색·아이콘을 직접 정해요.
+            카테고리의 순서·이름·색·아이콘을 직접 정해요.
           </p>
         </div>
         <Link
@@ -189,7 +236,7 @@ export function CategoriesManager() {
       )}
 
       <ul className="space-y-2">
-        {categories.map((c) => (
+        {categories.map((c, index) => (
           <li
             key={c.id}
             className="rounded-2xl bg-card p-4 ring-1 ring-border/70"
@@ -252,6 +299,24 @@ export function CategoriesManager() {
                 </span>
                 <span className="text-xs text-muted">{c.color}</span>
                 <span className="ml-auto flex gap-1">
+                  <button
+                    type="button"
+                    disabled={busy || index === 0}
+                    onClick={() => moveCategory(index, -1)}
+                    aria-label={`${c.name} 위로 이동`}
+                    className="rounded-full px-2 py-1 text-xs text-stone-500 transition-colors hover:bg-stone-100 disabled:opacity-25"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || index === categories.length - 1}
+                    onClick={() => moveCategory(index, 1)}
+                    aria-label={`${c.name} 아래로 이동`}
+                    className="rounded-full px-2 py-1 text-xs text-stone-500 transition-colors hover:bg-stone-100 disabled:opacity-25"
+                  >
+                    ↓
+                  </button>
                   <button
                     type="button"
                     onClick={() => startEdit(c)}

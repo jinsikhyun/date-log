@@ -10,7 +10,7 @@ export type ShareStop = {
 type Coord = { lat: number; lng: number };
 
 /**
- * 화면 밖에 숨겨두고 html2canvas 로 캡처하는 코스 공유 카드.
+ * 화면 밖에 숨겨두고 공유 PNG로 캡처하는 코스 공유 카드.
  * 지도 이미지는 넣지 않고 번호 리스트 + 구간 거리/시간으로 동선 표현.
  *
  * ⚠️ html2canvas 는 커스텀 폰트의 line-height / baseline 을 브라우저와 다르게 계산해서
@@ -33,6 +33,7 @@ export const CourseShareCard = forwardRef<
       style={{
         width: CARD_W,
         boxSizing: "border-box",
+        overflowWrap: "anywhere",
         fontFamily: SC.font,
         background: SC.cardBg,
         color: SC.fg,
@@ -51,6 +52,7 @@ export const CourseShareCard = forwardRef<
               marginTop: 8,
               fontSize: 13,
               lineHeight: "20px",
+              whiteSpace: "pre-wrap",
               color: SC.fgSoft,
             }}
           >

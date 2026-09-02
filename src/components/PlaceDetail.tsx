@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { withPreferences } from "@/lib/preferences";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -40,7 +41,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, favorite_by, is_regular, via_course, memory_count, created_at";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -60,7 +61,9 @@ function memoryToInput(m: Memory): NewMemoryInput {
 
 export function PlaceDetail({ id }: { id: number }) {
   const router = useRouter();
-  const { coupleMembers } = useAuth();
+  const { user } = useAuth();
+  const favLock = useRef(false);
+  const [favSaving, setFavSaving] = useState(false);
   const [place, setPlace] = useState<Place | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,13 +109,13 @@ export function PlaceDetail({ id }: { id: number }) {
       }
 
       // 코스 전용 장소는 독립적인 상세 페이지가 없다 (오직 그 코스 안에서만)
-      if ((placeRes.data as Place).status === "course_only") {
+      if (placeRes.data.status === "course_only") {
         setError("장소를 찾을 수 없어요.");
         setLoading(false);
         return;
       }
 
-      setPlace(placeRes.data as Place);
+      setPlace(withPreferences(placeRes.data as unknown as Place));
       if (memRes.error) {
         console.error("[memories] 조회 실패:", memRes.error);
       } else {
@@ -250,49 +253,49 @@ export function PlaceDetail({ id }: { id: number }) {
         throw new Error(`수정이 반영되지 않았어요. ${POLICY_HINT}`);
       }
 
-      setPlace(data[0] as Place);
+      setPlace(withPreferences(data[0] as unknown as Place));
       setEditing(false);
     },
     [id],
   );
 
-  // 픽/단골 토글 — 낙관적 업데이트 후 Supabase 반영, 실패 시 롤백.
+  // pick은 본인 행만, 단골은 커플 공동 값. 저장 후 서버 상태로 갱신.
   const toggleFavorite = useCallback(
     async (
       target: { kind: "member"; memberId: string } | { kind: "regular" },
     ) => {
-      if (!place) return;
+      if (!place || !user || favLock.current) return;
+      if (target.kind === "member" && target.memberId !== user.id) return;
+      favLock.current = true;
+      setFavSaving(true);
       setFavError(null);
-
-      const prevFav = place.favorite_by ?? [];
-      const prevReg = place.is_regular;
-      const patch: { favorite_by?: string[]; is_regular?: boolean } =
-        target.kind === "regular"
-          ? { is_regular: !prevReg }
-          : {
-              favorite_by: prevFav.includes(target.memberId)
-                ? prevFav.filter((x) => x !== target.memberId)
-                : [...prevFav, target.memberId],
-            };
-
-      setPlace((p) => (p ? { ...p, ...patch } : p));
-
-      const { data, error: upErr } = await supabase
-        .from("places")
-        .update(patch)
-        .eq("id", id)
-        .select("id");
-
-      if (upErr || !data || data.length === 0) {
-        setPlace((p) =>
-          p ? { ...p, favorite_by: prevFav, is_regular: prevReg } : p,
-        );
-        setFavError(
-          upErr ? "저장하지 못했어요. 다시 시도해 주세요." : POLICY_HINT,
-        );
+      try {
+        if (target.kind === "regular") {
+          const { data, error } = await supabase.from("places")
+            .update({ is_regular: !place.is_regular }).eq("id", id).select("id");
+          if (error) throw error;
+          if (!data?.length) throw new Error(POLICY_HINT);
+        } else if ((place.favorite_by ?? []).includes(user.id)) {
+          const { error } = await supabase.from("place_preferences").delete()
+            .eq("place_id", id).eq("user_id", user.id).eq("kind", "pick");
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("place_preferences")
+            .insert({ place_id: id, user_id: user.id, kind: "pick" });
+          // 다른 탭에서 이미 켰다면 같은 최종 상태이므로 재조회한다.
+          if (error && error.code !== "23505") throw error;
+        }
+        const { data, error } = await supabase.from("places").select(PLACE_COLUMNS).eq("id", id).single();
+        if (error) throw error;
+        setPlace(withPreferences(data as unknown as Place));
+      } catch {
+        setFavError("저장 상태를 확인하지 못했어요. 새로고침 후 다시 확인해 주세요.");
+      } finally {
+        favLock.current = false;
+        setFavSaving(false);
       }
     },
-    [place, id],
+    [place, id, user],
   );
 
   const handleDeletePlace = useCallback(async () => {
@@ -445,29 +448,25 @@ export function PlaceDetail({ id }: { id: number }) {
             {place.status === "visited" && (
               <>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  {coupleMembers
-                    .filter((m) => m.display_name?.trim())
-                    .map((m) => {
-                      const on = (place.favorite_by ?? []).includes(m.id);
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() =>
-                            toggleFavorite({ kind: "member", memberId: m.id })
-                          }
-                          aria-pressed={on}
-                          className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
-                            on ? "text-accent" : "text-muted hover:text-accent"
-                          }`}
-                        >
-                          <HeartMini className="h-4 w-4" />
-                          {m.display_name}
-                        </button>
-                      );
-                    })}
+                  {user && (
+                    <button
+                      type="button"
+                      disabled={favSaving}
+                      onClick={() => toggleFavorite({ kind: "member", memberId: user.id })}
+                      aria-pressed={(place.favorite_by ?? []).includes(user.id)}
+                      className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors disabled:cursor-default ${
+                        (place.favorite_by ?? []).includes(user.id)
+                          ? "text-accent"
+                          : "text-muted hover:text-accent"
+                      }`}
+                    >
+                      <HeartMini className="h-4 w-4" />
+                      내 pick으로 등록
+                    </button>
+                  )}
                   <button
                     type="button"
+                    disabled={!user || favSaving}
                     onClick={() => toggleFavorite({ kind: "regular" })}
                     aria-pressed={place.is_regular}
                     className={`flex cursor-pointer items-center gap-1 text-sm font-semibold transition-colors ${
@@ -499,9 +498,9 @@ export function PlaceDetail({ id }: { id: number }) {
                   href={place.naver_map_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-2 transition-colors hover:brightness-95"
+                  className="rounded-full bg-[#03C75A] px-3 py-1 text-xs font-semibold text-[#003B1B] transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#008A3E]"
                 >
-                  네이버지도에서 보기
+                  Naver Map
                 </a>
               )}
               {place.kakao_map_link && (
@@ -509,9 +508,9 @@ export function PlaceDetail({ id }: { id: number }) {
                   href={place.kakao_map_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-2 transition-colors hover:brightness-95"
+                  className="rounded-full bg-[#FEE500] px-3 py-1 text-xs font-semibold text-[#191919] transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#806E00]"
                 >
-                  카카오맵에서 보기
+                  Kakao Map
                 </a>
               )}
               <a
@@ -520,9 +519,9 @@ export function PlaceDetail({ id }: { id: number }) {
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full bg-background px-3 py-1 text-xs font-medium text-muted-2 transition-colors hover:brightness-95"
+                className="rounded-full bg-[#E8F0FE] px-3 py-1 text-xs font-semibold text-[#1967D2] ring-1 ring-inset ring-[#4285F4]/40 transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1967D2]"
               >
-                구글지도에서 보기
+                Google Map
               </a>
               <DirectionsButton
                 name={place.name}
