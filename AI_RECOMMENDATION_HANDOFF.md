@@ -234,12 +234,12 @@ http://localhost:3000/auth/ai-recommend-qa
   - 순수 로직 테스트(네트워크 없음): 태그 빈도 집계·정렬·상위 N개 제한·빈 배열/null 안전 처리 — 3개 케이스 통과.
   - 실제 클릭으로 검증: AI 추천 "커피그래"를 위시리스트에 추가 → 상세 페이지에 태그 칩 "커피·음료 중심" 정상 표시(다음 추천부터 `coupleFavoriteTags` 후보에 들어감).
   - **버그 발견 및 수정**: 이 작업 도중 `MAX_OUTPUT_TOKENS=800`이 너무 낮아 OpenAI 응답이 중간에 잘려(`Unterminated string in JSON`) "추천 응답을 이해하지 못했어요" 오류가 실제로 재현됨 — `gpt-5.6-luna`가 보이는 JSON 앞에 내부적으로 토큰을 더 쓰는 것으로 추정. `2000`으로 올려 해결(출력 단가가 1M 토큰당 $1.20라 비용 영향은 미미). 재현 후 정상 동작 재확인함.
-- **비용 제한 DB화**: `supabase/add-ai-recommend-rate-limit.sql` — `ai_recommend_calls(couple_id, created_at)` 테이블 추가, 기존 `my_couple_id()`/`set_couple_id()`(add-couple-rls.sql) 재사용해 커플 스코프 RLS 적용. `/api/ai-recommend`가 최근 1시간 자기 커플 행 수를 세어 20개 이상이면 429. DB 오류(마이그레이션 미적용 등)면 막지 않고 통과(가용성 우선) — 실제로 마이그레이션 적용 전 상태로 호출해서 정상 통과되는 것 확인(로그에 PGRST205 "table not found"만 찍히고 기능은 안 깨짐). 사용자가 SQL 실행 후 재검증 필요.
+- **비용 제한 DB화**: `supabase/add-ai-recommend-rate-limit.sql` — `ai_recommend_calls(couple_id, created_at)` 테이블 추가, 기존 `my_couple_id()`/`set_couple_id()`(add-couple-rls.sql) 재사용해 커플 스코프 RLS 적용. `/api/ai-recommend`가 최근 1시간 자기 커플 행 수를 세어 20개 이상이면 429. DB 오류(마이그레이션 미적용 등)면 막지 않고 통과(가용성 우선) — 실제로 마이그레이션 적용 전 상태로 호출해서 정상 통과되는 것 확인(로그에 PGRST205 "table not found"만 찍히고 기능은 안 깨짐). 사용자가 SQL 실행함.
+- **commit, push, Vercel 배포 완료** (2026-09-03). 커밋 `0846eca`, `origin/main` push. GitHub 연동으로 자동 재배포됨. 배포 직후엔 `KAKAO_REST_API_KEY`/`OPENAI_API_KEY`를 push 이후에 Vercel에 등록해서 "장소 후보 검색이 아직 설정되지 않았어요" 에러가 떴음 — Vercel은 이미 만들어진 배포에 환경변수를 소급 적용하지 않으므로 대시보드에서 수동 Redeploy 필요했음(원인 파악 + 안내). 재배포 후 사용자가 실제 프로덕션(`datelog.kr`)에서 로그인해 AI 추천 정상 동작 확인함.
 
 아직 하지 않음:
 
-- 위 `add-ai-recommend-rate-limit.sql` 실제 적용 후 재검증 (429 실제로 걸리는지까지는 아직 확인 안 함 — 시간당 20회를 일부러 다 채워야 하므로)
-- commit, push, 배포
+- `add-ai-recommend-rate-limit.sql`의 429가 실제로 걸리는지까지는 확인 안 함 (시간당 20회를 일부러 다 채워야 해서 보류 — 사용자가 "자명하니 넘어가자"고 판단)
 
 ## 11. Claude가 이어서 작업할 순서
 
