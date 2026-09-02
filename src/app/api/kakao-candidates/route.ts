@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
 import {
   collectCandidates,
   excludeNearSelf,
@@ -15,17 +16,17 @@ const MAX_LIMIT = 15;
 const DEFAULT_MIN_DISTANCE_METERS = 50; // 같은 건물/바로 옆 정도는 "새 추천"으로서 의미가 없다.
 const MAX_TAGS_IN_QUERY = 2;
 
-interface RequestBody {
-  category: string; // date.log 카테고리명("카페", "맛집" 등) — 검색어의 기본 축
-  tags?: string[]; // 카테고리와 조합해 추가 검색어를 만든다 (최대 MAX_TAGS_IN_QUERY개)
-  lat: number;
-  lng: number;
-  radiusMeters?: number;
-  limit?: number;
-  excludeKakaoIds?: string[]; // 자기 자신 id, 코스 작성 중 이미 추가된 곳 등
-  excludeAddress?: string; // 현재 장소 주소 — 정확히 같은 주소는 제외
-  minDistanceMeters?: number; // 기본 50 — 이보다 가까운 후보는 제외
-}
+const RequestBodySchema = z.object({
+  category: z.string().trim().min(1).max(100),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  lat: z.number().finite().min(-90).max(90),
+  lng: z.number().finite().min(-180).max(180),
+  radiusMeters: z.number().finite().min(1).max(MAX_RADIUS_METERS).optional(),
+  limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
+  excludeKakaoIds: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
+  excludeAddress: z.string().trim().max(300).optional(),
+  minDistanceMeters: z.number().finite().min(0).max(MAX_RADIUS_METERS).optional(),
+});
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -34,6 +35,17 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
+  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("couple_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile?.couple_id) {
+    return NextResponse.json(
+      { error: "커플 연결을 완료한 뒤 장소 추천을 이용해 주세요." },
+      { status: 403 },
+    );
   }
 
   const apiKey = process.env.KAKAO_REST_API_KEY;
@@ -45,23 +57,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: RequestBody;
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청이에요." }, { status: 400 });
   }
-
-  if (
-    !body.category?.trim() ||
-    typeof body.lat !== "number" ||
-    typeof body.lng !== "number"
-  ) {
+  const bodyResult = RequestBodySchema.safeParse(rawBody);
+  if (!bodyResult.success) {
     return NextResponse.json(
-      { error: "카테고리와 좌표(lat, lng)가 필요해요." },
+      { error: "장소 후보 요청 정보가 올바르지 않아요." },
       { status: 400 },
     );
   }
+  const body = bodyResult.data;
 
   // date.log 에 이미 저장된 장소는 후보에서 제외 — 같은 곳을 "새 추천"처럼 보여주지 않는다.
   const { data: ownPlaces, error: placesErr } = await supabase

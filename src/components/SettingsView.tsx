@@ -15,6 +15,8 @@ export function SettingsView() {
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [pendingAvatar, setPendingAvatar] = useState<Blob | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [partner, setPartner] = useState<
@@ -40,6 +42,12 @@ export function SettingsView() {
       .then(({ data }) => { if (!cancelled) setAvatarUrl(data?.signedUrl ?? null); });
     return () => { cancelled = true; };
   }, [profile?.display_name, profile?.avatar_path]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    };
+  }, [avatarPreviewUrl]);
 
   useEffect(() => {
     if (!ready) return;
@@ -126,26 +134,58 @@ export function SettingsView() {
 
   const dirty = (startDate || null) !== (savedStartDate ?? null);
 
-  const saveName = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); setProfileBusy(true); setProfileErr(null); setProfileMsg(null);
-    const { error } = await supabase.rpc("update_my_display_name", { p_display_name: name.trim() });
-    if (error) setProfileErr(error.message); else { await refreshProfile(); setProfileMsg("프로필을 저장했어요."); }
-    setProfileBusy(false);
+  const saveProfile = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    const nameChanged = trimmedName !== (profile.display_name?.trim() ?? "");
+    if (!trimmedName || (!nameChanged && !pendingAvatar)) return;
+
+    setProfileBusy(true); setProfileErr(null); setProfileMsg(null);
+    try {
+      if (nameChanged) {
+        const { error } = await supabase.rpc("update_my_display_name", {
+          p_display_name: trimmedName,
+        });
+        if (error) throw error;
+      }
+
+      if (pendingAvatar) {
+        const path = `${user.id}/avatar.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from("profile-avatars")
+          .upload(path, pendingAvatar, { contentType: "image/jpeg", upsert: true });
+        if (uploadError) throw uploadError;
+        const { error: updateError } = await supabase.rpc("set_my_avatar_path", {
+          p_avatar_path: path,
+        });
+        if (updateError) throw updateError;
+
+        const { data } = await supabase.storage
+          .from("profile-avatars")
+          .createSignedUrl(path, 3600);
+        setAvatarUrl(data?.signedUrl ? `${data.signedUrl}&v=${Date.now()}` : null);
+        setPendingAvatar(null);
+        setAvatarPreviewUrl(null);
+      }
+
+      await refreshProfile();
+      setProfileMsg("프로필을 저장했어요.");
+    } catch (err) {
+      setProfileErr(err instanceof Error ? err.message : "프로필 저장에 실패했어요.");
+    } finally {
+      setProfileBusy(false);
+    }
   };
 
-  const uploadAvatar = async (e: ChangeEvent<HTMLInputElement>) => {
+  const selectAvatar = async (e: ChangeEvent<HTMLInputElement>) => {
     const file=e.target.files?.[0]; if (!file) return;
     setProfileBusy(true); setProfileErr(null); setProfileMsg(null);
     try {
-      const jpeg=await processImageToJpeg(file, 640); const path=`${user.id}/avatar.jpg`;
-      const { error: uploadError }=await supabase.storage.from("profile-avatars").upload(path,jpeg,{contentType:"image/jpeg",upsert:true});
-      if (uploadError) throw uploadError;
-      const { error: updateError }=await supabase.rpc("set_my_avatar_path", {p_avatar_path:path});
-      if (updateError) throw updateError;
-      await refreshProfile();
-      const { data }=await supabase.storage.from("profile-avatars").createSignedUrl(path,3600);
-      setAvatarUrl(data?.signedUrl ? `${data.signedUrl}&v=${Date.now()}` : null); setProfileMsg("프로필 사진을 저장했어요.");
-    } catch (err) { setProfileErr(err instanceof Error ? err.message : "사진 저장에 실패했어요."); }
+      const jpeg=await processImageToJpeg(file, 640);
+      setPendingAvatar(jpeg);
+      setAvatarPreviewUrl(URL.createObjectURL(jpeg));
+      setProfileMsg("새 프로필 사진을 선택했어요. 저장 버튼을 눌러 적용해 주세요.");
+    } catch (err) { setProfileErr(err instanceof Error ? err.message : "사진을 불러오지 못했어요."); }
     finally { setProfileBusy(false); e.target.value=""; }
   };
 
@@ -224,24 +264,24 @@ export function SettingsView() {
         )}
       </form>
 
-      <form onSubmit={saveName} className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
+      <form onSubmit={saveProfile} className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
         <p className="text-xs font-medium text-muted">프로필 수정</p>
         <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
           <label className="group relative mx-auto block h-24 w-24 shrink-0 cursor-pointer sm:mx-0">
             <span className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-accent-soft text-3xl font-bold text-accent ring-4 ring-white shadow-md">
               {/* 비공개 Storage signed URL은 Next 이미지 최적화 프록시에 노출하지 않는다. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {avatarUrl ? <img src={avatarUrl} alt="내 프로필" className="h-full w-full object-cover" /> : (profile.display_name?.trim().charAt(0) || "♡")}
+              {(avatarPreviewUrl || avatarUrl) ? <img src={avatarPreviewUrl || avatarUrl || ""} alt="내 프로필" className="h-full w-full object-cover" /> : (profile.display_name?.trim().charAt(0) || "♡")}
             </span>
             <span className="absolute bottom-0 right-0 rounded-full bg-accent px-2 py-1 text-[10px] font-bold text-white shadow">사진 변경</span>
-            <input type="file" accept="image/*,.heic,.heif" onChange={uploadAvatar} disabled={profileBusy} className="sr-only" />
+            <input type="file" accept="image/*,.heic,.heif" onChange={selectAvatar} disabled={profileBusy} className="sr-only" />
           </label>
           <div className="min-w-0 flex-1 space-y-3">
             <label className="block text-xs font-medium text-muted">이름(별명)</label>
             <input value={name} onChange={(e)=>setName(e.target.value)} maxLength={30} required className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
             <p className="text-xs text-muted">별명을 바꾸면 과거 장소·추억·답장의 작성자 이름도 함께 변경돼요.</p>
             <p className="truncate text-xs text-muted">{user.email}</p>
-            <button type="submit" disabled={profileBusy || !name.trim() || name.trim()===profile.display_name} className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{profileBusy ? "저장 중…" : "프로필 저장"}</button>
+            <button type="submit" disabled={profileBusy || !name.trim() || (!pendingAvatar && name.trim()===(profile.display_name?.trim() ?? ""))} className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{profileBusy ? "저장 중…" : "프로필 저장"}</button>
           </div>
         </div>
         {profileMsg && <p className="mt-3 text-xs font-medium text-accent">{profileMsg}</p>}

@@ -56,42 +56,44 @@ async function checkRateLimit(
   return true;
 }
 
-interface CandidateInput {
-  id: string;
-  name: string;
-  category: string; // 표시용 중분류
-  categoryName?: string; // 카카오 원본 상세 카테고리(있으면 이걸 AI 판단 근거로 우선 사용)
-  address: string;
-  lat: number;
-  lng: number;
-  distanceMeters?: number; // 이미 계산돼 있으면(kakao-candidates) 재계산하지 않고 그대로 씀
-  kakaoMapUrl?: string | null;
-}
-
-interface CourseStopInput {
-  name: string;
-  category: string;
-  tags?: string[];
-}
-
-interface RequestBody {
+const ShortText = z.string().trim().min(1).max(200);
+const TagList = z.array(z.string().trim().min(1).max(40)).max(20).default([]);
+const Latitude = z.number().finite().min(-90).max(90);
+const Longitude = z.number().finite().min(-180).max(180);
+const CandidateInputSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: ShortText,
+  category: ShortText,
+  categoryName: z.string().trim().max(300).optional(),
+  address: z.string().trim().min(1).max(300),
+  lat: Latitude,
+  lng: Longitude,
+  distanceMeters: z.number().finite().min(0).max(100_000).optional(),
+  kakaoMapUrl: z.string().url().max(500).nullable().optional(),
+});
+const CourseStopInputSchema = z.object({
+  name: ShortText,
+  category: ShortText,
+  tags: TagList.optional(),
+});
+const RequestBodySchema = z.object({
   // place_detail(기본): 장소 상세 페이지, place 자체가 추천 기준.
-  // course: 코스 작성 화면, place 는 "기준점"(코스 마지막 정거장)이고 courseStops 로
-  // 코스 전체 맥락(공통 분위기·카테고리 조합)을 함께 준다. AI_RECOMMENDATION_HANDOFF.md §4·§5.
-  mode?: "place_detail" | "course";
-  place: {
-    name: string;
-    category: string;
-    address: string;
-    description?: string | null;
-    tags?: string[];
-    lat?: number | null;
-    lng?: number | null;
-  };
-  courseStops?: CourseStopInput[];
-  candidates: CandidateInput[];
-  count?: number;
-}
+  // course: place 는 마지막 정거장, courseStops 는 코스 전체 맥락이다.
+  mode: z.enum(["place_detail", "course"]).optional(),
+  place: z.object({
+    name: ShortText,
+    category: ShortText,
+    address: z.string().trim().min(1).max(300),
+    description: z.string().trim().max(1_000).nullable().optional(),
+    tags: TagList.optional(),
+    lat: Latitude.nullable().optional(),
+    lng: Longitude.nullable().optional(),
+  }),
+  courseStops: z.array(CourseStopInputSchema).max(20).optional(),
+  candidates: z.array(CandidateInputSchema).min(1).max(MAX_CANDIDATES),
+  count: z.number().int().min(MIN_COUNT).max(MAX_COUNT).optional(),
+});
+type RequestBody = z.infer<typeof RequestBodySchema>;
 
 export async function POST(req: NextRequest) {
   // 로그인한 커플만 호출 가능 — 비로그인 요청으로 유료 API 예산이 새는 것을 막는다.
@@ -108,14 +110,11 @@ export async function POST(req: NextRequest) {
     .select("couple_id")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.couple_id) {
-    const ok = await checkRateLimit(supabase, profile.couple_id);
-    if (!ok) {
-      return NextResponse.json(
-        { error: "AI 추천을 너무 많이 요청했어요. 잠시 후 다시 시도해 주세요." },
-        { status: 429 },
-      );
-    }
+  if (!profile?.couple_id) {
+    return NextResponse.json(
+      { error: "커플 연결을 완료한 뒤 AI 추천을 이용해 주세요." },
+      { status: 403 },
+    );
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -127,26 +126,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: RequestBody;
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청이에요." }, { status: 400 });
   }
-
-  const rawCandidates = (body.candidates ?? []).slice(0, MAX_CANDIDATES);
-  if (!body.place?.name || rawCandidates.length === 0) {
+  const bodyResult = RequestBodySchema.safeParse(rawBody);
+  if (!bodyResult.success) {
     return NextResponse.json(
-      { error: "장소 정보와 후보 목록이 필요해요." },
+      { error: "추천 요청의 장소 정보가 올바르지 않아요." },
       { status: 400 },
     );
   }
+  const body: RequestBody = bodyResult.data;
+
+  const ok = await checkRateLimit(supabase, profile.couple_id);
+  if (!ok) {
+    return NextResponse.json(
+      { error: "AI 추천을 너무 많이 요청했어요. 잠시 후 다시 시도해 주세요." },
+      { status: 429 },
+    );
+  }
+
+  const rawCandidates = body.candidates;
 
   // 커플이 그동안 저장한 장소들의 태그 빈도 상위 N개 — "위시리스트/코스 추가"로
   // 확정된 취향을 다음 추천에 다시 반영해 취향을 좁혀간다(피드백 루프).
   // AI가 추천을 고른 근거(matchedTags)를 그 장소의 tags로 그대로 저장해두기 때문에
   // (AiRecommendationSection.addToWishlist, CourseForm.addAiCandidate) 성립한다.
-  const { data: tagRows } = await supabase.from("places").select("tags");
+  const { data: tagRows } = await supabase
+    .from("places")
+    .select("tags")
+    .eq("couple_id", profile.couple_id);
   const tagCounts = new Map<string, number>();
   for (const row of tagRows ?? []) {
     for (const t of row.tags ?? []) {

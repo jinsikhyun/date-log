@@ -36,7 +36,7 @@ interface AiRecommendation {
  * 기본 접힘 — 처음 펼칠 때만 카카오 후보 수집 + OpenAI 호출(유료)을 실행한다.
  */
 export function AiRecommendationSection({ place }: { place: Place }) {
-  const { authorName } = useAuth();
+  const { user, authorName } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +112,7 @@ export function AiRecommendationSection({ place }: { place: Place }) {
 
   /** 카드의 "+ 위시리스트" — 새로 발견한 곳을 date.log 위시리스트에 저장한다. */
   const addToWishlist = async (r: AiRecommendation) => {
-    if (!authorName) {
+    if (!user || !authorName) {
       setError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
       return;
     }
@@ -132,7 +132,9 @@ export function AiRecommendationSection({ place }: { place: Place }) {
           lat: String(r.lat),
           lng: String(r.lng),
           status: "wishlist",
-          wanted_by_ids: [],
+          // 추천을 저장한 본인이 우선 가고 싶은 사람. 상세/위시 화면에서
+          // 파트너도 독립적으로 추가할 수 있다.
+          wanted_by_ids: [user.id],
           added_by: authorName,
           // AI가 이 후보를 고른 근거(matchedTags)를 그대로 저장 — 다음 추천 때
           // "커플이 선호해온 태그"로 다시 프롬프트에 들어가 취향을 좁혀준다.
