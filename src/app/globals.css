@@ -71,6 +71,17 @@ body {
   font-family: var(--font-sans);
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 사진 없는 장소용 크림 스트라이프 플레이스홀더 */
 .photo-placeholder {
   background-image: var(--photo-placeholder);

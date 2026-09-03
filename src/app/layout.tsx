@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/Header";
+import { AppShell } from "@/components/AppShell";
 import { CategoriesProvider } from "@/components/CategoriesProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 
@@ -36,13 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full bg-background text-foreground">
         <AuthProvider>
           <CategoriesProvider>
-            {/* 공통 셸: 데스크탑은 좌측 248px 사이드바만큼 패딩, 모바일은 하단 탭바만큼 */}
-            <div className="min-h-screen lg:pl-[248px]">
-              <Header />
-              <div className="pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
-                {children}
-              </div>
-            </div>
+            <AppShell>{children}</AppShell>
           </CategoriesProvider>
         </AuthProvider>
       </body>

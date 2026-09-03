@@ -8,7 +8,7 @@ import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
 
-export function LoginForm() {
+export function LoginForm({ embedded = false }: { embedded?: boolean }) {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,14 +53,18 @@ export function LoginForm() {
     window.location.assign(prof?.couple_id ? "/" : "/onboarding");
   };
 
+  const embeddedFieldClass =
+    "h-12 w-full rounded-2xl border border-border bg-[#fffdfa] px-4 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent-soft";
+
   return (
     <form
       onSubmit={submit}
-      className="grid gap-4 rounded-3xl bg-card p-6 ring-1 ring-border/70"
+      className={embedded ? "grid gap-4" : "grid gap-4 rounded-3xl bg-card p-6 ring-1 ring-border/70"}
     >
       <div>
-        <h1 className="text-lg font-bold">로그인</h1>
-        <p className="mt-1 text-sm text-muted">date.log 에 오신 걸 환영해요.</p>
+        {embedded && <p className="text-[11px] font-bold tracking-[.1em] text-accent">WELCOME BACK</p>}
+        <h1 className={embedded ? "mt-2 text-2xl font-black" : "text-lg font-bold"}>{embedded ? "우리의 기록으로 돌아가기" : "로그인"}</h1>
+        {!embedded && <p className="mt-1 text-sm text-muted">date.log 에 오신 걸 환영해요.</p>}
       </div>
 
       <div className="flex flex-col gap-1">
@@ -71,10 +75,10 @@ export function LoginForm() {
           id="li-email"
           type="email"
           autoComplete="email"
-          className={fieldClass}
+          className={embedded ? embeddedFieldClass : fieldClass}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder="이메일 주소를 입력해 주세요"
         />
       </div>
 
@@ -86,7 +90,7 @@ export function LoginForm() {
           id="li-pw"
           type="password"
           autoComplete="current-password"
-          className={fieldClass}
+          className={embedded ? embeddedFieldClass : fieldClass}
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           placeholder="••••••"
@@ -98,12 +102,12 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={busy}
-        className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+        className={embedded ? "h-12 rounded-2xl bg-accent px-5 text-sm font-bold text-white transition hover:bg-accent-hover disabled:opacity-60" : "rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-60"}
       >
         {busy ? "로그인 중…" : "로그인"}
       </button>
 
-      <GoogleAuthButton />
+      <GoogleAuthButton embedded={embedded} />
 
       <p className="text-center text-xs text-muted">
         계정이 없나요?{" "}

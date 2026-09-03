@@ -33,8 +33,10 @@ function GoogleG({ className = "" }: { className?: string }) {
  */
 export function GoogleAuthButton({
   label = "Google로 계속하기",
+  embedded = false,
 }: {
   label?: string;
+  embedded?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function GoogleAuthButton({
         type="button"
         onClick={go}
         disabled={busy}
-        className="flex items-center justify-center gap-2 rounded-full border border-border bg-white px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-background disabled:opacity-60"
+        className={`flex items-center justify-center gap-2 border border-border bg-white px-5 text-sm font-semibold text-foreground transition-colors hover:bg-background disabled:opacity-60 ${embedded ? "h-12 rounded-2xl" : "rounded-full py-2"}`}
       >
         <GoogleG className="h-[18px] w-[18px]" />
         {busy ? "Google로 이동 중…" : label}
