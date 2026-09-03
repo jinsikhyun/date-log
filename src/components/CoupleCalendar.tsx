@@ -118,11 +118,15 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
     }
     return map;
   }, [places]);
+  const calendarMemories = useMemo(() => {
+    const visitDateByPlace = new Map(places.map((place) => [place.id, place.date]));
+    return memories.filter((memory) => visitDateByPlace.get(memory.placeId) === memory.date);
+  }, [memories, places]);
   const memoriesByDate = useMemo(() => {
     const map = new Map<string, DayMemory[]>();
-    for (const m of memories) map.set(m.date, [...(map.get(m.date) ?? []), m]);
+    for (const m of calendarMemories) map.set(m.date, [...(map.get(m.date) ?? []), m]);
     return map;
-  }, [memories]);
+  }, [calendarMemories]);
   const firstRecordDate = [...places].sort((a, b) => a.date.localeCompare(b.date))[0]?.date ?? null;
   const eventsByDate = new Map<string, ReturnType<typeof buildAnniversaries>>();
   for (const event of buildAnniversaries(startDate, birthdays, year, year, firstRecordDate)) {
@@ -131,7 +135,7 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
 
   const prefix = prefixOf(year, month);
   const monthPlaces = places.filter((p) => p.date.startsWith(prefix));
-  const monthMemories = memories.filter((m) => m.date.startsWith(prefix));
+  const monthMemories = calendarMemories.filter((m) => m.date.startsWith(prefix));
   const dateDays = new Set([...monthPlaces.map((p) => p.date), ...monthMemories.map((m) => m.date)]).size;
   const prev = new Date(year, month - 1, 1);
   const prevCount = places.filter((p) => p.date.startsWith(prefixOf(prev.getFullYear(), prev.getMonth()))).length;
