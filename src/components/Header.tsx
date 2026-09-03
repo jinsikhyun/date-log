@@ -337,6 +337,15 @@ export function Header() {
             >
               <SettingsIcon className="h-[18px] w-[18px]" />
             </Link>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              aria-label="로그아웃"
+              title="로그아웃"
+              className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/[0.04] hover:text-accent"
+            >
+              <LogoutIcon className="h-[18px] w-[18px]" />
+            </button>
           </div>
         )}
       </header>
