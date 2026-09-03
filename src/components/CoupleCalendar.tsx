@@ -153,6 +153,11 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
     const bOrder = selectedPlaceOrder.get(b.placeId) ?? Number.MAX_SAFE_INTEGER;
     return aOrder - bOrder || a.id - b.id;
   });
+  const selectedRoutePhotoByPlace = new Map(
+    selectedPlaces
+      .filter((place) => place.imageUrl && place.imageCapturedDate === selectedDate)
+      .map((place) => [place.id, place.imageUrl as string]),
+  );
   const selectedPhotos = Array.from(new Set([
     ...selectedPlaces.flatMap((place) => [
       ...(place.imageUrl && place.imageCapturedDate === selectedDate ? [place.imageUrl] : []),
@@ -309,6 +314,13 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
                     <div key={place.id} className="flex shrink-0 items-center gap-1.5">
                       {index > 0 && <span className="text-[11px] text-accent/55">→</span>}
                       <Link href={`/places/${place.id}`} className="flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1.5 text-[10px] font-semibold text-accent transition hover:bg-accent hover:text-white">
+                        {selectedRoutePhotoByPlace.get(place.id) && (
+                          <img
+                            src={selectedRoutePhotoByPlace.get(place.id)}
+                            alt={`${place.name}에서 찍은 사진`}
+                            className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-white/80"
+                          />
+                        )}
                         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/80 text-[8px] text-accent">{index + 1}</span>
                         <span className="max-w-28 truncate">{place.name}</span>
                       </Link>
