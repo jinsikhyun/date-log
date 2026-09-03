@@ -381,7 +381,7 @@ export function PlaceDetail({ id }: { id: number }) {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="rounded-full bg-background px-3.5 py-1.5 text-sm font-medium text-muted-2 transition-colors hover:brightness-95"
+              className="whitespace-nowrap rounded-full bg-background px-3.5 py-1.5 text-sm font-medium text-muted-2 transition-colors hover:brightness-95"
             >
               수정
             </button>
@@ -389,7 +389,7 @@ export function PlaceDetail({ id }: { id: number }) {
               type="button"
               onClick={handleDeletePlace}
               disabled={deleting}
-              className="rounded-full bg-red-50 px-3.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+              className="whitespace-nowrap rounded-full bg-red-50 px-3.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
             >
               {deleting ? "삭제 중…" : "삭제"}
             </button>

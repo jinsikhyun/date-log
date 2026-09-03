@@ -39,7 +39,7 @@ export function AiRecommendationCard({
   const imageSearchUrl = naverImageSearchUrl(place.name, place.address);
 
   return (
-    <article className="group overflow-hidden rounded-[20px] bg-card ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[20px] bg-card ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]">
       <div className="relative h-36 overflow-hidden">
         {place.imageUrl ? (
           <div className="relative h-full bg-[#e6decf]">
@@ -81,7 +81,7 @@ export function AiRecommendationCard({
         </span>
       </div>
 
-      <div className="space-y-3 p-4">
+      <div className="flex flex-1 flex-col gap-3 p-4">
         <div>
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 text-[15px] font-bold leading-snug">
@@ -115,36 +115,34 @@ export function AiRecommendationCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-border/70 pt-3">
+        <div className={`mt-auto grid gap-2 border-t border-border/70 pt-3 ${onAddToWishlist ? "grid-cols-[0.85fr_1.3fr_0.85fr]" : "grid-cols-2"}`}>
           <a
             href={imageSearchUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] font-medium text-muted-2 transition-colors hover:text-accent"
+            className="flex h-9 items-center justify-center whitespace-nowrap rounded-full bg-[#f5f3ef] px-2 text-[11px] font-semibold text-muted-2 transition hover:bg-[#ede9e2] hover:text-accent"
           >
-            사진 보기 ↗
+            사진 ↗
           </a>
-          <div className="flex items-center gap-1.5">
-            {onAddToWishlist && (
-              <button
-                type="button"
-                onClick={onAddToWishlist}
-                disabled={adding || added}
-                className="rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
-              >
-                {added ? "추가됨" : adding ? "추가 중…" : "+ 위시리스트"}
-              </button>
-            )}
-            <a
-              href={naverMapSearchUrl(place.name, place.address)}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`${place.name} 네이버 지도 정보`}
-              className="rounded-full bg-[#03C75A] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-95"
+          {onAddToWishlist ? (
+            <button
+              type="button"
+              onClick={onAddToWishlist}
+              disabled={adding || added}
+              className="flex h-9 items-center justify-center whitespace-nowrap rounded-full bg-accent px-2 text-[11px] font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
             >
-              정보 ↗
-            </a>
-          </div>
+              {added ? "추가됨" : adding ? "추가 중…" : "+ 위시리스트"}
+            </button>
+          ) : null}
+          <a
+            href={naverMapSearchUrl(place.name, place.address)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${place.name} 네이버 지도 정보`}
+            className="flex h-9 items-center justify-center whitespace-nowrap rounded-full bg-[#03C75A] px-2 text-[11px] font-semibold text-white transition hover:brightness-95"
+          >
+            정보 ↗
+          </a>
         </div>
       </div>
     </article>

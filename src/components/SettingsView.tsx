@@ -288,7 +288,7 @@ export function SettingsView() {
           <button
             type="submit"
             disabled={loading || saving || !dirty}
-            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+            className="whitespace-nowrap rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
           >
             {saving ? "저장 중…" : "저장"}
           </button>
@@ -361,7 +361,7 @@ export function SettingsView() {
             </div>
             <p className="text-xs text-muted">생일은 매년 우리의 기록 캘린더에 기념일로 표시돼요.</p>
             <p className="truncate text-xs text-muted">{user.email}</p>
-            <button type="submit" disabled={profileBusy || !name.trim() || (!pendingAvatar && name.trim()===(profile.display_name?.trim() ?? "") && (birthDate || null) === savedBirthDate)} className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{profileBusy ? "저장 중…" : "프로필 저장"}</button>
+            <button type="submit" disabled={profileBusy || !name.trim() || (!pendingAvatar && name.trim()===(profile.display_name?.trim() ?? "") && (birthDate || null) === savedBirthDate)} className="whitespace-nowrap rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{profileBusy ? "저장 중…" : "프로필 저장"}</button>
           </div>
         </div>
         {profileMsg && <p className="mt-3 text-xs font-medium text-accent">{profileMsg}</p>}

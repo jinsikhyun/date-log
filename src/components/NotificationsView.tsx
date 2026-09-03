@@ -106,14 +106,14 @@ export function NotificationsView() {
               type="button"
               onClick={markAllRead}
               disabled={markingAll}
-              className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:opacity-60"
+              className="whitespace-nowrap rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:opacity-60"
             >
               {markingAll ? "처리 중…" : "모두 읽음"}
             </button>
           )}
           <Link
             href="/"
-            className="text-sm text-muted transition-colors hover:text-accent"
+            className="whitespace-nowrap text-sm text-muted transition-colors hover:text-accent"
           >
             ← 홈으로
           </Link>

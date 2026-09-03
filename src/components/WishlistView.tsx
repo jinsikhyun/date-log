@@ -306,7 +306,7 @@ export function WishlistView() {
             return (
               <article
                 key={place.id}
-                className="flex flex-col overflow-hidden rounded-[20px] border border-dashed border-border-dashed bg-card transition-colors hover:border-accent"
+                className="flex h-full flex-col overflow-hidden rounded-[20px] border border-dashed border-border-dashed bg-card transition-colors hover:border-accent"
               >
                 {/* 미방문 placeholder — 클릭 시 네이버 이미지 검색 (새 탭) */}
                 <a
@@ -337,24 +337,24 @@ export function WishlistView() {
                   >
                     {place.name}
                   </Link>
-                  <p className="text-xs text-muted-2">{place.address}</p>
+                  <p className="truncate text-xs text-muted-2">{place.address}</p>
                   {wishLabel && (
                     <span className="mt-0.5 self-start rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent">
                       {wishLabel}
                     </span>
                   )}
-                  <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                  <div className="mt-auto grid grid-cols-[1.25fr_0.75fr] gap-2 pt-3">
                     <button
                       type="button"
                       onClick={() => void handleVisited(place)}
                       disabled={convertingId != null}
-                      className="text-[13px] font-bold text-accent transition-colors hover:text-accent-hover disabled:opacity-50"
+                      className="flex h-9 items-center justify-center whitespace-nowrap rounded-full bg-accent px-3 text-[12px] font-bold text-white transition hover:brightness-95 disabled:opacity-50"
                     >
                       {convertingId === place.id ? "옮기는 중…" : "다녀왔어요 →"}
                     </button>
                     <Link
                       href={`/places/${place.id}`}
-                      className="text-xs font-medium text-muted-3 transition-colors hover:text-accent"
+                      className="flex h-9 items-center justify-center whitespace-nowrap rounded-full bg-background px-3 text-[11px] font-semibold text-muted-2 transition hover:bg-accent-soft hover:text-accent"
                     >
                       수정·삭제
                     </Link>

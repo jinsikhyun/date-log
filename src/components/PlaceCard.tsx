@@ -11,7 +11,7 @@ import { PlaceTagBadges } from "@/components/PlaceTagBadges";
 import type { Anniversary } from "@/lib/anniversaries";
 
 const CARD =
-  "group relative isolate flex flex-col overflow-hidden rounded-[20px] bg-card ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]";
+  "group relative isolate flex h-full flex-col overflow-hidden rounded-[20px] bg-card ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]";
 const CAT_CHIP =
   "absolute left-3.5 top-3.5 z-[1] rounded-full px-3 py-1 text-[11px] font-semibold";
 
@@ -85,7 +85,7 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
             <span className="shrink-0 text-[11px] text-muted-3">{visited}</span>
           )}
         </div>
-        <p className="text-xs text-muted-2">{place.address}</p>
+        <p className="truncate text-xs text-muted-2">{place.address}</p>
         {place.description && (
           <p className="line-clamp-2 text-[13px] leading-[1.6] text-[#4a463f]">
             {place.description}
@@ -102,15 +102,15 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+        <div className="mt-auto flex min-h-7 items-center justify-between gap-2 pt-2">
           <StarRating rating={place.rating} />
           <div className="relative z-20 flex items-center gap-1.5">
             {addedBy && (
-              <span className="rounded-full bg-background px-2.5 py-1 text-[11px] font-medium text-muted-2">
+              <span className="whitespace-nowrap rounded-full bg-background px-2.5 py-1 text-[11px] font-medium text-muted-2">
                 {addedBy}
               </span>
             )}
-            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent">
+            <span className="whitespace-nowrap rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent">
               추억 {place.memory_count}
             </span>
           </div>

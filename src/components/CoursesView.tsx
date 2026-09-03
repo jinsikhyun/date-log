@@ -179,7 +179,7 @@ export function CoursesView() {
               <Link
                 key={course.id}
                 href={`/courses/${course.id}`}
-                className="group flex flex-col gap-3 rounded-[20px] bg-card px-[26px] py-6 ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]"
+                className="group flex h-full flex-col gap-3 rounded-[20px] bg-card px-[26px] py-6 ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <h2 className="min-w-0 flex-1 truncate text-[19px] font-extrabold tracking-[-0.01em]">
@@ -223,7 +223,7 @@ export function CoursesView() {
                   )}
                 </ol>
 
-                <div className="mt-1 flex items-center justify-between gap-2 border-t border-background pt-3 text-[12px] font-medium text-muted-2">
+                <div className="mt-auto flex min-h-8 items-center justify-between gap-2 border-t border-background pt-3 text-[12px] font-medium text-muted-2">
                   <span className="whitespace-nowrap">
                     {km > 0 ? `총 ${km.toFixed(1)}km` : `장소 ${stops.length}곳`}
                     {km > 0 && (
@@ -232,7 +232,7 @@ export function CoursesView() {
                       </span>
                     )}
                   </span>
-                  <span className="font-bold text-accent transition-colors group-hover:text-accent-hover">
+                  <span className="shrink-0 whitespace-nowrap font-bold text-accent transition-colors group-hover:text-accent-hover">
                     코스 열기 →
                   </span>
                 </div>
