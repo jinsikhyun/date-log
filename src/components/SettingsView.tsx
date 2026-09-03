@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { processImageToJpeg } from "@/lib/photos";
 import { Lightbox } from "@/components/Lightbox";
-import { CoupleCalendar } from "@/components/CoupleCalendar";
 
 export function SettingsView() {
   const router = useRouter();
@@ -16,13 +15,15 @@ export function SettingsView() {
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [profileErr, setProfileErr] = useState<string | null>(null);
+  const [birthDate, setBirthDate] = useState("");
+  const [savedBirthDate, setSavedBirthDate] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingAvatar, setPendingAvatar] = useState<Blob | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [partner, setPartner] = useState<
-    { display_name: string | null; email: string | null; avatar_path: string | null } | null
+    { id: string; display_name: string | null; email: string | null; avatar_path: string | null; birth_date: string | null } | null
   >(null);
   const [partnerAvatarUrl, setPartnerAvatarUrl] = useState<string | null>(null);
   const [profilePhotoOpen, setProfilePhotoOpen] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export function SettingsView() {
     // 파트너 = 같은 커플의 나 아닌 프로필 (혹시 여러 개여도 첫 명만)
     supabase
       .from("profiles")
-      .select("display_name, email, avatar_path")
+      .select("id, display_name, email, avatar_path")
       .eq("couple_id", profile.couple_id)
       .neq("id", user.id)
       .order("created_at", { ascending: true })
@@ -93,9 +94,11 @@ export function SettingsView() {
         setPartner(
           row
             ? {
+                id: String(row.id),
                 display_name: (row.display_name as string | null) ?? null,
                 email: (row.email as string | null) ?? null,
                 avatar_path: avatarPath,
+                birth_date: null,
               }
             : null,
         );
@@ -106,8 +109,33 @@ export function SettingsView() {
             .createSignedUrl(avatarPath, 3600);
           if (!cancelled) setPartnerAvatarUrl(signed?.signedUrl ?? null);
         }
+        if (row?.id) {
+          const { data: birthday } = await supabase
+            .from("profiles")
+            .select("birth_date")
+            .eq("id", row.id)
+            .maybeSingle();
+          if (!cancelled) {
+            setPartner((current) => current ? {
+              ...current,
+              birth_date: (birthday?.birth_date as string | null) ?? null,
+            } : current);
+          }
+        }
         if (cancelled) return;
         setPartnerLoading(false);
+      });
+
+    supabase
+      .from("profiles")
+      .select("birth_date")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const birthday = (data?.birth_date as string | null) ?? null;
+        setSavedBirthDate(birthday);
+        setBirthDate(birthday ?? "");
       });
 
     return () => {
@@ -152,7 +180,8 @@ export function SettingsView() {
     e.preventDefault();
     const trimmedName = name.trim();
     const nameChanged = trimmedName !== (profile.display_name?.trim() ?? "");
-    if (!trimmedName || (!nameChanged && !pendingAvatar)) return;
+    const birthdayChanged = (birthDate || null) !== savedBirthDate;
+    if (!trimmedName || (!nameChanged && !pendingAvatar && !birthdayChanged)) return;
 
     setProfileBusy(true); setProfileErr(null); setProfileMsg(null);
     try {
@@ -180,6 +209,14 @@ export function SettingsView() {
         setAvatarUrl(data?.signedUrl ? `${data.signedUrl}&v=${Date.now()}` : null);
         setPendingAvatar(null);
         setAvatarPreviewUrl(null);
+      }
+
+      if (birthdayChanged) {
+        const { error } = await supabase.rpc("update_my_birth_date", {
+          p_birth_date: birthDate || null,
+        });
+        if (error) throw error;
+        setSavedBirthDate(birthDate || null);
       }
 
       await refreshProfile();
@@ -278,8 +315,6 @@ export function SettingsView() {
         )}
       </form>
 
-      {savedStartDate && <CoupleCalendar startDate={savedStartDate} />}
-
       <form onSubmit={saveProfile} className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
         <p className="text-xs font-medium text-muted">프로필 수정</p>
         <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
@@ -309,8 +344,24 @@ export function SettingsView() {
             <label className="block text-xs font-medium text-muted">이름(별명)</label>
             <input value={name} onChange={(e)=>setName(e.target.value)} maxLength={30} required className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent" />
             <p className="text-xs text-muted">별명을 바꾸면 과거 장소·추억·답장의 작성자 이름도 함께 변경돼요.</p>
+            <label className="block text-xs font-medium text-muted">생일</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={birthDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => {
+                  setBirthDate(e.target.value);
+                  setProfileMsg(null);
+                  setProfileErr(null);
+                }}
+                className="min-w-0 flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              {birthDate && <button type="button" onClick={() => setBirthDate("")} className="shrink-0 text-xs text-muted hover:text-accent">비우기</button>}
+            </div>
+            <p className="text-xs text-muted">생일은 매년 우리의 기록 캘린더에 기념일로 표시돼요.</p>
             <p className="truncate text-xs text-muted">{user.email}</p>
-            <button type="submit" disabled={profileBusy || !name.trim() || (!pendingAvatar && name.trim()===(profile.display_name?.trim() ?? ""))} className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{profileBusy ? "저장 중…" : "프로필 저장"}</button>
+            <button type="submit" disabled={profileBusy || !name.trim() || (!pendingAvatar && name.trim()===(profile.display_name?.trim() ?? "") && (birthDate || null) === savedBirthDate)} className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{profileBusy ? "저장 중…" : "프로필 저장"}</button>
           </div>
         </div>
         {profileMsg && <p className="mt-3 text-xs font-medium text-accent">{profileMsg}</p>}
@@ -351,6 +402,7 @@ export function SettingsView() {
               <span className="mt-0.5 block truncate text-xs text-muted">
                 {partner.email ?? "(이메일 없음)"}
               </span>
+              {partner.birth_date && <span className="mt-0.5 block text-[11px] text-muted-2">생일 {Number(partner.birth_date.slice(5, 7))}월 {Number(partner.birth_date.slice(8, 10))}일</span>}
             </span>
           </div>
         ) : (

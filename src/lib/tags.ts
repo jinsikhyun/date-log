@@ -29,7 +29,7 @@ export const RECOMMENDED_MIN_TAGS = 3;
 export const RECOMMENDED_MAX_TAGS = 5;
 export const MAX_SELECTED_TAGS = 8;
 
-// 카테고리별로 먼저 보여줄 6~8개. 목록에 없는 카테고리는 DEFAULT_SUGGESTED_TAGS를 쓴다.
+// 카테고리별 우선순위. UI에서는 앞의 5개만 먼저 보여주고 나머지는 더보기에 둔다.
 const CATEGORY_SUGGESTED_TAGS: Record<string, string[]> = {
   카페: [
     "조용한",
@@ -107,7 +107,7 @@ const DEFAULT_SUGGESTED_TAGS = [
 /** 장소 카테고리와 맥락에 맞춰 먼저 노출할 추천 태그 6~8개를 고른다. */
 export function suggestedTagsForCategory(category?: string | null): string[] {
   if (category && CATEGORY_SUGGESTED_TAGS[category]) {
-    return CATEGORY_SUGGESTED_TAGS[category];
+    return CATEGORY_SUGGESTED_TAGS[category].slice(0, 5);
   }
-  return DEFAULT_SUGGESTED_TAGS;
+  return DEFAULT_SUGGESTED_TAGS.slice(0, 5);
 }

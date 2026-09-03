@@ -10,6 +10,40 @@ const BUCKET = "place-photos";
 const MAX_WIDTH = 1600;
 const JPEG_QUALITY = 0.85;
 
+function dateToLocalKey(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{4})[:/-](\d{2})[:/-](\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  return null;
+}
+
+/** 원본 사진의 EXIF 촬영일을 YYYY-MM-DD로 반환. 메타데이터가 없거나 깨졌으면 null. */
+export async function extractPhotoTakenDate(file: File): Promise<string | null> {
+  try {
+    const { parse } = await import("exifr");
+    const metadata = (await parse(file, [
+      "DateTimeOriginal",
+      "CreateDate",
+      "DateTimeDigitized",
+    ])) as Record<string, unknown> | undefined;
+    return dateToLocalKey(
+      metadata?.DateTimeOriginal ??
+        metadata?.CreateDate ??
+        metadata?.DateTimeDigitized,
+    );
+  } catch {
+    // SNS 저장본·스크린샷처럼 EXIF가 없는 사진은 기존 흐름으로 조용히 돌아간다.
+    return null;
+  }
+}
+
 /** 확장자나 MIME 로 HEIC/HEIF 판별 (iPhone 원본 사진) */
 function isHeic(file: File): boolean {
   const name = file.name.toLowerCase();

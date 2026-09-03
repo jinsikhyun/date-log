@@ -8,6 +8,7 @@ import { daysTogether } from "@/lib/recap";
 import { useAuth } from "@/components/AuthProvider";
 import { OnThisMonthBanner } from "@/components/OnThisMonthBanner";
 import { withSubjectParticle } from "@/lib/korean";
+import { CoupleCalendar } from "@/components/CoupleCalendar";
 
 type PlaceRow = {
   id: number;
@@ -329,6 +330,9 @@ export function RecapDashboard() {
 
           {/* 작년 오늘과 가장 가까운 실제 기록이 있으면 회상 카드, 없으면 안 뜸 */}
           <OnThisMonthBanner variant="recap" />
+
+          {/* 관계 시작 연도부터 오늘까지, 실제 방문일을 날짜로 탐색 */}
+          {startDate && <CoupleCalendar startDate={startDate} />}
 
           {/* 누가 더 많이 등록했을까 — 레이스 ({A} 티일 vs {B} 앰버) */}
           {runners.length > 0 && (

@@ -35,6 +35,8 @@ import {
 } from "@/components/PlaceTagBadges";
 import { Lightbox } from "@/components/Lightbox";
 import { useAuth } from "@/components/AuthProvider";
+import { useAnniversaries } from "@/hooks/useAnniversaries";
+import { anniversariesOn } from "@/lib/anniversaries";
 import {
   AddPlaceForm,
   placeFormInput,
@@ -42,7 +44,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -63,6 +65,7 @@ function memoryToInput(m: Memory): NewMemoryInput {
 export function PlaceDetail({ id }: { id: number }) {
   const router = useRouter();
   const { user } = useAuth();
+  const anniversaries = useAnniversaries();
   const favLock = useRef(false);
   const [favSaving, setFavSaving] = useState(false);
   const [place, setPlace] = useState<Place | null>(null);
@@ -362,6 +365,7 @@ export function PlaceDetail({ id }: { id: number }) {
   const visited = place.first_visit_date
     ? place.first_visit_date.split("-").join(".")
     : null;
+  const visitAnniversaries = anniversariesOn(anniversaries, place.first_visit_date);
 
   return (
     <div className="space-y-8">
@@ -507,6 +511,16 @@ export function PlaceDetail({ id }: { id: number }) {
                     {tag}
                   </span>
                 ))}
+              </div>
+            )}
+            {visitAnniversaries.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {visitAnniversaries.slice(0, 2).map((event) => (
+                  <span key={`${event.kind}-${event.label}`} className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#fff3ee] px-3 py-1.5 text-xs font-semibold text-[#a85f50] ring-1 ring-[#e7b9ad]/50">
+                    <span aria-hidden>{event.icon}</span>{event.label}에 다녀왔어요
+                  </span>
+                ))}
+                {visitAnniversaries.length > 2 && <span className="rounded-full bg-[#fff3ee] px-2.5 py-1.5 text-xs font-bold text-[#a85f50]">+{visitAnniversaries.length - 2}</span>}
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2 pt-1">

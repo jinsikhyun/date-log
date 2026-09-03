@@ -32,10 +32,14 @@ create table if not exists public.places (
   wanted_by_ids    uuid[] not null default '{}',      -- 이 위시를 원하는 커플 구성원 profile id (0~2), 독립 토글
   added_by         text,                             -- 등록한 사람 (로그인 사용자 display_name)
   memory_count     integer not null default 0,
+  visit_order      integer,
+  image_captured_date date,
   created_at       timestamptz not null default now()
   -- 장소 유일성은 커플 단위 (couple_id, name, address) — couple_id 컬럼이 생긴 뒤
   -- 아래 "멀티 커플 모델" 섹션에서 places_couple_name_address_key 로 건다.
 );
+alter table public.places add column if not exists visit_order integer;
+alter table public.places add column if not exists image_captured_date date;
 
 -- 기존 DB 에도 컬럼 보장
 alter table public.places add column if not exists image_url text;
@@ -220,10 +224,12 @@ create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   email        text, -- 가입 이메일 (설정 페이지 "파트너 계정" 표시용)
+  birth_date   date, -- 프로필 생일 (캘린더 기념일 표시용)
   couple_id    uuid references public.couples(id) on delete set null,
   created_at   timestamptz not null default now()
 );
 alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists birth_date date;
 update public.profiles p set email = u.email
   from auth.users u where u.id = p.id and (p.email is null or p.email = '');
 

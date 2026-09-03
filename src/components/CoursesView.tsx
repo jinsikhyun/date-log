@@ -12,6 +12,9 @@ import {
 } from "@/lib/courses";
 import { categoryStyle } from "@/lib/places";
 import { CourseForm, type CourseFormInput } from "@/components/CourseForm";
+import { AnniversaryPlanBanner } from "@/components/AnniversaryPlanBanner";
+import { useAnniversaries } from "@/hooks/useAnniversaries";
+import { nextAnniversary } from "@/lib/anniversaries";
 
 const COURSE_LIST_SELECT =
   "id, title, concept, created_at, course_places(order_index, places(id, name, category, address, image_url, lat, lng, status))";
@@ -27,6 +30,17 @@ export function CoursesView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const anniversaries = useAnniversaries();
+  const upcomingAnniversary = nextAnniversary(
+    anniversaries.filter((event) => event.kind !== "first-record"),
+  );
+
+  const openAnniversaryPlan = () => {
+    setShowForm(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById("course-planner")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -123,12 +137,18 @@ export function CoursesView() {
         </button>
       </div>
 
+      {upcomingAnniversary && (
+        <AnniversaryPlanBanner event={upcomingAnniversary} onPlan={openAnniversaryPlan} />
+      )}
+
       {showForm && (
-        <CourseForm
-          onSubmit={handleCreate}
-          onCancel={() => setShowForm(false)}
-          submitLabel="코스 저장"
-        />
+        <div id="course-planner" className="scroll-mt-24">
+          <CourseForm
+            onSubmit={handleCreate}
+            onCancel={() => setShowForm(false)}
+            submitLabel="코스 저장"
+          />
+        </div>
       )}
 
       {loadError && (

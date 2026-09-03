@@ -1,8 +1,8 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { uploadPhoto } from "@/lib/photos";
+import { extractPhotoTakenDate, uploadPhoto } from "@/lib/photos";
 
 export interface NewMemoryInput {
   date: string;
@@ -49,7 +49,9 @@ export function AddMemoryForm({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoDateMsg, setPhotoDateMsg] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const dateManuallyEditedRef = useRef(false);
 
   const set = <K extends keyof NewMemoryInput>(key: K, value: NewMemoryInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -62,6 +64,7 @@ export function AddMemoryForm({
     );
     if (all.length === 0) return;
     setPhotoError(null);
+    setPhotoDateMsg(null);
 
     if (files.length === 0) {
       setPhotoError("이미지 파일만 올릴 수 있어요.");
@@ -76,11 +79,27 @@ export function AddMemoryForm({
 
     setUploading(true);
     try {
+      let takenDate: string | null = null;
+      if (!initial && !dateManuallyEditedRef.current) {
+        for (const file of files) {
+          takenDate = await extractPhotoTakenDate(file);
+          if (takenDate) break;
+        }
+      }
       const urls: string[] = [];
       for (const file of files) {
         urls.push(await uploadPhoto(file));
       }
-      setForm((f) => ({ ...f, photo_urls: [...f.photo_urls, ...urls] }));
+      setForm((f) => ({
+        ...f,
+        date: takenDate ?? f.date,
+        photo_urls: [...f.photo_urls, ...urls],
+      }));
+      if (takenDate) {
+        setPhotoDateMsg(
+          `사진 촬영일 ${takenDate.replaceAll("-", ".")}을 날짜로 입력했어요.`,
+        );
+      }
     } catch (err) {
       setPhotoError(
         err instanceof Error ? err.message : "사진 업로드에 실패했어요.",
@@ -143,8 +162,15 @@ export function AddMemoryForm({
             type="date"
             className={fieldClass}
             value={form.date}
-            onChange={(e) => set("date", e.target.value)}
+            onChange={(e) => {
+              dateManuallyEditedRef.current = true;
+              set("date", e.target.value);
+              setPhotoDateMsg(null);
+            }}
           />
+          {photoDateMsg && (
+            <span className="text-[11px] font-medium text-accent">{photoDateMsg}</span>
+          )}
         </div>
         <div className="flex flex-col gap-1">
           <label className={labelClass} htmlFor="mf-mood">
@@ -241,6 +267,9 @@ export function AddMemoryForm({
               <span className="text-xs text-muted">
                 {form.photo_urls.length}/{MAX_PHOTOS} · 자동으로 가로 1600px JPEG
                 변환
+              </span>
+              <span className="text-[11px] text-muted-3">
+                촬영일 정보가 있으면 추억 날짜도 자동으로 입력해요.
               </span>
             </>
           )}

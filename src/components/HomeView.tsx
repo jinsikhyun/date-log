@@ -19,6 +19,8 @@ import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
 import { FavoriteFilterChips } from "@/components/FavoriteFilterChips";
 import { NearbyPanel } from "@/components/NearbyPanel";
+import { useAnniversaries } from "@/hooks/useAnniversaries";
+import { anniversariesOn } from "@/lib/anniversaries";
 
 
 // 카카오맵은 window 에 의존 → 클라이언트에서만 렌더 (SSR 비활성화)
@@ -39,7 +41,7 @@ type ViewMode = "feed" | "map";
 import { withPreferences } from "@/lib/preferences";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 // 목록 조회 시엔 memories(count) 를 임베딩해서 장소별 실제 추억 개수를 가져온다.
 const PLACE_LIST_SELECT = `${PLACE_COLUMNS}, memories(count)`;
@@ -52,6 +54,7 @@ function withMemoryCount(row: PlaceListRow): Place {
 }
 
 export function HomeView() {
+  const anniversaries = useAnniversaries();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { orderNames } = useCategories();
@@ -319,7 +322,11 @@ export function HomeView() {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {visiblePlaces.map((place) => (
-              <PlaceCard key={place.id} place={place} />
+              <PlaceCard
+                key={place.id}
+                place={place}
+                visitAnniversaries={anniversariesOn(anniversaries, place.first_visit_date)}
+              />
             ))}
           </div>
         )

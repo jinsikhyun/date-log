@@ -130,6 +130,7 @@ export function AiRecommendationSection({ place }: { place: Place }) {
           first_visit_date: "",
           description: "",
           image_url: "",
+          image_captured_date: "",
           lat: String(r.lat),
           lng: String(r.lng),
           status: "wishlist",

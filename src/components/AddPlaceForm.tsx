@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type PlaceStatus } from "@/lib/places";
-import { uploadPhoto } from "@/lib/photos";
+import { extractPhotoTakenDate, uploadPhoto } from "@/lib/photos";
 import { ensureKakaoLoaded, geocode, keywordSearchFirst } from "@/lib/kakao";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
@@ -20,6 +20,7 @@ export interface NewPlaceInput {
   description: string;
   tags: string[]; // 취향 태그 (선택 사항, 방문/위시 상태와 무관하게 저장)
   image_url: string; // 업로드 완료된 대표 사진 URL. 빈 문자열이면 사진 없음(선택 항목).
+  image_captured_date: string; // 대표사진 EXIF 촬영일. 메타데이터가 없으면 빈 문자열.
   lat: string; // 카카오 장소검색으로 채워지는 위도/경도. 빈 문자열이면 지도가 주소를 지오코딩.
   lng: string;
   status: PlaceStatus; // '다녀온 곳' | '가고 싶은 곳'
@@ -38,12 +39,19 @@ const EMPTY: NewPlaceInput = {
   description: "",
   tags: [],
   image_url: "",
+  image_captured_date: "",
   lat: "",
   lng: "",
   status: "visited",
   wanted_by_ids: [],
   added_by: "",
 };
+
+function today(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
 
 const RATING_CHOICES = ["5", "4.5", "4", "3.5", "3", "2.5", "2", "1.5", "1", "0.5"];
 
@@ -63,6 +71,7 @@ export function placeFormInput(p: {
   description: string | null;
   tags?: string[] | null;
   image_url: string | null;
+  image_captured_date?: string | null;
   lat: number | null;
   lng: number | null;
   status?: string | null;
@@ -79,6 +88,7 @@ export function placeFormInput(p: {
     description: p.description ?? "",
     tags: p.tags ?? [],
     image_url: p.image_url ?? "",
+    image_captured_date: p.image_captured_date ?? "",
     lat: p.lat != null ? String(p.lat) : "",
     lng: p.lng != null ? String(p.lng) : "",
     status: p.status === "wishlist" ? "wishlist" : "visited",
@@ -103,13 +113,20 @@ export function AddPlaceForm({
   const { authorName, coupleMembers } = useAuth();
   const { categories } = useCategories();
   const wishMembers = coupleMembers.filter((m) => m.display_name?.trim());
-  const base = initial ?? { ...EMPTY, status: initialStatus ?? "visited" };
+  const initialFormStatus = initialStatus ?? "visited";
+  const base = initial ?? {
+    ...EMPTY,
+    status: initialFormStatus,
+    first_visit_date: initialFormStatus === "visited" ? today() : "",
+  };
   const [form, setForm] = useState<NewPlaceInput>(base);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoDateMsg, setPhotoDateMsg] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const dateManuallyEditedRef = useRef(false);
 
   // ── 카카오 장소 검색 자동완성 ──────────────────────────────
   const placesSvcRef = useRef<kakao.maps.services.Places | null>(null);
@@ -221,6 +238,10 @@ export function AddPlaceForm({
     setForm((current) => ({
       ...current,
       status,
+      first_visit_date:
+        status === "visited"
+          ? current.first_visit_date || today()
+          : current.first_visit_date,
       category:
         status === "visited"
           ? normalizeVisitedCategory(
@@ -234,10 +255,33 @@ export function AddPlaceForm({
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return;
     setPhotoError(null);
+    setPhotoDateMsg(null);
     setUploading(true);
     try {
+      const takenDate = await extractPhotoTakenDate(file);
       const url = await uploadPhoto(file);
-      set("image_url", url);
+      setForm((current) => ({
+        ...current,
+        image_url: url,
+        image_captured_date: takenDate ?? "",
+        first_visit_date:
+          current.status === "visited" &&
+          !initial &&
+          !dateManuallyEditedRef.current &&
+          takenDate
+            ? takenDate
+            : current.first_visit_date,
+      }));
+      if (
+        form.status === "visited" &&
+        !initial &&
+        !dateManuallyEditedRef.current &&
+        takenDate
+      ) {
+        setPhotoDateMsg(
+          `사진 촬영일 ${takenDate.replaceAll("-", ".")}을 방문일로 입력했어요.`,
+        );
+      }
     } catch (err) {
       setPhotoError(
         err instanceof Error ? err.message : "사진 업로드에 실패했어요.",
@@ -490,8 +534,15 @@ export function AddPlaceForm({
           type="date"
           className={fieldClass}
           value={form.first_visit_date}
-          onChange={(e) => set("first_visit_date", e.target.value)}
+          onChange={(e) => {
+            dateManuallyEditedRef.current = true;
+            set("first_visit_date", e.target.value);
+            setPhotoDateMsg(null);
+          }}
         />
+        {photoDateMsg && (
+          <span className="text-[11px] font-medium text-accent">{photoDateMsg}</span>
+        )}
       </div>
 
       <div className="flex flex-col gap-1 sm:col-span-2">
@@ -545,7 +596,7 @@ export function AddPlaceForm({
                 </label>
                 <button
                   type="button"
-                  onClick={() => set("image_url", "")}
+                  onClick={() => setForm((current) => ({ ...current, image_url: "", image_captured_date: "" }))}
                   disabled={uploading}
                   className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-stone-200"
                 >
@@ -570,6 +621,9 @@ export function AddPlaceForm({
               </label>
               <span className="text-xs text-muted">
                 JPG · PNG · HEIC — 자동으로 가로 1600px JPEG 로 변환돼요 (선택 항목)
+              </span>
+              <span className="text-[11px] text-muted-3">
+                촬영일 정보가 있으면 방문일도 자동으로 입력해요.
               </span>
             </>
           )}

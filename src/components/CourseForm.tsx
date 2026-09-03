@@ -83,6 +83,7 @@ const blankRow = (over: Partial<PlaceRowInput>): PlaceRowInput => ({
   first_visit_date: "",
   description: "",
   image_url: "",
+  image_captured_date: "",
   lat: "",
   lng: "",
   status: "visited",

@@ -15,7 +15,7 @@ const basePlace: Place = {
   id: 1, name: "서촌에서 함께 발견한 아주 긴 이름의 작은 커피집 — 긴장소명공백없이도끝까지표시되는지확인",
   category: "카페", address: "서울 종로구 테스트길 12, 창가 옆 작은 자리",
   description: "첫 번째 줄: 비 오는 날 함께 마신 따뜻한 커피.\n두 번째 줄: 우산을 접고 오래 앉아 나눈 이야기.\n세 번째 줄: 마지막 문장과 아래 date.log까지 잘리지 않아야 해요.",
-  rating: 4.5, image_url: photo, first_visit_date: "2025-06-28",
+  rating: 4.5, image_url: photo, image_captured_date: "2025-06-28", first_visit_date: "2025-06-28",
   naver_map_link: null, kakao_map_link: null, lat: null, lng: null, status: "visited",
   wanted_by: null, wanted_by_ids: [], added_by: "테스트", favorite_by: [], is_regular: false,
   memory_count: 0, created_at: "2025-06-28T00:00:00Z", via_course: false, tags: [],

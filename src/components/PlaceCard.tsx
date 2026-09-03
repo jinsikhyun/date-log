@@ -8,13 +8,14 @@ import {
 } from "@/lib/places";
 import { StarRating } from "@/components/StarRating";
 import { PlaceTagBadges } from "@/components/PlaceTagBadges";
+import type { Anniversary } from "@/lib/anniversaries";
 
 const CARD =
   "group relative isolate flex flex-col overflow-hidden rounded-[20px] bg-card ring-1 ring-border transition duration-200 hover:ring-accent-border hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]";
 const CAT_CHIP =
   "absolute left-3.5 top-3.5 z-[1] rounded-full px-3 py-1 text-[11px] font-semibold";
 
-export function PlaceCard({ place }: { place: Place }) {
+export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; visitAnniversaries?: Anniversary[] }) {
   const visited = place.first_visit_date
     ? place.first_visit_date.split("-").join(".")
     : null;
@@ -89,6 +90,16 @@ export function PlaceCard({ place }: { place: Place }) {
           <p className="line-clamp-2 text-[13px] leading-[1.6] text-[#4a463f]">
             {place.description}
           </p>
+        )}
+        {visitAnniversaries.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {visitAnniversaries.slice(0, 2).map((event) => (
+              <span key={`${event.kind}-${event.label}`} className="w-fit rounded-full bg-[#fff3ee] px-2.5 py-1 text-[10px] font-semibold text-[#a85f50] ring-1 ring-[#e7b9ad]/50">
+                {event.icon} {event.label}에 다녀왔어요
+              </span>
+            ))}
+            {visitAnniversaries.length > 2 && <span className="rounded-full bg-[#fff3ee] px-2 py-1 text-[10px] font-bold text-[#a85f50]">+{visitAnniversaries.length - 2}</span>}
+          </div>
         )}
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">

@@ -11,33 +11,32 @@ import {
   placeInputToRow,
   wantedByLabelFromIds,
 } from "@/lib/places";
-import {
-  AddPlaceForm,
-  placeFormInput,
-  type NewPlaceInput,
-} from "@/components/AddPlaceForm";
+import { AddPlaceForm, type NewPlaceInput } from "@/components/AddPlaceForm";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
 import { normalizeVisitedCategory } from "@/lib/categories";
+import { VisitMoodPrompt } from "@/components/VisitMoodPrompt";
 
 import { withPreferences } from "@/lib/preferences";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
 export function WishlistView() {
-  const { coupleMembers } = useAuth();
+  const { coupleMembers, authorName } = useAuth();
   const { categories: officialCategories, orderNames } = useCategories();
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  // "다녀왔어요" 전환용. 세부 수정·삭제는 장소 상세(/places/[id])에서.
-  const [visiting, setVisiting] = useState<Place | null>(null);
+  const [convertingId, setConvertingId] = useState<number | null>(null);
+  const [converted, setConverted] = useState<Place | null>(null);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [moodSaving, setMoodSaving] = useState(false);
   // 주 필터: 카테고리 탭 (null = 전체). 보조 필터: "{이름} wish" 칩 (여러 개 = OR).
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [wishFilterIds, setWishFilterIds] = useState<string[]>([]);
@@ -120,70 +119,64 @@ export function WishlistView() {
     }
   }, []);
 
-  // "다녀왔어요" — 같은 행을 visited 로 전환
+  // "다녀왔어요" — 입력 폼 없이 오늘 날짜의 공동 방문 기록으로 즉시 전환.
   const handleVisited = useCallback(
-    async (input: NewPlaceInput) => {
-      if (!visiting) return;
+    async (place: Place) => {
+      setConvertingId(place.id);
+      setConvertError(null);
+      const visitedCategory = normalizeVisitedCategory(
+        place.category,
+        officialCategories.map((category) => category.name),
+      );
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+      const visitDate = local.toISOString().slice(0, 10);
+
       const { data, error } = await supabase
         .from("places")
-        .update(placeInputToRow(input))
-        .eq("id", visiting.id)
+        .update({
+          status: "visited",
+          first_visit_date: visitDate,
+          category: visitedCategory,
+          wanted_by_ids: [],
+        })
+        .eq("id", place.id)
         .select(PLACE_COLUMNS);
-      if (error) throw new Error(error.message);
+      setConvertingId(null);
+      if (error) {
+        setConvertError(`전환하지 못했어요: ${error.message}`);
+        return;
+      }
       if (!data || data.length === 0) {
-        throw new Error(`저장이 반영되지 않았어요. ${POLICY_HINT}`);
+        setConvertError(`저장이 반영되지 않았어요. ${POLICY_HINT}`);
+        return;
       }
 
       const saved = withPreferences(data[0] as unknown as Place);
-      setPlaces((prev) =>
-        saved.status === "wishlist"
-          ? prev.map((p) => (p.id === saved.id ? saved : p))
-          : prev.filter((p) => p.id !== saved.id),
-      );
-      setVisiting(null);
+      setPlaces((prev) => prev.filter((item) => item.id !== saved.id));
+      setConverted(saved);
     },
-    [visiting],
+    [officialCategories],
   );
 
-  if (visiting) {
-    const visitedCategory = normalizeVisitedCategory(
-      visiting.category,
-      officialCategories.map((category) => category.name),
-    );
-    return (
-      <div className="space-y-5">
-        <button
-          type="button"
-          onClick={() => setVisiting(null)}
-          className="text-sm text-muted transition-colors hover:text-accent"
-        >
-          ← 가고 싶은 곳으로 돌아가기
-        </button>
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl">
-            ‘{visiting.name}’ 다녀왔어요
-          </h1>
-          <p className="mt-1.5 text-sm text-muted">
-            별점·방문일·한줄평·사진을 채우고 저장하면 “다녀온 곳”으로 옮겨져요.
-          </p>
-          {visitedCategory !== visiting.category && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent">
-              {visiting.category} → {visitedCategory}로 분류했어요
-            </p>
-          )}
-        </div>
-        <AddPlaceForm
-          initial={{
-            ...placeFormInput({ ...visiting, status: "visited" }),
-            category: visitedCategory,
-          }}
-          submitLabel="다녀온 곳으로 저장"
-          onSubmit={handleVisited}
-          onCancel={() => setVisiting(null)}
-        />
-      </div>
-    );
-  }
+  const saveMood = async (mood: string) => {
+    if (!converted || !authorName) return;
+    setMoodSaving(true);
+    const { error } = await supabase.from("memories").insert({
+      place_id: converted.id,
+      date: converted.first_visit_date,
+      content: "",
+      mood_tag: mood,
+      author: authorName,
+      photo_urls: [],
+    });
+    setMoodSaving(false);
+    if (error) {
+      setConvertError(`느낌을 저장하지 못했어요: ${error.message}`);
+      return;
+    }
+    setConverted(null);
+  };
 
   return (
     <>
@@ -216,6 +209,24 @@ export function WishlistView() {
           onSubmit={handleAdd}
           onCancel={() => setAdding(false)}
         />
+      )}
+
+      {converted && (
+        <div className="mb-6">
+          <VisitMoodPrompt
+            placeId={converted.id}
+            placeName={converted.name}
+            busy={moodSaving}
+            onMood={(mood) => void saveMood(mood)}
+            onClose={() => setConverted(null)}
+          />
+        </div>
+      )}
+
+      {convertError && (
+        <div className="mb-6 rounded-2xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
+          {convertError}
+        </div>
       )}
 
       {loadError && (
@@ -335,10 +346,11 @@ export function WishlistView() {
                   <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => setVisiting(place)}
-                      className="text-[13px] font-bold text-accent transition-colors hover:text-accent-hover"
+                      onClick={() => void handleVisited(place)}
+                      disabled={convertingId != null}
+                      className="text-[13px] font-bold text-accent transition-colors hover:text-accent-hover disabled:opacity-50"
                     >
-                      다녀왔어요 →
+                      {convertingId === place.id ? "옮기는 중…" : "다녀왔어요 →"}
                     </button>
                     <Link
                       href={`/places/${place.id}`}
