@@ -46,10 +46,10 @@
 
 ## 2026-09-05 place-photos P0 보안 수정
 
-- P0-2 익명 접근 취약점: **해결됨(Resolved, 코드 기준)**. 운영 SQL 실행 성공은 사용자 보고로 확인; 실제 접근 차단 검증은 대기.
+- P0-2 익명 접근 취약점: **해결됨(Resolved)**. 사용자 확인 기준 운영 버킷 private 전환 및 RLS 정책 적용 완료.
 - 마이그레이션: `supabase/migrations/20260905000000_secure_place_photos.sql`. 기존 설치 SQL도 동일 보안 정책으로 갱신.
 - 검증: `supabase/security/test-place-photos.mjs`를 격리 PGlite에서 실행해 통과. private 전환, 재실행, anon CRUD 차단, authenticated 조회, 소유자 쓰기, 타인 upsert/소유권 변조 차단, 소유자 없는 파일 보호, 광범위 정책 우회 차단, 다른 버킷 권한 유지 확인. `git diff --check` 통과.
-- 미검증/후속: 실제 Supabase 적용·API 동작, private 사진 표시용 signed URL 연동, 기존 파일 소유권 매핑, 커플별 조회 격리. 운영 SQL·commit/push·배포 미실시.
+- 이후 private 사진 표시 경로와 커플별 조회 격리까지 구현되었고 운영 SQL 적용도 사용자 확인 완료. 아래 내용은 당시 작업 이력으로만 보존한다.
 
 ## 2026-09-05 배포 준비 검증
 
@@ -166,7 +166,7 @@
 - `reactions` (커플 스코프, 대상=memory/reply) · `notifications(couple_id, recipient_id)`
 - `courses(couple_id)` · `course_places(course_id, place_id, order_index)`
 - `categories(name, color, icon, sort_order)` — **커플 무관 공용, anon 전체 CRUD 허용** (의도된 것, `add-couple-rls.sql` 주석).
-- **사진 저장소**: Supabase Storage 버킷 `place-photos`: 코드상 private + authenticated/소유자 RLS로 수정 완료(P0-2 참조). 운영 적용 상태 미확인.
+- **사진 저장소**: Supabase Storage 버킷 `place-photos`: **해결됨(Resolved)**. 사용자 확인 기준 운영 버킷은 private이며 RLS 정책 적용 완료(P0-2 참조).
 
 ### 환경변수 (이름·용도만)
 - `NEXT_PUBLIC_KAKAO_MAP_KEY` — 카카오 JS 키. 콘솔 Web 플랫폼에 실행 도메인 등록 필요.
@@ -198,12 +198,11 @@
   - 파일: 위 SQL 5개 + `add-couple-rls.sql`.
   - 다음 행동: 먼저 `supabase/audit_access_readonly.sql`로 실제 정책·RLS·버킷 공개 상태를 확인. 이후 레거시 실행 방지와 검증된 마이그레이션 진입점을 설계한다. 복구 SQL은 대상 확인·별도 승인 없이 실행 금지. README의 schema.sql만으로 커플 RLS가 설정된다는 설명도 현 코드와 불일치.
   - 완료 기준: 어떤 단일 SQL 파일을 재실행해도 anon 쓰기 권한이 생기지 않음.
-- **[P0-2] 해결됨(Resolved) — 코드상 익명 업로드/교체/삭제 차단; 사용자 운영 실행 성공 보고; 실제 접근 검증 대기.**
+- **[P0-2] 해결됨(Resolved) — 운영 `place-photos` 버킷 private 전환 및 RLS 정책 적용 완료(사용자 확인).**
   - 과거 취약점: anonymous upload, replacement, deletion allowed (`place-photos`의 anon 전체 CRUD).
   - 해결: `supabase/migrations/20260905000000_secure_place_photos.sql`에서 private 전환, RLS 활성화 상태 필수 검사, 기존 익명 CRUD 정책 제거. authenticated 조회 및 owner_id 기반 본인 업로드/수정/삭제만 허용. restrictive 정책으로 다른 광범위 허용 정책의 우회도 차단. 레거시 `storage_place_photos.sql`도 같은 보안 SQL로 교체하여 재실행 시 공개 권한 복원 방지.
-  - 범위: 요청한 로그인 사용자 전체 조회를 허용하므로 **다른 커플 사진 조회 격리는 미해결 후속 과제**. 기존 완료 기준(다른 커플 접근 불가) 전체를 충족했다고 보지 않는다.
-  - 적용 영향: 기존 getPublicUrl 및 저장된 public URL은 private 전환 후 동작하지 않으므로 signed URL/인증 다운로드 연동이 필요. owner_id 없는 기존 파일은 사용자 수정/삭제 불가하며 소유권 매핑은 별도 검토. 기존 객체/소유권을 임의로 변경하지 않음.
-  - 운영 상태: 이번 작업은 로컬 SQL/문서 작성 및 격리 DB 검증만 수행. 운영 DB 실행·Storage API 통합 검증·배포는 미실시.
+  - 후속 구현도 완료: 커플별 사진 조회 격리 및 private 사진 표시 경로를 적용했고, 운영 격리 SQL 실행 결과는 기존 65개 중 61개 배정·4개 안전 격리로 사용자 확인됨.
+  - 이 항목은 더 이상 미해결 P0 경고로 취급하지 않는다. 격리된 4개 파일의 사용 여부 확인은 데이터 정리 과제이며 익명 접근 취약점 재발을 뜻하지 않는다.
 - **[P0-3] `categories` 테이블 anon 전체 CRUD + 커플 공용.**
   - 현상: `schema.sql` 및 `add-couple-rls.sql`(의도적으로 "손대지 않음")로 anon이 카테고리 수정·삭제 가능하고 모든 커플이 같은 행 공유.
   - 다음 행동: 커플 스코프로 분리할지 제품 결정 필요. 최소한 `authenticated` 한정.
@@ -242,10 +241,10 @@
 ## 5. 작업 규칙 및 검증
 
 - **2026-09-01 변경 전 기준선**: `npx tsc --noEmit` 통과. `npm run lint` 실패(기존 6건, 전부 react-hooks/set-state-in-effect: AuthProvider 79·110, CategoriesProvider 77, CourseDetail 88, KakaoMap 52, PlaceDetail 82). `npm run build`는 Turbopack의 프로세스/포트 생성 권한 오류로 2회 중단되어 성공 여부 미확인. 앱 코드 수정 없음. 로컬 Terminal에서 재검증 필요.
-- **운영 권한 진단 수신**: 사용자 제공 결과에서 장소·추억·코스 커플 정책, categories 익명 CRUD, place-photos 공개 버킷·익명 CRUD 확인. profiles 본인 행 UPDATE 및 couples 전체 로그인 사용자 SELECT가 허용됨. 소속 변경 우회 가능성은 별도 함수/트리거 검토가 필요. 실제 침해 여부는 확인하지 않음.
+- **과거 운영 권한 진단(해결 전 이력)**: 당시 `place-photos` 공개 버킷·익명 CRUD가 확인됐으나, 이후 private 전환과 RLS 정책 적용으로 **해결됨(Resolved)**. 이 과거 결과를 현재 운영 상태 경고로 사용하지 않는다. 장소·추억·코스 및 기타 항목은 별도 상태를 따른다.
 - **1단계 로컬 구현**: `supabase/security/README.md` 참조. `01_prepare_membership.sql`은 신원 서버 결정·정원·시도 제한을 포함한 원자적 `connect_couple` RPC. `02_enforce_membership.sql`은 직접 소속 변경/커플 전체 조회와 비로그인 카테고리 접근을 차단. `OnboardingView`는 RPC 사용으로 교체, 긴 초대코드 줄바꿈 추가. RPC 미설치 상태의 로컬 온보딩은 안내 오류가 나며 이전 직접 쓰기로 폴백하지 않음.
 - **검증**: 임시 PGlite의 가상 데이터로 12개 테스트 통과(운영 접속 없음), `npx tsc --noEmit` 및 수정 파일 ESLint 통과. 전체 lint는 기존 동일 6건. 실제 브라우저/Supabase 통합·독립 연결 동시성·빌드는 이번 단계 미검증.
-- **다음 사용자 단계**: `supabase/security/00_preflight_readonly.sql` 운영 조회 결과로 추가 함수·트리거·컬럼 확인 후 스테이징/배포 승인. 01 → 앱 배포 → 02 순서 필수. 사진 권한은 아직 그대로이며 기존 파일 소유 매핑/비공개 전환은 후속. 카테고리의 로그인 사용자 간 공용 수정, 레거시 SQL 재실행 위험도 잔존. commit/push/배포 및 운영 SQL 실행 없음.
+- **당시 다음 사용자 단계(과거 이력)**: `supabase/security/00_preflight_readonly.sql` 운영 조회 후 01 → 앱 배포 → 02 순서를 계획했음. `place-photos` 비공개 전환과 RLS 적용은 이후 완료되어 이 항목의 미해결 대상이 아니다. 카테고리의 로그인 사용자 간 공용 수정과 레거시 SQL 재실행 위험은 별도 과제로 남음.
 
 - **AGENTS.md / CLAUDE.md 필독**: 이 Next.js는 학습 데이터와 다를 수 있으니 `node_modules/next/dist/docs/`의 해당 가이드를 먼저 볼 것. `next dev`가 AGENTS.md 상단 블록을 재기록하므로 그 변경은 작업과 함께 커밋.
 - 로컬: `npm install` → `.env.local` 채우기 → `npm run dev` (localhost:3000).
@@ -280,4 +279,4 @@
 ## place-photos 실제 권한 검증 진행
 
 - 기존 소스에 포함된 공개 사진 URL을 인증 없는 HEAD 요청으로 확인: HTTP 400, 캐시 BYPASS. 공개 응답 실패는 확인했으나 파일 부재 가능성 때문에 RLS 차단의 확정 증거로 보지 않음. 사진 본문 다운로드/업로드/수정/삭제 없음.
-- Supabase 직접 연결 도구 없음. Chrome 접근은 Computer Use permissions are not granted로 차단. 운영 정책 검증은 `supabase/security/verify-place-photos-readonly.sql` 사용자 조회 결과 대기. 실제 쓰기 차단 및 로그인 사용자 접근은 미검증.
+- 이후 사용자가 운영 버킷 private 전환과 RLS 정책 적용 완료를 확인했으므로 위 내용은 과거 검증 이력이다. `place-photos` P0는 **해결됨(Resolved)**으로 관리한다.
