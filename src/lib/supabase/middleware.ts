@@ -43,6 +43,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+  // Photo API returns 401/404 itself; never redirect an image request to HTML.
+  if (path === "/api/place-photo") return supabaseResponse;
 
   // 이메일 확인 콜백은 항상 통과
   if (path.startsWith("/auth/")) return supabaseResponse;

@@ -1,5 +1,3 @@
--- Secure legacy setup entry point; keep identical to the canonical migration below.
--- Canonical: supabase/migrations/20260905000000_secure_place_photos.sql
 -- P0-2: anonymous upload, replacement, deletion allowed — resolved in code.
 -- Apply with a migration/admin role. Live application requires separate approval.
 -- Private buckets require authenticated downloads or signed URLs; getPublicUrl no longer works.

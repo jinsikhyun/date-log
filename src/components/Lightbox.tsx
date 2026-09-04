@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -58,8 +59,7 @@ export function Lightbox({
         ✕
       </button>
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <PhotoImage
         src={urls[i]}
         alt=""
         className="max-h-[85vh] max-w-full rounded-lg object-contain"

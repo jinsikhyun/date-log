@@ -1,3 +1,4 @@
+import PhotoImage from "@/components/PhotoImage";
 import Link from "next/link";
 import {
   type Place,
@@ -32,8 +33,8 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
 
       {place.image_url ? (
         <div className="relative h-44 overflow-hidden bg-[#e6decf]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+
+          <PhotoImage
             src={place.image_url}
             alt={place.name}
             loading="lazy"

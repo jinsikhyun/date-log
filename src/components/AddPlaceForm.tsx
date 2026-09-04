@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { type PlaceStatus } from "@/lib/places";
 import { extractPhotoTakenDate, uploadPhoto } from "@/lib/photos";
@@ -584,8 +585,8 @@ export function AddPlaceForm({
         >
           {form.image_url ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+
+              <PhotoImage
                 src={form.image_url}
                 alt="대표 사진 미리보기"
                 className="max-h-44 rounded-lg object-cover"

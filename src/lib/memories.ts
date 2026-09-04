@@ -6,7 +6,7 @@ export interface Memory {
   content: string | null;
   mood_tag: string | null;
   author: string | null; // 작성한 사람 (커플 구성원 display_name)
-  photo_urls: string[]; // 첨부 사진 public URL 목록 (place-photos 버킷). 없으면 []
+  photo_urls: string[]; // 첨부 사진 영구 Storage 참조 또는 레거시 URL 목록 (place-photos 버킷). 없으면 []
   created_at: string;
 }
 

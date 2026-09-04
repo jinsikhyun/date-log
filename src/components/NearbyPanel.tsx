@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { geocode } from "@/lib/kakao";
@@ -21,8 +22,8 @@ function Thumb({ place, size }: { place: Place; size: number }) {
   const { styleOf, iconOf } = useCategories();
   if (place.image_url) {
     return (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
+
+      <PhotoImage
         src={place.image_url}
         alt=""
         className="shrink-0 rounded-xl object-cover"

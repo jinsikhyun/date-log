@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { type FormEvent, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { extractPhotoTakenDate, uploadPhoto } from "@/lib/photos";
@@ -226,8 +227,8 @@ export function AddMemoryForm({
                   key={`${u}-${i}`}
                   className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-border/70"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={u} alt="" className="h-full w-full object-cover" />
+
+                  <PhotoImage src={u} alt="" className="h-full w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => removePhoto(i)}

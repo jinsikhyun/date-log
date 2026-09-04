@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { withPreferences } from "@/lib/preferences";
 import Link from "next/link";
@@ -415,8 +416,8 @@ export function PlaceDetail({ id }: { id: number }) {
                 aria-label="대표 사진 크게 보기"
                 className="group absolute inset-0 block cursor-zoom-in"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+
+                <PhotoImage
                   src={place.image_url}
                   alt={place.name}
                   className="h-full w-full object-cover transition duration-200 group-hover:brightness-90"

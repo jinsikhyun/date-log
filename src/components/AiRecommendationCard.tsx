@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import {
   categoryIcon,
   categoryStyle,
@@ -43,8 +44,8 @@ export function AiRecommendationCard({
       <div className="relative h-36 overflow-hidden">
         {place.imageUrl ? (
           <div className="relative h-full bg-[#e6decf]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+
+            <PhotoImage
               src={place.imageUrl}
               alt={`${place.name} 대표 사진`}
               loading="lazy"

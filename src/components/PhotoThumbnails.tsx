@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { useState } from "react";
 import { Lightbox } from "@/components/Lightbox";
 
@@ -31,8 +32,8 @@ export function PhotoThumbnails({
             className="h-16 w-16 shrink-0 overflow-hidden rounded-lg ring-1 ring-border/70 transition-transform hover:scale-[1.04]"
             aria-label={`사진 ${i + 1} 크게 보기`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+
+            <PhotoImage
               src={u}
               alt=""
               loading="lazy"

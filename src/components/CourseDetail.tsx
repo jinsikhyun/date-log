@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -369,8 +370,8 @@ export function CourseDetail({ id }: { id: number }) {
                         {i + 1}
                       </span>
                       {p.image_url ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
+
+                        <PhotoImage
                           src={p.image_url}
                           alt={p.name}
                           loading="lazy"

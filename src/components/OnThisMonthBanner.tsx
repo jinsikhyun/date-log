@@ -1,5 +1,6 @@
 "use client";
 
+import PhotoImage from "@/components/PhotoImage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
@@ -178,8 +179,8 @@ export function OnThisMonthBanner({
     >
       {recall.image_url && (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+
+          <PhotoImage
             src={recall.image_url}
             alt=""
             aria-hidden

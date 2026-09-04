@@ -2,7 +2,7 @@
 //
 //  - 원본이 큰 용량이어도 canvas 로 가로 최대 1600px 로 줄이고 JPEG 로 재인코딩한다.
 //  - HEIC/HEIF 는 Safari 처럼 네이티브 디코딩이 되면 그대로, 안 되면(크롬 등) heic2any 로 변환한다.
-//  - 성공 시 "place-photos" 버킷의 public URL 을 돌려준다. 실패하면 throw.
+//  - 성공 시 "place-photos" 버킷의 영구 Storage 참조를 돌려준다. 실패하면 throw.
 
 import { supabase } from "@/lib/supabase/client";
 
@@ -117,11 +117,16 @@ export async function processImageToJpeg(
   return blob;
 }
 
-/** 사진 1장을 리사이즈·JPEG 변환 후 place-photos 버킷에 올리고 public URL 을 돌려준다.
+/** 사진 1장을 리사이즈·JPEG 변환 후 place-photos 버킷에 올리고 영구 Storage 참조를 돌려준다.
  *  (장소 대표 사진, 추억 첨부 사진 공용) */
 export async function uploadPhoto(file: File): Promise<string> {
   const jpeg = await processImageToJpeg(file);
-  const path = `${crypto.randomUUID()}.jpg`;
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("로그인 후 사진을 올려 주세요.");
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles").select("couple_id").eq("id", user.id).single();
+  if (profileError || !profile?.couple_id) throw new Error("커플 연결을 확인해 주세요.");
+  const path = `${profile.couple_id}/${user.id}/${crypto.randomUUID()}.jpg`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -134,7 +139,5 @@ export async function uploadPhoto(file: File): Promise<string> {
     );
   }
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  if (!data?.publicUrl) throw new Error("업로드는 됐지만 공개 URL 을 못 받았어요.");
-  return data.publicUrl;
+  return `storage://${BUCKET}/${path}`;
 }

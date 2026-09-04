@@ -23,7 +23,7 @@ export interface Place {
   first_visit_date: string | null; // 'YYYY-MM-DD'
   description: string | null;
   tags: string[]; // 취향 태그 (AI_RECOMMENDATION_HANDOFF.md §6 확정 체계 + 사용자 직접 추가)
-  image_url: string | null; // 대표 사진 (place-photos 버킷 public URL). 없으면 placeholder.
+  image_url: string | null; // 대표 사진 (place-photos 버킷 영구 Storage 참조 또는 레거시 URL). 없으면 placeholder.
   image_captured_date: string | null; // 대표사진 EXIF 촬영일. 방문일과 같을 때만 그날의 사진에 포함.
   lat: number | null; // 위도 (장소 검색 자동완성으로 채워짐). 없으면 지도가 주소를 지오코딩.
   lng: number | null; // 경도

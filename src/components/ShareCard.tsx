@@ -1,3 +1,4 @@
+import { photoDisplayUrl } from "@/lib/photoUrls";
 import { forwardRef } from "react";
 import type { Place } from "@/lib/places";
 import { categoryIcon } from "@/lib/categories";
@@ -50,7 +51,7 @@ export const ShareCard = forwardRef<HTMLDivElement, { place: Place }>(
               style={{
                 position: "absolute",
                 inset: 0,
-                backgroundImage: `url("${place.image_url}")`,
+                backgroundImage: `url("${photoDisplayUrl(place.image_url) ?? ""}")`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 backgroundRepeat: "no-repeat",

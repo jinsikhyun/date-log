@@ -11,7 +11,7 @@ async function imageData(src: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await fetch(src, { signal: controller.signal, mode: "cors", credentials: "omit" });
+    const response = await fetch(src, { signal: controller.signal, mode: "cors", credentials: "same-origin" });
     if (!response.ok) throw new Error("image response failed");
     const blob = await response.blob();
     const data = await new Promise<string>((resolve, reject) => {
