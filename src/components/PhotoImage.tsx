@@ -5,5 +5,5 @@ import { photoDisplayUrl } from "@/lib/photoUrls";
 export default function PhotoImage({ src, alt, ...props }: ComponentProps<"img">) {
   const displaySrc = typeof src === "string" ? photoDisplayUrl(src) : src;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img {...props} alt={alt ?? ""} src={displaySrc} />;
+  return <img decoding="async" {...props} alt={alt ?? ""} src={displaySrc} />;
 }

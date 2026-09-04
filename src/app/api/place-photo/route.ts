@@ -3,7 +3,8 @@ import { PHOTO_BUCKET, validPhotoPath } from "@/lib/photoUrls";
 
 export const dynamic = "force-dynamic";
 const headers = {
-  "Cache-Control": "private, no-store, max-age=0",
+  // The browser may reuse a photo for this session; shared/CDN caches may not.
+  "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
   "Vary": "Cookie",
   "X-Content-Type-Options": "nosniff",
   "Cross-Origin-Resource-Policy": "same-origin",

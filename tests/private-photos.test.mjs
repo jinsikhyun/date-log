@@ -36,7 +36,7 @@ function handler({user=true,allowed=true,accessError=null,downloadError=null,typ
 }
 test('unauthenticated request cannot query access or download',async()=>{
  const h=handler({user:false});const r=await h.get('old.jpg');assert.equal(r.status,401);assert.equal(h.calls.length,0);
- assert.match(r.headers.get('cache-control'),/no-store/);
+ assert.match(r.headers.get('cache-control'),/private/);
 });
 test('missing migration and foreign couple fail closed without download',async()=>{
  for(const options of [{allowed:false},{accessError:{message:'function missing'}}]) {
@@ -44,9 +44,9 @@ test('missing migration and foreign couple fail closed without download',async()
  assert.equal(h.calls.filter(c=>c[0]==='download').length,0);
  }
 });
-test('authorized download is private, no-store, same-origin and no signed URL',async()=>{
+test('authorized download is browser-private cached, same-origin and no signed URL',async()=>{
  const h=handler();const r=await h.get('old.jpg');assert.equal(r.status,200);
- assert.equal(r.headers.get('content-type'),'image/jpeg');assert.match(r.headers.get('cache-control'),/private, no-store/);
+ assert.equal(r.headers.get('content-type'),'image/jpeg');assert.match(r.headers.get('cache-control'),/private, max-age=3600/);
  assert.equal(r.headers.get('cross-origin-resource-policy'),'same-origin');assert.equal(r.headers.get('vary'),'Cookie');
  assert.equal(r.headers.get('location'),null);assert.equal(await r.text(),'fake-image');
  assert.deepEqual(h.calls,[['rpc','can_access_place_photo','old.jpg'],['download','place-photos','old.jpg']]);
