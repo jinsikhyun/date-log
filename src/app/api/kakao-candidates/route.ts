@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { CourseContextSchema } from "@/lib/courseContext";
+import { diverseCandidates, isLocalCourse, searchQueries, contextPolicy, contextualQueries } from "@/lib/recommendationPolicy";
 import {
   collectCandidates,
   excludeNearSelf,
@@ -12,11 +14,17 @@ import {
 // AI_RECOMMENDATION_HANDOFF.md §5·§6: 서울·경기 범위 제한 + date.log 에 이미 있는 장소 제외.
 
 const MAX_RADIUS_METERS = 20000;
-const MAX_LIMIT = 15;
+const MAX_LIMIT = 20;
 const DEFAULT_MIN_DISTANCE_METERS = 50; // 같은 건물/바로 옆 정도는 "새 추천"으로서 의미가 없다.
-const MAX_TAGS_IN_QUERY = 2;
 
 const RequestBodySchema = z.object({
+  context: CourseContextSchema.optional(),
+  mode: z.enum(["place_detail", "course"]).default("place_detail"),
+  courseStops: z.array(z.object({
+    category: z.string().max(100),
+    lat: z.number().min(-90).max(90).nullable().optional(),
+    lng: z.number().min(-180).max(180).nullable().optional(),
+  })).max(20).default([]),
   category: z.string().trim().min(1).max(100),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   lat: z.number().finite().min(-90).max(90),
@@ -75,7 +83,8 @@ export async function POST(req: NextRequest) {
   // date.log 에 이미 저장된 장소는 후보에서 제외 — 같은 곳을 "새 추천"처럼 보여주지 않는다.
   const { data: ownPlaces, error: placesErr } = await supabase
     .from("places")
-    .select("kakao_map_link");
+    .select("kakao_map_link")
+    .eq("couple_id", profile.couple_id);
   if (placesErr) {
     console.error("[kakao-candidates] 기존 장소 조회 실패:", placesErr);
     return NextResponse.json(
@@ -92,12 +101,10 @@ export async function POST(req: NextRequest) {
 
   // 카테고리 하나로만 검색하지 않고, 태그를 조합한 검색어도 함께 써서 후보 폭을 넓힌다.
   const category = body.category.trim();
-  const queries = [
-    category,
-    ...(body.tags ?? [])
-      .slice(0, MAX_TAGS_IN_QUERY)
-      .map((t) => `${category} ${t}`),
-  ];
+  const local = body.mode === "course" && isLocalCourse(body.courseStops);
+  const context = body.mode === "course" ? body.context : undefined;
+  const policy = contextPolicy(local, context);
+  const queries = contextualQueries(searchQueries(body.mode, category, [], body.courseStops), context);
 
   let raw;
   try {
@@ -106,7 +113,7 @@ export async function POST(req: NextRequest) {
       queries,
       lat: body.lat,
       lng: body.lng,
-      radiusMeters: Math.min(MAX_RADIUS_METERS, body.radiusMeters ?? 3000),
+      radiusMeters: context?.travel ? policy.radiusMeters : Math.min(MAX_RADIUS_METERS, body.radiusMeters ?? policy.radiusMeters),
     });
   } catch (err) {
     console.error("[kakao-candidates] 카카오 API 호출 실패:", err);
@@ -123,10 +130,10 @@ export async function POST(req: NextRequest) {
     { address: body.excludeAddress },
     body.minDistanceMeters ?? DEFAULT_MIN_DISTANCE_METERS,
   );
-  const candidates = nearFiltered
-    .filter((c) => !excludeIds.has(c.id))
-    .sort((a, b) => a.distanceMeters - b.distanceMeters)
-    .slice(0, Math.min(MAX_LIMIT, body.limit ?? 12));
+  const candidates = diverseCandidates(
+    nearFiltered.filter((c) => !excludeIds.has(c.id) && (!context?.travel || c.distanceMeters <= policy.radiusMeters)),
+    Math.min(MAX_LIMIT, body.limit ?? 20), policy.distanceFirst,
+  );
 
   return NextResponse.json({ candidates });
 }

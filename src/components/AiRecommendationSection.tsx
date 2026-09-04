@@ -64,7 +64,7 @@ export function AiRecommendationSection({ place }: { place: Place }) {
           lat: place.lat,
           lng: place.lng,
           excludeAddress: place.address,
-          limit: 12,
+          limit: 20,
         }),
       });
       const candJson = await candRes.json();
@@ -119,8 +119,8 @@ export function AiRecommendationSection({ place }: { place: Place }) {
     }
     setAddingId(r.kakaoPlaceId);
     try {
-      const { error: insErr } = await supabase.from("places").insert(
-        placeInputToRow({
+      const { error: insErr } = await supabase.from("places").insert({
+        ...placeInputToRow({
           name: r.name,
           category: r.category,
           address: r.address,
@@ -140,9 +140,10 @@ export function AiRecommendationSection({ place }: { place: Place }) {
           added_by: authorName,
           // AI가 이 후보를 고른 근거(matchedTags)를 그대로 저장 — 다음 추천 때
           // "커플이 선호해온 태그"로 다시 프롬프트에 들어가 취향을 좁혀준다.
-          tags: r.matchedTags,
+          tags: [], // 추천 근거는 사용자 확인 태그가 아니다.
         }),
-      );
+        ai_suggested_tags: r.matchedTags,
+      });
       if (insErr) {
         throw new Error(
           insErr.code === "23505"

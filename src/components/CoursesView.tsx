@@ -15,6 +15,8 @@ import { CourseForm, type CourseFormInput } from "@/components/CourseForm";
 import { AnniversaryPlanBanner } from "@/components/AnniversaryPlanBanner";
 import { useAnniversaries } from "@/hooks/useAnniversaries";
 import { nextAnniversary } from "@/lib/anniversaries";
+import { useAuth } from "@/components/AuthProvider";
+import { readDraft } from "@/lib/courseDraft";
 
 const COURSE_LIST_SELECT =
   "id, title, concept, created_at, course_places(order_index, places(id, name, category, address, image_url, lat, lng, status))";
@@ -25,11 +27,34 @@ const POLICY_HINT =
 const fmtDate = (d: string) => d.slice(0, 10).replace(/-/g, ".");
 
 export function CoursesView() {
+  const { user, coupleMembers } = useAuth();
+  const draftKey = `course-draft:${user?.id}:${coupleMembers.map(m => m.id).sort().join(':')}`;
+  const [draft, setDraft] = useState<CourseFormInput | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const saveDraft = useCallback((value: CourseFormInput) => {
+    setDraft(value);
+    try { sessionStorage.setItem(draftKey, JSON.stringify(value)); } catch {}
+  }, [draftKey]);
   const router = useRouter();
   const [courses, setCourses] = useState<CourseWithStops[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [seedIds, setSeedIds] = useState<number[]>([]);
+  useEffect(() => {
+    if (!user || !coupleMembers.length) return;
+    const saved = readDraft(draftKey);
+    const raw = new URLSearchParams(window.location.search).get("places");
+    const ids = raw ? [...new Set(raw.split(',').filter(x => /^\d+$/.test(x)).map(Number).filter(x => Number.isSafeInteger(x) && x > 0))] : [];
+    if (ids.length) {
+      setSeedIds(ids);
+      setDraft({ title: saved?.title ?? "", concept: saved?.concept ?? "", placeIds: [...new Set([...(saved?.placeIds ?? []), ...ids])], courseOnlyPlaceIds: saved?.courseOnlyPlaceIds ?? [] });
+      setShowForm(true);
+      const url = new URL(window.location.href); url.searchParams.delete('places');
+      window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    } else { setDraft(saved); if (saved) setShowForm(true); }
+    setDraftReady(true);
+  }, [user, coupleMembers.length, draftKey]);
   const anniversaries = useAnniversaries();
   const upcomingAnniversary = nextAnniversary(
     anniversaries.filter((event) => event.kind !== "first-record"),
@@ -113,9 +138,10 @@ export function CoursesView() {
     }
 
     // 방금 만든 코스 상세로 이동 (임베딩/좌표는 거기서 정확히 로드)
+    try { sessionStorage.removeItem(draftKey); } catch {}
     setShowForm(false);
     router.push(`/courses/${course.id}`);
-  }, [router]);
+  }, [router, draftKey]);
 
   return (
     <>
@@ -141,9 +167,11 @@ export function CoursesView() {
         <AnniversaryPlanBanner event={upcomingAnniversary} onPlan={openAnniversaryPlan} />
       )}
 
-      {showForm && (
+      {showForm && draftReady && (
         <div id="course-planner" className="scroll-mt-24">
           <CourseForm
+            initial={draft ?? { title: "", concept: "", placeIds: seedIds }}
+            onDraftChange={saveDraft}
             onSubmit={handleCreate}
             onCancel={() => setShowForm(false)}
             submitLabel="코스 저장"

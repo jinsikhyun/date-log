@@ -513,6 +513,12 @@ export function PlaceDetail({ id }: { id: number }) {
                 ))}
               </div>
             )}
+            <Link
+              href={`/courses?places=${place.id}`}
+              className="inline-flex w-fit items-center gap-1 py-2 text-xs font-medium text-muted transition-colors hover:text-accent focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              이 장소로 코스 만들기 <span aria-hidden="true">→</span>
+            </Link>
             {visitAnniversaries.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {visitAnniversaries.slice(0, 2).map((event) => (

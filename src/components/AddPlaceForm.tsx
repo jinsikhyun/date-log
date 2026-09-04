@@ -10,6 +10,7 @@ import { TagSelector } from "@/components/TagSelector";
 import { normalizeVisitedCategory } from "@/lib/categories";
 
 export interface NewPlaceInput {
+  confirmed_tags?: string[];
   name: string;
   category: string;
   address: string;
@@ -467,8 +468,14 @@ export function AddPlaceForm({
         <TagSelector
           category={form.category}
           selected={form.tags}
-          onChange={(tags) => set("tags", tags)}
+          onChange={(tags) => setForm(prev => ({ ...prev, tags, confirmed_tags: prev.confirmed_tags?.filter(t => tags.includes(t)) }))}
         />
+        {form.tags.length > 0 && (
+          <button type="button" onClick={() => set("confirmed_tags", [...form.tags])}
+            className="mt-2 text-xs font-medium text-accent">
+            {form.confirmed_tags?.length === form.tags.length ? "✓ 선택한 태그 확인 완료 · 저장하면 반영돼요" : "선택한 태그가 이 장소에 맞아요 · 확인"}
+          </button>
+        )}
       </div>
 
       {form.status === "wishlist" && (

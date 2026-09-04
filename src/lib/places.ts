@@ -125,6 +125,7 @@ export function matchesFavoriteFilter(place: Place, f: FavoriteFilter): boolean 
 
 // 장소 추가/수정 폼 값(전부 문자열) → places 테이블 row.
 export interface PlaceRowInput {
+  confirmed_tags?: string[];
   name: string;
   category: string;
   address: string;
@@ -166,5 +167,6 @@ export function placeInputToRow(input: PlaceRowInput) {
     image_url: lite ? null : input.image_url.trim() || null,
     image_captured_date: lite || !input.image_url ? null : input.image_captured_date || null,
     tags: input.tags ?? [], // 방문/위시/코스전용 모두 취향 태그는 유지
+    ...(input.confirmed_tags !== undefined ? { confirmed_tags: input.confirmed_tags } : {}),
   };
 }

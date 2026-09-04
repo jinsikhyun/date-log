@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PlaceCard } from "@/components/PlaceCard";
+import { useCourseSelection } from "@/components/CourseSelection";
 import { AddPlaceForm, type NewPlaceInput } from "@/components/AddPlaceForm";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -54,6 +55,7 @@ function withMemoryCount(row: PlaceListRow): Place {
 }
 
 export function HomeView() {
+  const courseSelection = useCourseSelection();
   const anniversaries = useAnniversaries();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -259,6 +261,7 @@ export function HomeView() {
             ))}
           </div>
 
+          <span onClick={() => { if (!courseSelection.active) setParams({ view: "feed" }); }}>{courseSelection.trigger}</span>
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
@@ -293,6 +296,8 @@ export function HomeView() {
         <AddPlaceForm onSubmit={handleAdd} onCancel={() => setShowForm(false)} />
       )}
 
+      {courseSelection.toolbar}
+
       {loadError && (
         <div className="mb-6 rounded-2xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
           {loadError}
@@ -322,11 +327,15 @@ export function HomeView() {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {visiblePlaces.map((place) => (
+              <div key={place.id} className="relative h-full">
+              {courseSelection.selector(place.id, place.name)}
+              <div inert={courseSelection.active} className="h-full">
               <PlaceCard
-                key={place.id}
                 place={place}
                 visitAnniversaries={anniversariesOn(anniversaries, place.first_visit_date)}
               />
+              </div>
+              </div>
             ))}
           </div>
         )
@@ -366,6 +375,7 @@ export function HomeView() {
           )}
         </section>
       )}
+      {courseSelection.active && <div aria-hidden="true" className="h-20 lg:hidden" />}
     </>
   );
 }

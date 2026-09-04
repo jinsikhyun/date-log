@@ -147,14 +147,18 @@ export async function collectCandidates(params: {
         limit: params.limitPerCall ?? PAGE_SIZE,
         sort,
         maxPages: 1, // 검색어 여러 개를 합치므로 조합당 1페이지면 충분
-      }).catch(() => [] as KakaoCandidate[]),
+      }),
     ),
   );
 
-  const lists = await Promise.all(calls);
+  const settled = await Promise.allSettled(calls);
+  const lists = settled.flatMap(r => r.status === "fulfilled" ? [r.value] : []);
+  if (!lists.length) throw new Error("모든 장소 검색 요청이 실패했습니다.");
   const merged = new Map<string, KakaoCandidate>();
-  for (const list of lists) {
-    for (const c of list) {
+  for (let i = 0; i < PAGE_SIZE; i++) {
+    for (const list of lists) {
+      const c = list[i];
+      if (!c) continue;
       if (!merged.has(c.id)) merged.set(c.id, c);
     }
   }

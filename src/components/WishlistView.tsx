@@ -1,4 +1,5 @@
 "use client";
+import { useCourseSelection } from "@/components/CourseSelection";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -27,6 +28,7 @@ const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
 
 export function WishlistView() {
+  const courseSelection = useCourseSelection();
   const { coupleMembers, authorName } = useAuth();
   const { categories: officialCategories, orderNames } = useCategories();
   const [places, setPlaces] = useState<Place[]>([]);
@@ -193,6 +195,8 @@ export function WishlistView() {
                 : `위시리스트 ${places.length}곳`}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        {courseSelection.trigger}
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
@@ -200,6 +204,7 @@ export function WishlistView() {
         >
           {adding ? "폼 닫기" : "가고 싶은 곳 추가"}
         </button>
+        </div>
       </div>
 
       {adding && (
@@ -278,6 +283,7 @@ export function WishlistView() {
         </>
       )}
 
+      {courseSelection.toolbar}
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -306,9 +312,11 @@ export function WishlistView() {
             return (
               <article
                 key={place.id}
-                className="flex h-full flex-col overflow-hidden rounded-[20px] border border-dashed border-border-dashed bg-card transition-colors hover:border-accent"
+                className="relative flex h-full flex-col overflow-hidden rounded-[20px] border border-dashed border-border-dashed bg-card transition-colors hover:border-accent"
               >
                 {/* 미방문 placeholder — 클릭 시 네이버 이미지 검색 (새 탭) */}
+                {courseSelection.selector(place.id, place.name)}
+                <div inert={courseSelection.active} className="flex h-full flex-col">
                 <a
                   href={naverImageSearchUrl(place.name, place.address)}
                   target="_blank"
@@ -360,6 +368,7 @@ export function WishlistView() {
                     </Link>
                   </div>
                 </div>
+                </div>
               </article>
             );
           })}
@@ -373,6 +382,7 @@ export function WishlistView() {
         </Link>{" "}
         목록에서 볼 수 있어요.
       </p>
+      {courseSelection.active && <div aria-hidden="true" className="h-20 lg:hidden" />}
     </>
   );
 }
