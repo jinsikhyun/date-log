@@ -452,31 +452,14 @@ export function AddPlaceForm({
         )}
       </div>
 
-      <div className="flex flex-col gap-1 sm:col-span-2">
-        <label className={labelClass} htmlFor="pf-link">
-          네이버지도 링크
-        </label>
-        <input
-          id="pf-link"
-          className={fieldClass}
-          value={form.naver_map_link}
-          onChange={(e) => set("naver_map_link", e.target.value)}
-          placeholder="https://naver.me/..."
-        />
-      </div>
-
       <div className="sm:col-span-2">
         <TagSelector
           category={form.category}
           selected={form.tags}
-          onChange={(tags) => setForm(prev => ({ ...prev, tags, confirmed_tags: prev.confirmed_tags?.filter(t => tags.includes(t)) }))}
+          onChange={(tags) =>
+            setForm((prev) => ({ ...prev, tags, confirmed_tags: tags }))
+          }
         />
-        {form.tags.length > 0 && (
-          <button type="button" onClick={() => set("confirmed_tags", [...form.tags])}
-            className="mt-2 text-xs font-medium text-accent">
-            {form.confirmed_tags?.length === form.tags.length ? "✓ 선택한 태그 확인 완료 · 저장하면 반영돼요" : "선택한 태그가 이 장소에 맞아요 · 확인"}
-          </button>
-        )}
       </div>
 
       {form.status === "wishlist" && (
