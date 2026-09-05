@@ -32,6 +32,21 @@ export function validPhotoWidth(value: unknown): number | null {
   return typeof width === "number" && DISPLAY_WIDTHS.has(width) ? width : null;
 }
 
+// Must match the "newly uploaded" branch of can_access_place_photo() in
+// supabase/migrations/20260905010000_isolate_place_photos_by_couple.sql (without
+// the thumbnail suffix). Only paths in this exact shape can have a pregenerated
+// "-<width>.jpg" sibling; legacy flat filenames never do.
+const NEW_FORMAT_PHOTO_PATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/;
+
+export function isNewFormatPhotoPath(path: string): boolean {
+  return NEW_FORMAT_PHOTO_PATH.test(path);
+}
+
+/** Storage path of the pregenerated thumbnail sibling for a new-format original path. */
+export function thumbnailPath(path: string, width: number): string {
+  return path.replace(/\.jpg$/, `-${width}.jpg`);
+}
+
 export function photoDisplayUrl(value: string | undefined, width?: number): string | undefined {
   if (!value) return undefined;
   const path = photoPath(value);

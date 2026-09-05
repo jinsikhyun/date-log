@@ -5,10 +5,14 @@
 //  - 성공 시 "place-photos" 버킷의 영구 Storage 참조를 돌려준다. 실패하면 throw.
 
 import { supabase } from "@/lib/supabase/client";
+import { thumbnailPath } from "@/lib/photoUrls";
 
 const BUCKET = "place-photos";
 const MAX_WIDTH = 1600;
 const JPEG_QUALITY = 0.85;
+// Must stay a subset of DISPLAY_WIDTHS in src/lib/photoUrls.ts and the width
+// whitelist in supabase/migrations/20260905020000_allow_place_photo_thumbnails.sql.
+const THUMBNAIL_WIDTHS = [160, 320, 640, 960, 1280];
 
 function dateToLocalKey(value: unknown): string | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -89,16 +93,14 @@ async function decodeToImage(file: File): Promise<HTMLImageElement> {
   }
 }
 
-/** File → 가로 최대 maxWidth 로 축소한 JPEG Blob */
-export async function processImageToJpeg(
-  file: File,
-  maxWidth = MAX_WIDTH,
-): Promise<Blob> {
+function validateImageFile(file: File) {
   if (!file.type.startsWith("image/") && !isHeic(file)) {
     throw new Error("이미지 파일만 올릴 수 있어요.");
   }
+}
 
-  const img = await decodeToImage(file);
+/** 디코딩된 이미지 → 가로 최대 maxWidth 로 축소한 JPEG Blob (업스케일 안 함) */
+function resizeToJpeg(img: HTMLImageElement, maxWidth: number): Promise<Blob> {
   const scale = Math.min(1, maxWidth / img.naturalWidth);
   const width = Math.max(1, Math.round(img.naturalWidth * scale));
   const height = Math.max(1, Math.round(img.naturalHeight * scale));
@@ -110,17 +112,33 @@ export async function processImageToJpeg(
   if (!ctx) throw new Error("이미지를 변환할 수 없어요 (canvas 미지원).");
   ctx.drawImage(img, 0, 0, width, height);
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
-  );
-  if (!blob) throw new Error("이미지를 JPEG 로 변환하지 못했어요.");
-  return blob;
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("이미지를 JPEG 로 변환하지 못했어요."))),
+      "image/jpeg",
+      JPEG_QUALITY,
+    );
+  });
+}
+
+/** File → 가로 최대 maxWidth 로 축소한 JPEG Blob */
+export async function processImageToJpeg(
+  file: File,
+  maxWidth = MAX_WIDTH,
+): Promise<Blob> {
+  validateImageFile(file);
+  const img = await decodeToImage(file);
+  return resizeToJpeg(img, maxWidth);
 }
 
 /** 사진 1장을 리사이즈·JPEG 변환 후 place-photos 버킷에 올리고 영구 Storage 참조를 돌려준다.
- *  (장소 대표 사진, 추억 첨부 사진 공용) */
+ *  (장소 대표 사진, 추억 첨부 사진 공용)
+ *  같은 디코딩 결과로 표시용 썸네일도 함께 만들어 나란히 올린다 — /api/place-photo가
+ *  Supabase 변환 대신 이 파일들을 바로 서빙해 로딩을 빠르게 한다. */
 export async function uploadPhoto(file: File): Promise<string> {
-  const jpeg = await processImageToJpeg(file);
+  validateImageFile(file);
+  const img = await decodeToImage(file);
+  const jpeg = await resizeToJpeg(img, MAX_WIDTH);
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) throw new Error("로그인 후 사진을 올려 주세요.");
   const { data: profile, error: profileError } = await supabase
@@ -138,6 +156,22 @@ export async function uploadPhoto(file: File): Promise<string> {
       `업로드 실패: ${error.message} (로그인 상태와 사진 저장소 권한을 확인해 주세요. 예전 공개 권한 SQL은 재실행하지 마세요.)`,
     );
   }
+
+  // Best-effort: 썸네일이 하나라도 실패해도 업로드 자체는 성공 처리한다.
+  // /api/place-photo가 없는 썸네일은 온디맨드 변환→원본 순으로 폴백한다.
+  await Promise.all(
+    THUMBNAIL_WIDTHS.filter((w) => w < img.naturalWidth).map(async (w) => {
+      try {
+        const thumb = await resizeToJpeg(img, w);
+        const { error: thumbError } = await supabase.storage
+          .from(BUCKET)
+          .upload(thumbnailPath(path, w), thumb, { contentType: "image/jpeg", upsert: false });
+        if (thumbError) console.warn(`[uploadPhoto] ${w}px 썸네일 업로드 실패:`, thumbError.message);
+      } catch (err) {
+        console.warn(`[uploadPhoto] ${w}px 썸네일 생성 실패:`, err);
+      }
+    }),
+  );
 
   return `storage://${BUCKET}/${path}`;
 }

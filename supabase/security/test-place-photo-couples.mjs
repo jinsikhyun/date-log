@@ -35,9 +35,11 @@ create policy "broad" on storage.objects for all to public using(true) with chec
 `);
 const base=await readFile(new URL('../migrations/20260905000000_secure_place_photos.sql',import.meta.url),'utf8');
 const couple=await readFile(new URL('../migrations/20260905010000_isolate_place_photos_by_couple.sql',import.meta.url),'utf8');
+const thumbnails=await readFile(new URL('../migrations/20260905020000_allow_place_photo_thumbnails.sql',import.meta.url),'utf8');
 await db.exec(base);
 await db.exec(`create policy "인증된 사용자 조회 허용" on storage.objects for select to authenticated using(bucket_id='place-photos');`);
 await db.exec(couple);
+await db.exec(thumbnails);
 async function as(id,sql) {
  await db.exec(`set role ${id===null?'anon':'authenticated'}`);
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id===null?'':u(id)]);
@@ -92,6 +94,21 @@ await test('owner deletion allowed, moving to another couple denied',async()=>{
  const temp=`${a}/${u(1)}/${u(202)}.jpg`;
  await as(1,`insert into storage.objects values('place-photos','${temp}','${u(1)}',null)`);
  assert.equal((await as(1,`delete from storage.objects where name='${temp}' returning name`)).length,1);
+});
+await test('thumbnail sibling (-<width>.jpg): whitelisted upload + partner read; other suffixes rejected',async()=>{
+ // The preceding replay test reapplies the pre-thumbnail `couple` migration text,
+ // reverting can_access_place_photo(); re-apply on top, as a real deploy would.
+ await db.exec(thumbnails);
+ const thumb=`${a}/${u(1)}/${u(203)}-640.jpg`;
+ await as(1,`insert into storage.objects values('place-photos','${thumb}','${u(1)}',null)`);
+ assert.equal((await as(2,`select * from storage.objects where name='${thumb}'`)).length,1);
+ assert.equal((await as(3,`select * from storage.objects where name='${thumb}'`)).length,0);
+ for(const bad of [
+   `${a}/${u(1)}/${u(203)}-999.jpg`,
+   `${a}/${u(1)}/${u(203)}-640.png`,
+   `${a}/${u(1)}/${u(203)}-640-320.jpg`,
+ ]) await assert.rejects(()=>as(1,`insert into storage.objects values('place-photos','${bad}','${u(1)}',null)`),/row-level security/);
+ assert.equal((await as(1,`delete from storage.objects where name='${thumb}' returning name`)).length,1);
 });
 await test('membership change revokes old couple access without moving legacy mapping',async()=>{
  await db.exec(`update public.profiles set couple_id='${b}' where id='${u(1)}'`);

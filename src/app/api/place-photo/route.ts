@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { PHOTO_BUCKET, validPhotoPath, validPhotoWidth } from "@/lib/photoUrls";
+import { PHOTO_BUCKET, isNewFormatPhotoPath, thumbnailPath, validPhotoPath, validPhotoWidth } from "@/lib/photoUrls";
 
 export const dynamic = "force-dynamic";
 const headers = {
@@ -27,10 +27,19 @@ export async function GET(request: Request) {
   if (allowed !== true) return new Response(null, { status: 404, headers });
   // User session only: Storage RLS applies. Never use the service-role key here.
   const bucket = supabase.storage.from(PHOTO_BUCKET);
-  let { data, error } = await bucket.download(
-    path,
-    width ? { transform: { width, quality: 85, resize: "contain" } } : undefined,
-  );
+  let data, error;
+  // Fastest path: a pregenerated thumbnail sibling, served with no per-request
+  // transform work. Falls through when absent (legacy photo, or generation
+  // failed at upload time) — RLS re-checks this exact object name regardless.
+  if (width && isNewFormatPhotoPath(path)) {
+    ({ data, error } = await bucket.download(thumbnailPath(path, width)));
+  }
+  if (error || !data) {
+    ({ data, error } = await bucket.download(
+      path,
+      width ? { transform: { width, quality: 85, resize: "contain" } } : undefined,
+    ));
+  }
   // Image transformation may be unavailable on some Supabase plans. Keep the
   // photo usable without weakening access control; Storage RLS still applies.
   if ((error || !data) && width) {

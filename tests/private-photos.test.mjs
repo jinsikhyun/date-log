@@ -28,14 +28,17 @@ test('invalid storage paths, traversal, URL inputs and empty reference rejected'
  assert.equal(urls.photoDisplayUrl('storage://place-photos/../a.jpg'),undefined);
  assert.equal(urls.photoPath('https://example.supabase.co/storage/v1/object/public/place-photos/a%2f..%2fb.jpg'),null);
 });
-function handler({user=true,allowed=true,accessError=null,downloadError=null,type='image/jpeg'}={}){
+function handler({user=true,allowed=true,accessError=null,downloadError=null,type='image/jpeg',downloadImpl=null}={}){
  const calls=[];const transforms=[];
  const client={auth:{getUser:async()=>({data:{user:user?{id:'test'}:null},error:null})},
  rpc:async(name,args)=>{calls.push(['rpc',name,args.p_name]);return {data:allowed,error:accessError};},
- storage:{from:bucket=>({download:async(path,options)=>{calls.push(['download',bucket,path]);transforms.push(options?.transform);return {data:downloadError?null:new Blob(['fake-image'],{type}),error:downloadError};}})}};
+ storage:{from:bucket=>({download:async(path,options)=>{calls.push(['download',bucket,path]);transforms.push(options?.transform);if(downloadImpl) return downloadImpl(path,options);return {data:downloadError?null:new Blob(['fake-image'],{type}),error:downloadError};}})}};
  const route=load('src/app/api/place-photo/route.ts',{'@/lib/supabase/server':{createClient:async()=>client},'@/lib/photoUrls':urls});
  return {get:(path,width)=>route.GET(new Request('https://app.invalid/api/place-photo?path='+encodeURIComponent(path)+(width?'&w='+width:''))),calls,transforms};
 }
+const NEW_A='aaaaaaaa-1111-2222-3333-444444444444',NEW_B='bbbbbbbb-1111-2222-3333-444444444444',NEW_C='cccccccc-1111-2222-3333-444444444444';
+const NEW_PATH=`${NEW_A}/${NEW_B}/${NEW_C}.jpg`;
+const NEW_THUMB=`${NEW_A}/${NEW_B}/${NEW_C}-640.jpg`;
 test('unauthenticated request cannot query access or download',async()=>{
  const h=handler({user:false});const r=await h.get('old.jpg');assert.equal(r.status,401);assert.equal(h.calls.length,0);
  assert.match(r.headers.get('cache-control'),/private/);
@@ -57,6 +60,24 @@ test('thumbnail width is allowlisted and requested from private storage transfor
  const h=handler();assert.equal((await h.get('old.jpg',320)).status,200);
  assert.equal(JSON.stringify(h.transforms[0]),JSON.stringify({width:320,quality:85,resize:'contain'}));
  const invalid=handler();assert.equal((await invalid.get('old.jpg',333)).status,200);assert.equal(invalid.transforms[0],undefined);
+});
+test('pregenerated thumbnail sibling is served directly, without any transform request',async()=>{
+ const h=handler({downloadImpl:(path)=>path===NEW_THUMB?{data:new Blob(['thumb'],{type:'image/jpeg'}),error:null}:{data:null,error:{message:'should not be requested'}}});
+ const r=await h.get(NEW_PATH,640);
+ assert.equal(r.status,200);assert.equal(await r.text(),'thumb');
+ assert.deepEqual(h.calls.filter(c=>c[0]==='download'),[['download','place-photos',NEW_THUMB]]);
+ assert.equal(h.transforms[0],undefined);
+});
+test('missing pregenerated thumbnail falls back to on-demand transform, then original',async()=>{
+ const h=handler({downloadImpl:(path,options)=>path===NEW_PATH&&!options?.transform?{data:new Blob(['orig'],{type:'image/jpeg'}),error:null}:{data:null,error:{message:'unavailable'}}});
+ const r=await h.get(NEW_PATH,640);
+ assert.equal(r.status,200);assert.equal(await r.text(),'orig');
+ assert.deepEqual(h.calls.filter(c=>c[0]==='download').map(c=>c[2]),[NEW_THUMB,NEW_PATH,NEW_PATH]);
+ assert.equal(JSON.stringify(h.transforms),JSON.stringify([undefined,{width:640,quality:85,resize:'contain'},undefined]));
+});
+test('legacy/flat path never attempts a derived thumbnail lookup',async()=>{
+ const h=handler();await h.get('old.jpg',320);
+ assert.deepEqual(h.calls.filter(c=>c[0]==='download').map(c=>c[2]),['old.jpg']);
 });
 test('storage denial, invalid path, and active content fail closed',async()=>{
  assert.equal((await handler({downloadError:{message:'RLS denied'}}).get('old.jpg')).status,404);

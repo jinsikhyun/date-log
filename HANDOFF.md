@@ -1,5 +1,32 @@
 # date.log — 인수인계 (Codex 이전용)
 
+## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-05)
+
+- Git: `main`/`origin/main`이 `ef1acc2 Improve responsive private photo quality`로 일치한다. 이 커밋까지 Production 배포 및 `datelog.kr` 반영을 확인했다.
+- 비공개 사진: `place-photos` private 버킷과 커플 격리 RLS가 운영에 적용되었다고 사용자가 확인했다. 앱은 인증 → `can_access_place_photo` 권한 검사 → Storage 다운로드 순서의 `/api/place-photo` 경로로 표시하며 서비스 키를 사용하지 않는다.
+- 썸네일: 허용 너비 160/320/640/960/1280px, 품질 85, contain 변환을 사용한다. 카드에는 640/960 반응형 이미지와 160px 흐림 미리보기를 사용하고, 상세는 1280px, 사진 확대 화면은 원본을 요청한다. Supabase 이미지 변환이 불가능하면 원본으로 안전하게 폴백한다. 브라우저 캐시는 private 1시간 + stale-while-revalidate 1일이다.
+- 사진 검증: `tests/private-photos.test.mjs` 7개 통과. 프로덕션 Webpack 빌드도 28개 경로에서 통과했다. 실제 모바일 환경에서는 카드 로딩 속도·화질, 상세 1280px, 확대 원본을 한 번 더 비교할 것.
+- **업로드 시점 썸네일 사전 생성 — SQL 운영 적용 완료(사용자 확인), 앱 코드는 아직 미배포**: 아래 "사진 로딩 속도 개선 — 업로드 시 썸네일 사전 생성" 항목 참고. `20260905020000_allow_place_photo_thumbnails.sql` 운영 실행 성공을 사용자가 확인했다. 앱 코드(썸네일 생성/서빙)는 로컬 검증만 끝났고 commit/push/배포는 별도 승인 대기 중.
+- 코스 진입: 다녀온 곳/가고 싶은 곳에서 선택한 장소는 저장된 초안보다 먼저 배치되어 기준 장소가 된다. 코스 페이지는 기준 장소 2km 이내 후보를 거리순으로 먼저 보여주고 나머지는 카테고리 아코디언에 둔다.
+- 모바일 UI: 홈·위시·코스의 주요 버튼과 필터 칩이 좁은 화면에서 글자 단위로 두 줄이 되지 않도록 정리되어 배포되었다.
+- 보안 주의: private 버킷이나 커플 격리를 해제하지 않는다. 운영 SQL/실데이터 변경/commit/push/배포는 사용자에게 별도 확인받은 뒤 수행한다.
+- 작업 트리에는 사용자 소유의 비추적 ZIP/디자인 폴더와 `src/app/.layout.tsx.swp`가 있다. 임의로 삭제하거나 커밋하지 않는다.
+
+### 다음 권장 작업
+
+1. 운영 모바일에서 카드 → 상세 → 확대의 이미지 요청 크기와 체감 속도를 검증한다.
+2. `/api/place-photo?...&w=...` 요청이 변환 결과를 반환하는지 확인하고, 폴백 비율이 높으면 서버 로그에 개인정보 없는 진단 신호를 추가한다.
+3. 이후 수정은 관련 테스트와 `npm run build -- --webpack`을 통과시킨 뒤 사용자 승인에 따라 커밋·배포한다.
+
+## 사진 로딩 속도 개선 — 업로드 시 썸네일 사전 생성 (로컬 코드 완료 + 운영 SQL 적용 완료, 앱 배포 대기)
+
+- 목적: `/api/place-photo`는 요청마다 Supabase Storage 이미지 변환을 시도하고 실패하면 원본(최대 1600px) 전체를 서빙한다. 변환이 자주 실패하는 환경에서는 160px 미리보기 요청에도 원본 전체가 내려가 로딩이 느려질 수 있다. 사용자가 "품질 유지 + 속도 개선"을 요청해 업로드 시점 사전 생성 방식을 선택했다.
+- 파일명 규칙: 원본 `{couple}/{user}/{uuid}.jpg`는 그대로 두고, 썸네일을 `{couple}/{user}/{uuid}-{width}.jpg` (width는 기존 `DISPLAY_WIDTHS` 화이트리스트 160/320/640/960/1280과 동일)로 나란히 저장. DB(`places.image_url`, `memories.photo_urls`)에는 항상 원본 경로만 저장되므로 스키마 변경 없음.
+- SQL: `supabase/migrations/20260905020000_allow_place_photo_thumbnails.sql`. `can_access_place_photo()`의 신규 업로드 판정 정규식과 `"place-photos: upload path guard"` INSERT 정책 정규식에 `(-(?:160|320|640|960|1280))?` 화이트리스트 접미사만 추가. 폭 값이 정확히 저 5개 중 하나가 아니면 계속 거부됨(임의 접미사·경로 우회 불가). `"place-photos: couple isolation"` 정책은 함수만 호출하므로 SQL 수정 불필요. **사용자가 운영 실행 성공을 확인함(클립보드로 전달 → 실행 → "성공했어" 보고).** 실행 결과 상세(오류 유무 외 값)는 별도로 조회하지 않았음.
+- 앱 코드(배포 대기, 아직 사용자 승인 전): `src/lib/photos.ts`의 `uploadPhoto`가 이미 디코딩한 이미지를 재사용해 원본보다 작은 폭들만(업스케일 방지) quality 0.85로 리사이즈 후 원본과 병렬 업로드. 썸네일 업로드 실패는 best-effort로 무시(원본 업로드만 성공하면 됨). `src/app/api/place-photo/route.ts`는 신규 포맷 경로 + `w` 파라미터가 있으면 (1) 사전 생성 썸네일 sibling을 변환 없이 바로 조회 → (2) 실패 시 기존 on-demand 변환 → (3) 그래도 실패 시 원본, 3단 폴백으로 확장. 레거시 flat 파일과 `w` 없는 요청(예: ShareCard)은 기존과 동일하게 동작.
+- 검증: `node --test tests/private-photos.test.mjs`(10개, 사전 생성 썸네일 직접 서빙/폴백/레거시 미시도 케이스 추가) 통과. `PGLITE_MODULE=... node --test supabase/security/test-place-photos.mjs supabase/security/test-place-photo-couples.mjs`(신규 SQL 포함 12개 커플 격리 시나리오, 화이트리스트 밖 접미사·확장자·이중 접미사 삽입 거부 포함) 통과. `npx tsc --noEmit`, 수정 파일 `eslint`, `npm run build -- --webpack`(28개 경로) 모두 통과. PGlite 모듈은 이전 세션이 `/private/tmp/date-log-security.1THam6/node_modules/@electric-sql/pglite`에 설치해 둔 것을 재사용(프로젝트 의존성에 추가하지 않음, 새 세션에서는 경로가 다를 수 있음).
+- 미검증/다음 단계: (1) 앱 코드 배포 — SQL은 운영 적용됐으나 앱 코드(썸네일 생성/서빙)는 아직 commit/push/배포 전. 별도 승인 필요. (2) 기존 운영 사진(약 65장) 썸네일 backfill은 이번 작업 범위 밖 — 별도 스크립트/승인 필요한 실데이터 생성 작업. (3) 실제 브라우저에서 새 업로드 → 카드/상세/확대 정상 표시 및 네트워크 탭 상 사전 생성 썸네일 응답 확인은 미실시(로컬 dev 서버 미실행, 배포 후 검증 필요). (4) 사진 삭제/교체 시 Storage 정리는 원본조차 기존에 없는 상태라 이번 작업에서 새로 만들지 않음.
+
 ## 운영 커플 격리 SQL 적용 성공 — 사용자 확인
 
 - 사용자가 `20260905010000_isolate_place_photos_by_couple.sql` 운영 실행 결과를 `65, 61, 4`로 보고: 기존 65개 중 61개 커플 배정, 4개 안전 격리. SQL 적용 성공 확인.
