@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ShareCard } from "./ShareCard";
 import { CourseShareCard } from "./CourseShareCard";
+import { PlaceShareCard } from "./PlaceShareCard";
+import { ShareCourseCard, type CourseShareStop } from "./ShareCourseCard";
 import { ShareImageModal } from "./ShareImageModal";
 import { captureElement, downloadBlob } from "@/lib/shareImage";
 import type { CaptureEngine } from "@/lib/shareCapture";
 import type { Place } from "@/lib/places";
+import { SHARE_RATIOS } from "@/lib/shareOutputs";
 
 const photo = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#e3ece8"/><circle cx="400" cy="240" r="130" fill="#36585a"/><rect x="180" y="430" width="440" height="60" fill="#c9a46a"/></svg>',
@@ -17,13 +20,14 @@ const basePlace: Place = {
   description: "첫 번째 줄: 비 오는 날 함께 마신 따뜻한 커피.\n두 번째 줄: 우산을 접고 오래 앉아 나눈 이야기.\n세 번째 줄: 마지막 문장과 아래 date.log까지 잘리지 않아야 해요.",
   rating: 4.5, image_url: photo, image_captured_date: "2025-06-28", first_visit_date: "2025-06-28",
   naver_map_link: null, kakao_map_link: null, lat: null, lng: null, status: "visited",
-  wanted_by: null, wanted_by_ids: [], added_by: "테스트", favorite_by: [], is_regular: false,
+  wanted_by: null, wanted_by_ids: [], added_by: "테스트", favorite_by: ["u1"], is_regular: false,
   memory_count: 0, created_at: "2025-06-28T00:00:00Z", via_course: false, tags: [],
 };
 const stops = Array.from({ length: 12 }, (_, i) => ({ id: i + 1,
   name: i === 1 ? "아주긴이름공백없이도옆의카테고리를밀어내지않아야하는전시공간" : `${i + 1}번째 함께 걷는 서촌의 장소`,
   category: i % 2 ? "전시" : "카페" }));
 const coords = new Map(stops.map((s, i) => [s.id, i === 3 ? null : { lat: 37.575 + i * .001, lng: 126.97 }]));
+const courseStops: CourseShareStop[] = stops.map(s => ({ ...s, address: "서울 종로구 테스트길 12" }));
 type Result = { label: string; url: string; blob: Blob; hash: string };
 
 export function ShareCaptureQA() {
@@ -74,6 +78,28 @@ export function ShareCaptureQA() {
     <div className="flex flex-wrap items-start gap-5">
       <ShareCard ref={placeRef} place={place} />
       <CourseShareCard ref={courseRef} title="우리의 길고 여유로운 서촌 산책 코스" concept={"아침부터 저녁까지 천천히 걸어요.\n마지막 12번 장소와 워터마크까지 확인해요."} stops={stops} coords={coords} />
+    </div>
+    <h2 className="text-lg font-bold">신규 PlaceShareCard 스트레스 테스트 (비율별, 스케일 0.35)</h2>
+    <div className="flex flex-wrap items-start gap-5">
+      {SHARE_RATIOS.map(r => (
+        <div key={r} style={{ transform: "scale(0.35)", transformOrigin: "top left" }}>
+          <PlaceShareCard place={place} ratio={r} frameNumber={7} />
+        </div>
+      ))}
+    </div>
+    <h2 className="text-lg font-bold">신규 ShareCourseCard 스트레스 테스트 (12스탑, 비율별, 스케일 0.35)</h2>
+    <div className="flex flex-wrap items-start gap-5">
+      {SHARE_RATIOS.map(r => (
+        <div key={r} style={{ transform: "scale(0.35)", transformOrigin: "top left" }}>
+          <ShareCourseCard
+            title="우리의 길고 여유로운 서촌 산책 코스"
+            concept={"아침부터 저녁까지 천천히 걸어요.\n마지막 12번 장소와 워터마크까지 확인해요."}
+            stops={courseStops}
+            coords={coords}
+            ratio={r}
+          />
+        </div>
+      ))}
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
       {results.map(result => <section key={result.label}>

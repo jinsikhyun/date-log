@@ -17,6 +17,7 @@ export type SharePhase = "idle" | "capturing" | "ready" | "sharing";
 export function useShareImage(
   targetRef: RefObject<HTMLElement | null>,
   filename: string,
+  captureOpts?: { pixelRatio?: number },
 ) {
   const [phase, setPhase] = useState<SharePhase>("idle");
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -51,7 +52,7 @@ export function useShareImage(
     try {
       const el = targetRef.current;
       if (!el) throw new Error("카드를 준비하지 못했어요.");
-      const b = await captureElement(el);
+      const b = await captureElement(el, "html-to-image", captureOpts);
       if (generation !== generationRef.current) return;
       setBlob(b);
       setPreviewUrl((old) => {

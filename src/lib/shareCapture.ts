@@ -61,7 +61,11 @@ async function preparedClone(source: HTMLElement) {
 }
 
 /** 엔진 비교용 공통 준비 단계. html2canvas는 비교 기준으로만 남긴다. */
-export async function captureCard(source: HTMLElement, engine: CaptureEngine): Promise<Blob> {
+export async function captureCard(
+  source: HTMLElement,
+  engine: CaptureEngine,
+  opts?: { pixelRatio?: number },
+): Promise<Blob> {
   await timeout(document.fonts.ready, 12000, "글꼴 로딩이 오래 걸려요. 잠시 후 다시 시도해 주세요.");
   const clone = await preparedClone(source);
   const host = document.createElement("div");
@@ -75,7 +79,8 @@ export async function captureCard(source: HTMLElement, engine: CaptureEngine): P
     const height = Math.ceil(Math.max(clone.getBoundingClientRect().height, clone.scrollHeight));
     if (!width || !height || height > 8000) throw new Error("카드가 너무 길거나 크기를 확인할 수 없어요. 내용을 나눠서 공유해 주세요.");
     // 모바일 메모리 사용 상한: 최대 2배, 12MP 이하.
-    const scale = Math.min(2, Math.sqrt(12000000 / (width * height)));
+    // opts.pixelRatio 가 주어지면(정확한 출력 픽셀 크기가 필요한 카드) 자동 계산을 건너뛴다.
+    const scale = opts?.pixelRatio ?? Math.min(2, Math.sqrt(12000000 / (width * height)));
     const render = async () => {
       if (engine === "html-to-image") {
         const { toBlob } = await import("html-to-image");

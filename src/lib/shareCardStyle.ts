@@ -16,6 +16,11 @@ export const SC = {
   border: "#ded6c8",
   accentTint: "#e3ece8",
   font: '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  // 공유 카드 개편(비율별 전용 레이아웃)용 추가 토큰.
+  ivory: "#F8F5F0",
+  hairline: "#E9E4DE",
+  mono: 'var(--font-geist-mono), ui-monospace, "SF Mono", monospace',
+  gold: "#B08D57",
 } as const;
 
 // 카테고리 색 이름 → (배경, 글자) hex. (Tailwind 100/700 근사값)

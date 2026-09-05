@@ -1,8 +1,22 @@
 import { captureCard, type CaptureEngine } from "@/lib/shareCapture";
 
 /** 고정 카드 비교 후 선택한 로컬 후보. 모바일 실기기 확인 전 운영 배포 보류. */
-export function captureElement(el: HTMLElement, engine: CaptureEngine = "html-to-image"): Promise<Blob> {
-  return captureCard(el, engine);
+export function captureElement(
+  el: HTMLElement,
+  engine: CaptureEngine = "html-to-image",
+  opts?: { pixelRatio?: number },
+): Promise<Blob> {
+  return captureCard(el, engine, opts);
+}
+
+/** 파일명에 쓸 수 있게 다듬는다. 한글은 유지하고 공백은 하이픈으로, 위험한 문자만 제거. */
+export function toFilenameSlug(name: string): string {
+  return name
+    .trim()
+    .replace(/[/\\:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "place";
 }
 
 /** Blob 을 파일로 저장 */

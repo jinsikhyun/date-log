@@ -47,6 +47,13 @@ export function thumbnailPath(path: string, width: number): string {
   return path.replace(/\.jpg$/, `-${width}.jpg`);
 }
 
+/** 공유 이미지 등, 리사이즈된 표시용 폭이 아니라 저장된 최대 화질 원본이 무조건 필요한
+ * 곳에서 쓴다. Storage에 저장된 "원본"은 업로드 시 이미 가로 최대 1600px/quality 0.85로
+ * 처리된 파일이며(src/lib/photos.ts), 그보다 더 높은 화질의 사본은 존재하지 않는다. */
+export function photoOriginalUrl(value: string | undefined): string | undefined {
+  return photoDisplayUrl(value);
+}
+
 export function photoDisplayUrl(value: string | undefined, width?: number): string | undefined {
   if (!value) return undefined;
   const path = photoPath(value);

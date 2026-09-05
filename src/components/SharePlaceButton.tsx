@@ -1,18 +1,73 @@
 "use client";
 
+import { useState } from "react";
 import type { Place } from "@/lib/places";
-import { ShareCard } from "@/components/ShareCard";
-import { ShareImageModal } from "@/components/ShareImageModal";
+import { getFrameNumber } from "@/lib/shareFrame";
+import { toFilenameSlug } from "@/lib/shareImage";
+import { DEFAULT_SHARE_RATIO, type ShareRatio } from "@/lib/shareOutputs";
+import { ShareRatioModal } from "@/components/ShareRatioModal";
+import { SharePreviewModal } from "@/components/SharePreviewModal";
+import { PlaceShareCard } from "@/components/PlaceShareCard";
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-3.5 w-3.5">
+      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" y1="2" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function todayStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 export function SharePlaceButton({ place }: { place: Place }) {
-  const filename = `datelog-${(place.name || "place")
-    .trim()
-    .replace(/\s+/g, "-")}.png`;
+  const [step, setStep] = useState<"closed" | "ratio" | "preview">("closed");
+  const [ratio, setRatio] = useState<ShareRatio>(DEFAULT_SHARE_RATIO);
+  const [frameNumber, setFrameNumber] = useState<number | null>(null);
+
+  const open = () => {
+    setStep("ratio");
+    void getFrameNumber(place.id).then(setFrameNumber);
+  };
+
+  const filename = `datelog-place-${toFilenameSlug(place.name)}-${todayStamp()}.png`;
 
   return (
-    <ShareImageModal
-      filename={filename}
-      renderCard={(ref) => <ShareCard ref={ref} place={place} />}
-    />
+    <>
+      <button
+        type="button"
+        onClick={open}
+        aria-label="이미지로 공유"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 hover:text-accent"
+      >
+        <ShareIcon />
+      </button>
+
+      {step === "ratio" && (
+        <ShareRatioModal
+          ratio={ratio}
+          onChangeRatio={setRatio}
+          onCancel={() => setStep("closed")}
+          onPreview={() => setStep("preview")}
+          renderCard={(r) => <PlaceShareCard place={place} ratio={r} frameNumber={frameNumber} />}
+        />
+      )}
+
+      {step === "preview" && (
+        <SharePreviewModal
+          ratio={ratio}
+          filename={filename}
+          onChangeRatio={() => setStep("ratio")}
+          onClose={() => setStep("closed")}
+          renderCard={(ref, r) => <PlaceShareCard ref={ref} place={place} ratio={r} frameNumber={frameNumber} />}
+        />
+      )}
+    </>
   );
 }

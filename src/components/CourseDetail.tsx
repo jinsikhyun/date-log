@@ -313,6 +313,7 @@ export function CourseDetail({ id }: { id: number }) {
                     id: s.places!.id,
                     name: s.places!.name,
                     category: s.places!.category,
+                    address: s.places!.address,
                   }))}
                   coords={coords}
                 />
