@@ -21,7 +21,7 @@ export function CategoryChips({
   children?: React.ReactNode;
 }) {
   const chip = (on: boolean) =>
-    `inline-flex shrink-0 items-center gap-1.5 rounded-full px-[17px] py-[9px] text-[13px] font-medium transition-colors ${
+    `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-[17px] py-[9px] text-[13px] font-medium transition-colors ${
       on
         ? "bg-foreground text-surface"
         : "bg-card text-muted ring-1 ring-border hover:ring-accent-border"

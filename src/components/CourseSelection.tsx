@@ -16,7 +16,7 @@ export function useCourseSelection() {
   }, [key, user]);
   useEffect(() => { if (readyKey === key) { try { sessionStorage.setItem(key, JSON.stringify({ ids, active })); } catch {} } }, [ids, active, key, readyKey]);
   const toggle = (id: number) => setIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < MAX_COURSE_PLACES ? [...prev, id] : prev);
-  const trigger = <button type="button" className="rounded-full px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-accent/5 hover:text-accent" onClick={() => { setActive(!active); setIds([]); }}>{active ? "선택 취소" : "코스 조합하기"}</button>;
+  const trigger = <button type="button" className="whitespace-nowrap rounded-full px-2.5 py-2 text-[11px] font-medium text-muted transition-colors hover:bg-accent/5 hover:text-accent sm:px-3 sm:text-xs" onClick={() => { setActive(!active); setIds([]); }}>{active ? "선택 취소" : "코스 조합하기"}</button>;
   const toolbar = active ? <div className="my-4 flex flex-wrap items-center gap-3">
     {active && <span className="text-xs text-muted">누른 순서대로 코스에 담겨요. ({ids.length}/{MAX_COURSE_PLACES})</span>}
     {active && ids.length > 0 && <Link className="hidden rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white lg:inline-flex" href={`/courses?places=${ids.join(',')}`}>{ids.length}곳으로 코스 만들기 →</Link>}

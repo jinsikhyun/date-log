@@ -21,7 +21,7 @@ export function FavoriteFilterChips({
   if (members.length === 0) return null;
 
   const chipClass = (on: boolean, tone: "accent" | "amber" | "neutral") =>
-    `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition-colors ${
+    `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition-colors ${
       on
         ? tone === "amber"
           ? "bg-amber-50 text-amber-700 ring-amber-300"

@@ -157,7 +157,7 @@ export function CoursesView() {
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="rounded-full bg-foreground px-5 py-[11px] text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
+          className="whitespace-nowrap rounded-full bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-colors hover:bg-ink-hover sm:px-5 sm:py-[11px] sm:text-sm"
         >
           {showForm ? "폼 닫기" : "코스 만들기"}
         </button>

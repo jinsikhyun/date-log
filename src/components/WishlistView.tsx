@@ -182,8 +182,8 @@ export function WishlistView() {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="mb-5 flex flex-wrap items-stretch justify-between gap-4 sm:items-end">
+        <div className="w-full sm:w-auto">
           <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
             가고 싶은 곳
           </h1>
@@ -195,12 +195,12 @@ export function WishlistView() {
                 : `위시리스트 ${places.length}곳`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
         {courseSelection.trigger}
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="rounded-full bg-foreground px-5 py-[11px] text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
+          className="whitespace-nowrap rounded-full bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-colors hover:bg-ink-hover sm:px-5 sm:py-[11px] sm:text-sm"
         >
           {adding ? "폼 닫기" : "가고 싶은 곳 추가"}
         </button>

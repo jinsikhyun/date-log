@@ -223,8 +223,8 @@ export function HomeView() {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="mb-5 flex flex-wrap items-stretch justify-between gap-4 sm:items-end">
+        <div className="w-full sm:w-auto">
           <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
             우리가 다녀온 곳
           </h1>
@@ -237,8 +237,8 @@ export function HomeView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-full bg-card p-1 ring-1 ring-border">
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:flex sm:w-auto">
+          <div className="grid min-w-0 grid-cols-2 rounded-full bg-card p-1 ring-1 ring-border">
             {(
               [
                 ["feed", "피드"],
@@ -250,7 +250,7 @@ export function HomeView() {
                 type="button"
                 onClick={() => setParams({ view: mode })}
                 aria-pressed={view === mode}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm ${
                   view === mode
                     ? "bg-accent text-white shadow-sm"
                     : "text-muted hover:text-accent"
@@ -261,11 +261,11 @@ export function HomeView() {
             ))}
           </div>
 
-          <span onClick={() => { if (!courseSelection.active) setParams({ view: "feed" }); }}>{courseSelection.trigger}</span>
+          <span className="shrink-0" onClick={() => { if (!courseSelection.active) setParams({ view: "feed" }); }}>{courseSelection.trigger}</span>
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="rounded-full bg-foreground px-5 py-[11px] text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
+            className="shrink-0 whitespace-nowrap rounded-full bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-colors hover:bg-ink-hover sm:px-5 sm:py-[11px] sm:text-sm"
           >
             {showForm ? "폼 닫기" : "장소 추가"}
           </button>
