@@ -2,11 +2,11 @@
 
 ## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-05)
 
-- Git: `main`/`origin/main`이 `ef1acc2 Improve responsive private photo quality`로 일치한다. 이 커밋까지 Production 배포 및 `datelog.kr` 반영을 확인했다.
+- Git: `main`/`origin/main`이 `6f3fe2c Pregenerate private photo thumbnails at upload time`로 일치한다(이전 확인된 배포 기준은 `ef1acc2`). `6f3fe2c`의 Production 배포·`datelog.kr` 반영 여부는 아직 확인 못함 — Vercel 대시보드 확인 필요.
 - 비공개 사진: `place-photos` private 버킷과 커플 격리 RLS가 운영에 적용되었다고 사용자가 확인했다. 앱은 인증 → `can_access_place_photo` 권한 검사 → Storage 다운로드 순서의 `/api/place-photo` 경로로 표시하며 서비스 키를 사용하지 않는다.
 - 썸네일: 허용 너비 160/320/640/960/1280px, 품질 85, contain 변환을 사용한다. 카드에는 640/960 반응형 이미지와 160px 흐림 미리보기를 사용하고, 상세는 1280px, 사진 확대 화면은 원본을 요청한다. Supabase 이미지 변환이 불가능하면 원본으로 안전하게 폴백한다. 브라우저 캐시는 private 1시간 + stale-while-revalidate 1일이다.
 - 사진 검증: `tests/private-photos.test.mjs` 7개 통과. 프로덕션 Webpack 빌드도 28개 경로에서 통과했다. 실제 모바일 환경에서는 카드 로딩 속도·화질, 상세 1280px, 확대 원본을 한 번 더 비교할 것.
-- **업로드 시점 썸네일 사전 생성 — SQL 운영 적용 완료(사용자 확인), 앱 코드는 아직 미배포**: 아래 "사진 로딩 속도 개선 — 업로드 시 썸네일 사전 생성" 항목 참고. `20260905020000_allow_place_photo_thumbnails.sql` 운영 실행 성공을 사용자가 확인했다. 앱 코드(썸네일 생성/서빙)는 로컬 검증만 끝났고 commit/push/배포는 별도 승인 대기 중.
+- **업로드 시점 썸네일 사전 생성 — SQL 운영 적용 완료, 앱 코드 commit·push 완료, Vercel 배포 상태 미확인**: 아래 "사진 로딩 속도 개선 — 업로드 시 썸네일 사전 생성" 항목 참고. `20260905020000_allow_place_photo_thumbnails.sql` 운영 실행 성공을 사용자가 확인했고, 사용자 승인에 따라 커밋 `6f3fe2c`를 `origin/main`에 push했다. 이 세션에 Vercel CLI가 없어 자동 재배포 완료(READY)와 `datelog.kr` 반영 여부는 직접 확인하지 못함 — Vercel 대시보드에서 확인 필요.
 - 코스 진입: 다녀온 곳/가고 싶은 곳에서 선택한 장소는 저장된 초안보다 먼저 배치되어 기준 장소가 된다. 코스 페이지는 기준 장소 2km 이내 후보를 거리순으로 먼저 보여주고 나머지는 카테고리 아코디언에 둔다.
 - 모바일 UI: 홈·위시·코스의 주요 버튼과 필터 칩이 좁은 화면에서 글자 단위로 두 줄이 되지 않도록 정리되어 배포되었다.
 - 보안 주의: private 버킷이나 커플 격리를 해제하지 않는다. 운영 SQL/실데이터 변경/commit/push/배포는 사용자에게 별도 확인받은 뒤 수행한다.
