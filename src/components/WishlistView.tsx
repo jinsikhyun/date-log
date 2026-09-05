@@ -12,10 +12,12 @@ import {
   placeInputToRow,
   wantedByLabelFromIds,
 } from "@/lib/places";
-import { AddPlaceForm, type NewPlaceInput } from "@/components/AddPlaceForm";
+import { AddPlaceForm, blankPlaceInput, type NewPlaceInput } from "@/components/AddPlaceForm";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
+import { PlaceSearchBox } from "@/components/PlaceSearchBox";
+import { matchesQuery } from "@/lib/placeSearch";
 import { normalizeVisitedCategory } from "@/lib/categories";
 import { VisitMoodPrompt } from "@/components/VisitMoodPrompt";
 
@@ -35,6 +37,8 @@ export function WishlistView() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // 검색 결과 없음 → "이 이름으로 추가" 진입 시에만 채워짐. 일반 "가고 싶은 곳 추가"는 빈 폼.
+  const [prefillName, setPrefillName] = useState("");
   const [convertingId, setConvertingId] = useState<number | null>(null);
   const [converted, setConverted] = useState<Place | null>(null);
   const [convertError, setConvertError] = useState<string | null>(null);
@@ -42,6 +46,7 @@ export function WishlistView() {
   // 주 필터: 카테고리 탭 (null = 전체). 보조 필터: "{이름} wish" 칩 (여러 개 = OR).
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [wishFilterIds, setWishFilterIds] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
 
   const wishMembers = coupleMembers.filter((m) => m.display_name?.trim());
 
@@ -60,11 +65,13 @@ export function WishlistView() {
           (p) =>
             wishFilterIds.length === 0 ||
             wishFilterIds.some((id) => (p.wanted_by_ids ?? []).includes(id)),
-        ),
-    [places, effectiveCat, wishFilterIds],
+        )
+        .filter((p) => matchesQuery(p, query)),
+    [places, effectiveCat, wishFilterIds, query],
   );
 
-  const filtered = effectiveCat !== null || wishFilterIds.length > 0;
+  const filtered =
+    effectiveCat !== null || wishFilterIds.length > 0 || query.trim() !== "";
 
   useEffect(() => {
     let cancelled = false;
@@ -196,10 +203,11 @@ export function WishlistView() {
           </p>
         </div>
         <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+        <PlaceSearchBox value={query} onChange={setQuery} />
         {courseSelection.trigger}
         <button
           type="button"
-          onClick={() => setAdding((v) => !v)}
+          onClick={() => { setPrefillName(""); setAdding((v) => !v); }}
           className="whitespace-nowrap rounded-full bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-colors hover:bg-ink-hover sm:px-5 sm:py-[11px] sm:text-sm"
         >
           {adding ? "폼 닫기" : "가고 싶은 곳 추가"}
@@ -209,7 +217,9 @@ export function WishlistView() {
 
       {adding && (
         <AddPlaceForm
+          key={prefillName}
           initialStatus="wishlist"
+          initial={prefillName ? blankPlaceInput(prefillName, "wishlist") : undefined}
           submitLabel="위시리스트에 저장"
           onSubmit={handleAdd}
           onCancel={() => setAdding(false)}
@@ -299,9 +309,22 @@ export function WishlistView() {
           담아보세요.
         </p>
       ) : visible.length === 0 ? (
-        <p className="rounded-[20px] bg-card p-12 text-center text-sm text-muted-2 ring-1 ring-border">
-          이 조건에 맞는 장소가 없어요.
-        </p>
+        <div className="rounded-[20px] bg-card p-12 text-center ring-1 ring-border">
+          <p className="text-sm text-muted-2">
+            {query.trim()
+              ? `‘${query.trim()}’ 와 맞는 곳이 없어요.`
+              : "이 조건에 맞는 장소가 없어요."}
+          </p>
+          {query.trim() && (
+            <button
+              type="button"
+              onClick={() => { setPrefillName(query.trim()); setAdding(true); }}
+              className="mt-3 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-ink-hover"
+            >
+              이 이름으로 위시에 추가
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {visible.map((place) => {

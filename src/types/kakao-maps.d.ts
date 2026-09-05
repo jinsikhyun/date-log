@@ -21,6 +21,8 @@ declare global {
     class LatLngBounds {
       constructor();
       extend(latlng: LatLng): void;
+      getSouthWest(): LatLng;
+      getNorthEast(): LatLng;
     }
 
     interface MapOptions {
@@ -31,8 +33,10 @@ declare global {
     class Map {
       constructor(container: HTMLElement, options: MapOptions);
       setCenter(latlng: LatLng): void;
+      panTo(latlng: LatLng): void;
       setLevel(level: number): void;
       setBounds(bounds: LatLngBounds): void;
+      getBounds(): LatLngBounds;
       relayout(): void;
     }
 
@@ -147,6 +151,7 @@ declare global {
         location?: LatLng; // 이 좌표 기준 검색
         radius?: number; // location 과 함께, 미터 (최대 20000)
         sort?: "accuracy" | "distance";
+        bounds?: LatLngBounds; // 이 영역 안에서만 검색 (지도 뷰포트 기준 검색용)
       }
 
       class Places {

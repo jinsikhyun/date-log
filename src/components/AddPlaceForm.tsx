@@ -61,6 +61,11 @@ const fieldClass =
   "w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-accent";
 const labelClass = "text-xs font-medium text-muted";
 
+/** 이름만 채운 빈 폼 초기값 (검색 결과 없음 → "이 이름으로 추가" 진입 시 사용) */
+export function blankPlaceInput(name: string, status?: PlaceStatus): NewPlaceInput {
+  return { ...EMPTY, name, ...(status ? { status } : {}) };
+}
+
 /** places 행 → 폼 초기값 (수정 시 사용) */
 export function placeFormInput(p: {
   name: string;
@@ -140,41 +145,6 @@ export function AddPlaceForm({
   const [showSuggest, setShowSuggest] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  // SDK 로드 (실패해도 폼은 수동 입력으로 계속 동작)
-  useEffect(() => {
-    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-    if (!appKey) return;
-    let cancelled = false;
-    ensureKakaoLoaded(appKey)
-      .then(() => {
-        if (!cancelled) {
-          placesSvcRef.current = new window.kakao.maps.services.Places();
-        }
-      })
-      .catch((err: unknown) => {
-        console.warn(
-          "[AddPlaceForm] 카카오 장소검색을 못 불러왔어요 — 수동 입력만 가능:",
-          err,
-        );
-      });
-    return () => {
-      cancelled = true;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  // 드롭다운 바깥 클릭 시 닫기
-  useEffect(() => {
-    if (!showSuggest) return;
-    const onDown = (e: MouseEvent) => {
-      if (nameBoxRef.current && !nameBoxRef.current.contains(e.target as Node)) {
-        setShowSuggest(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [showSuggest]);
-
   const runPlaceSearch = (keyword: string) => {
     const svc = placesSvcRef.current;
     const q = keyword.trim();
@@ -199,6 +169,46 @@ export function AddPlaceForm({
       { size: 6 },
     );
   };
+
+  // SDK 로드 (실패해도 폼은 수동 입력으로 계속 동작)
+  useEffect(() => {
+    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+    if (!appKey) return;
+    let cancelled = false;
+    ensureKakaoLoaded(appKey)
+      .then(() => {
+        if (cancelled) return;
+        placesSvcRef.current = new window.kakao.maps.services.Places();
+        // "이 이름으로 추가"(검색 결과 없음 → 빠른 추가) 진입 — 이름만 채워져 있고
+        // 주소는 비어 있으므로, 타이핑을 기다리지 않고 바로 카카오 후보를 보여준다.
+        if (initial?.name && !initial.address.trim()) {
+          runPlaceSearch(initial.name);
+        }
+      })
+      .catch((err: unknown) => {
+        console.warn(
+          "[AddPlaceForm] 카카오 장소검색을 못 불러왔어요 — 수동 입력만 가능:",
+          err,
+        );
+      });
+    return () => {
+      cancelled = true;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 드롭다운 바깥 클릭 시 닫기
+  useEffect(() => {
+    if (!showSuggest) return;
+    const onDown = (e: MouseEvent) => {
+      if (nameBoxRef.current && !nameBoxRef.current.contains(e.target as Node)) {
+        setShowSuggest(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showSuggest]);
 
   const handleNameChange = (value: string) => {
     set("name", value);

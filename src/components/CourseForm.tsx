@@ -19,6 +19,7 @@ import {
 } from "@/lib/places";
 import { geocode, keywordSearchFirst } from "@/lib/kakao";
 import { haversineKm } from "@/lib/courses";
+import { matchesQuery } from "@/lib/placeSearch";
 import { PlaceAutocompleteInput } from "@/components/PlaceAutocompleteInput";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
@@ -270,7 +271,7 @@ export function CourseForm({
     (p) => !placeIds.includes(p.id) && p.status !== "course_only"
       && (!province || placeRegion(p.address).province === province)
       && (!district || placeRegion(p.address).district === district)
-      && (!placeQuery.trim() || p.name.toLowerCase().includes(placeQuery.trim().toLowerCase())),
+      && matchesQuery(p, placeQuery),
   );
 
   // 기준점 + 거리 계산이 준비됐는지

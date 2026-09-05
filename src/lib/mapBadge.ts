@@ -8,23 +8,36 @@ import { categoryIcon, categoryStyle } from "@/lib/places";
  *  - 배경 = 옅은 카테고리 색, 테두리(2px) = 진한 카테고리 색 (categoryStyle 의 text-* → currentColor)
  *  - 안에 카테고리 아이콘
  *  - status='wishlist' 면 테두리 점선 + opacity 0.65, 'visited' 면 실선 + 불투명
+ *  - opts.dim: 지도 검색 중 검색어와 안 맞는 장소용 — 흐리게(0.25) + 클릭 불가
  */
-export function createCategoryBadge(place: {
-  category: string;
-  status: string;
-}): HTMLDivElement {
+export function createCategoryBadge(
+  place: { category: string; status: string },
+  opts?: { dim?: boolean },
+): HTMLDivElement {
   const wishlist = place.status === "wishlist";
+  const dim = opts?.dim ?? false;
   const el = document.createElement("div");
   // categoryStyle() → "bg-<c>-100 text-<c>-700" (배경 + 글자색=테두리색 소스)
   el.className = `${categoryStyle(
     place.category,
   )} flex items-center justify-center rounded-full`;
   el.style.cssText =
-    "width:30px;height:30px;font-size:15px;line-height:1;cursor:pointer;" +
+    "width:30px;height:30px;font-size:15px;line-height:1;" +
+    `cursor:${dim ? "default" : "pointer"};` +
+    `pointer-events:${dim ? "none" : "auto"};` +
     `border:2px ${wishlist ? "dashed" : "solid"} currentColor;` +
-    `opacity:${wishlist ? "0.65" : "1"};` +
+    `opacity:${dim ? "0.25" : wishlist ? "0.65" : "1"};` +
     "box-shadow:0 1px 3px rgba(0,0,0,0.25);";
   el.textContent = categoryIcon(place.category);
+  return el;
+}
+
+/** 아직 우리 기록에 없는 후보 마커. 카테고리 뱃지와 같은 모양, 점선 + 반투명. */
+export function createCandidateBadge(category: string): HTMLElement {
+  const el = createCategoryBadge({ category, status: "wishlist" });
+  el.style.borderStyle = "dashed";
+  el.style.opacity = "0.9";
+  el.style.filter = "grayscale(0.35)";
   return el;
 }
 
