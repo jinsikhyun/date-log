@@ -1,8 +1,9 @@
 # date.log — 인수인계 (Codex 이전용)
 
-## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-05)
+## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-06)
 
-- Git: `main`/`origin/main`이 `6f3fe2c Pregenerate private photo thumbnails at upload time`로 일치한다(이전 확인된 배포 기준은 `ef1acc2`). `6f3fe2c`의 Production 배포·`datelog.kr` 반영 여부는 아직 확인 못함 — Vercel 대시보드 확인 필요.
+- Git: `main`/`origin/main`이 `f36efd2 Add free-text place search and a map-based search-and-add flow`로 일치한다(직전 확인 기준은 `6f3fe2c`). `f36efd2`의 Production 배포·`datelog.kr` 반영 여부는 아직 확인 못함 — Vercel 대시보드 확인 필요.
+- **신규: 자유텍스트 검색 + 홈 지도 검색·추가**. 아래 "장소 검색 + 지도 검색·추가 (신규)" 항목 참고. `f36efd2`까지 push 완료, 배포 확인 대기.
 - 비공개 사진: `place-photos` private 버킷과 커플 격리 RLS가 운영에 적용되었다고 사용자가 확인했다. 앱은 인증 → `can_access_place_photo` 권한 검사 → Storage 다운로드 순서의 `/api/place-photo` 경로로 표시하며 서비스 키를 사용하지 않는다.
 - 썸네일: 허용 너비 160/320/640/960/1280px, 품질 85, contain 변환을 사용한다. 카드에는 640/960 반응형 이미지와 160px 흐림 미리보기를 사용하고, 상세는 1280px, 사진 확대 화면은 원본을 요청한다. Supabase 이미지 변환이 불가능하면 원본으로 안전하게 폴백한다. 브라우저 캐시는 private 1시간 + stale-while-revalidate 1일이다.
 - 사진 검증: `tests/private-photos.test.mjs` 7개 통과. 프로덕션 Webpack 빌드도 28개 경로에서 통과했다. 실제 모바일 환경에서는 카드 로딩 속도·화질, 상세 1280px, 확대 원본을 한 번 더 비교할 것.
@@ -14,9 +15,24 @@
 
 ### 다음 권장 작업
 
-1. 운영 모바일에서 카드 → 상세 → 확대의 이미지 요청 크기와 체감 속도를 검증한다.
-2. `/api/place-photo?...&w=...` 요청이 변환 결과를 반환하는지 확인하고, 폴백 비율이 높으면 서버 로그에 개인정보 없는 진단 신호를 추가한다.
-3. 이후 수정은 관련 테스트와 `npm run build -- --webpack`을 통과시킨 뒤 사용자 승인에 따라 커밋·배포한다.
+1. Vercel 배포(`f36efd2`) 완료 및 `datelog.kr` 반영 확인.
+2. 실제 기기에서 홈 지도 검색 전체 흐름(검색→마커/카드→추가, 이 근처 둘러보기, panTo/강조) 눈으로 확인.
+3. 운영 모바일에서 카드 → 상세 → 확대의 이미지 요청 크기와 체감 속도를 검증한다.
+4. `/api/place-photo?...&w=...` 요청이 변환 결과를 반환하는지 확인하고, 폴백 비율이 높으면 서버 로그에 개인정보 없는 진단 신호를 추가한다.
+5. 이후 수정은 관련 테스트와 `npm run build -- --webpack`을 통과시킨 뒤 사용자 승인에 따라 커밋·배포한다.
+
+## 장소 검색 + 지도 검색·추가 (신규, 로컬 완료 + push 완료, 배포 확인 대기)
+
+- **자유텍스트 검색 공용화**: `src/lib/placeSearch.ts`(`matchesQuery`/`matchRank`) — 이름·주소·카테고리·설명·태그 대상 AND(토큰)/OR(필드) 매칭. 검색어가 공백 제외 3자 미만이면 주소·설명·카테고리는 빼고 이름·태그만 본다(도로명 주소 "…로/…길" 접미사로 인한 짧은 검색어 오탐 방지). `matchRank`는 이름 시작(0)>이름 포함(1)>태그(2)>그 외(3) 순 정렬용. 홈·위시리스트 검색창(`PlaceSearchBox`)과 CourseForm의 기존 장소 검색(이름만 하던 것)이 전부 이걸 쓴다.
+- **검색 결과 없음 → 빠른 추가**: 홈/위시 모두 "이 이름으로 추가" 진입 시 `AddPlaceForm`이 이름 채운 채로 열리고 카카오 자동완성도 즉시 한 번 실행된다(`AddPlaceForm.tsx`, `blankPlaceInput`).
+- **홈 지도 검색(`MapSearchPanel` + `KakaoMap` 확장)**: 검색창은 2자 이상 키워드만 제출되고(`runMapSearch`), "이 지역에서 다시 검색"/"이 근처 둘러보기" 버튼(`searchThisArea`)은 검색어가 있으면 키워드, 없으면 주변 맛집·카페(`searchNearby`)를 부른다 — 후자가 "주변 검색" 기능의 유일한 진입로다. 매칭된 우리 장소(실선)/비매칭(흐림)은 카카오 응답과 무관하게 로컬 `matchesQuery`로 타이핑마다 즉시 갈라지고, 카카오는 새 후보(점선) 찾기에만 쓰인다.
+  - **검색어 없을 때(둘러보기)는 리스트를 절대 안 띄운다** — 후보는 지도 점선 마커로만 보이고, 클릭하면 `panTo`+마커 강조+지도 아래 카드(이름·카테고리·주소·거리+카카오맵 링크+다녀온 곳/가고 싶은 곳 버튼)로 확인한다. 검색어가 있을 때만 패널에 "우리 기록"(상위 8개, `matchRank` 정렬)과 "새로 찾은 곳" 목록이 뜬다.
+  - 후보 저장(`addCandidate`)은 성공 시 후보 목록에서 즉시 제거되고, 실패하면 던져서 패널 인라인 행/카드가 각자 자기 자리에서 에러를 보여준다(패널 밖 별도 배너 없음). 카테고리는 `normalizeVisitedCategory`로 우리 카테고리 목록에 맞게 정규화.
+  - 외부 이동(카카오맵)은 카드 안 링크(`target="_blank"`)를 눌렀을 때만 — 마커/행 클릭 자체는 절대 새 탭을 열거나 페이지 이동을 하지 않는다(검색 상태 보존).
+  - `src/types/kakao-maps.d.ts`에 실제 카카오 SDK엔 있지만 이 프로젝트 최소 타입엔 없던 `Map.panTo/getBounds`, `LatLngBounds.getSouthWest/getNorthEast`, `PlacesSearchOptions.bounds`를 추가.
+- **검증**: `npx tsc --noEmit`, 수정/신규 파일 `eslint`, `npm run build -- --webpack`(28개 경로), 기존 `tests/private-photos.test.mjs`(무관 회귀 확인용) 전부 통과. `matchesQuery`/`matchRank`는 스크래치 스크립트로 직접 실행해 좁은/넓은 필드 분기와 정렬 순서를 확인(파일은 검증 후 삭제, 저장소에 남지 않음).
+- **미검증**: 실제 브라우저 클릭 흐름(검색→카드→추가, 둘러보기, panTo/강조 애니메이션 체감)은 로컬 dev 서버로 코드 레벨 확인만 했고 사람이 직접 눌러보지는 않았다. `f36efd2` push까지는 사용자 승인, Vercel 배포 확인은 아직.
+- **범위 밖**: DB 스키마/SQL 변경 없음(전부 이미 있는 컬럼만 사용). `NearbySimilar.tsx`(장소 상세의 "근처 다른 곳") 리팩터는 이번에 손대지 않음 — 새 모듈이 실전 검증되기 전엔 건드리지 않기로 함.
 
 ## 사진 로딩 속도 개선 — 업로드 시 썸네일 사전 생성 (로컬 코드 완료 + 운영 SQL 적용 완료, 앱 배포 대기)
 
