@@ -55,7 +55,7 @@ test('authorized download is browser-private cached, same-origin and no signed U
 });
 test('thumbnail width is allowlisted and requested from private storage transform',async()=>{
  const h=handler();assert.equal((await h.get('old.jpg',320)).status,200);
- assert.equal(JSON.stringify(h.transforms[0]),JSON.stringify({width:320,quality:76,resize:'contain'}));
+ assert.equal(JSON.stringify(h.transforms[0]),JSON.stringify({width:320,quality:85,resize:'contain'}));
  const invalid=handler();assert.equal((await invalid.get('old.jpg',333)).status,200);assert.equal(invalid.transforms[0],undefined);
 });
 test('storage denial, invalid path, and active content fail closed',async()=>{

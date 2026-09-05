@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const bucket = supabase.storage.from(PHOTO_BUCKET);
   let { data, error } = await bucket.download(
     path,
-    width ? { transform: { width, quality: 76, resize: "contain" } } : undefined,
+    width ? { transform: { width, quality: 85, resize: "contain" } } : undefined,
   );
   // Image transformation may be unavailable on some Supabase plans. Keep the
   // photo usable without weakening access control; Storage RLS still applies.
