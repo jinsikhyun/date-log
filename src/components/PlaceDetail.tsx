@@ -419,6 +419,7 @@ export function PlaceDetail({ id }: { id: number }) {
 
                 <PhotoImage
                   src={place.image_url}
+                  displayWidth={1280}
                   alt={place.name}
                   className="h-full w-full object-cover transition duration-200 group-hover:brightness-90"
                 />

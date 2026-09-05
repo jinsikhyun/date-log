@@ -373,6 +373,7 @@ export function CourseDetail({ id }: { id: number }) {
 
                         <PhotoImage
                           src={p.image_url}
+                          displayWidth={160}
                           alt={p.name}
                           loading="lazy"
                           className="h-12 w-12 shrink-0 rounded-xl object-cover"

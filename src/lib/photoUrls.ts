@@ -25,10 +25,22 @@ export function photoPath(value: string, projectUrl = process.env.NEXT_PUBLIC_SU
   return validPhotoPath(path) ? path : null;
 }
 
-export function photoDisplayUrl(value: string | undefined): string | undefined {
+const DISPLAY_WIDTHS = new Set([160, 320, 640, 960, 1280]);
+
+export function validPhotoWidth(value: unknown): number | null {
+  const width = typeof value === "string" ? Number(value) : value;
+  return typeof width === "number" && DISPLAY_WIDTHS.has(width) ? width : null;
+}
+
+export function photoDisplayUrl(value: string | undefined, width?: number): string | undefined {
   if (!value) return undefined;
   const path = photoPath(value);
-  if (path) return `/api/place-photo?path=${encodeURIComponent(path)}`;
+  if (path) {
+    const params = new URLSearchParams({ path });
+    const safeWidth = validPhotoWidth(width);
+    if (safeWidth) params.set("w", String(safeWidth));
+    return `/api/place-photo?${params.toString()}`;
+  }
   // A malformed internal reference must never be sent to a public endpoint.
   if (value.startsWith("storage://")) return undefined;
   return value;

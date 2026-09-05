@@ -25,6 +25,7 @@ function Thumb({ place, size }: { place: Place; size: number }) {
 
       <PhotoImage
         src={place.image_url}
+        displayWidth={160}
         alt=""
         className="shrink-0 rounded-xl object-cover"
         style={{ width: size, height: size }}

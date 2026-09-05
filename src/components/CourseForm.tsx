@@ -275,12 +275,24 @@ export function CourseForm({
 
   // 기준점 + 거리 계산이 준비됐는지
   const split = anchorId != null && !!anchorCoord && candCoords.size > 0;
+  const nearbyLoading = anchorId != null && (
+    anchorCoord === undefined || (!!anchorCoord && candCoords.size === 0)
+  );
 
   const distKm = (id: number): number | null => {
     const c = candCoords.get(id);
     if (!c || !anchorCoord) return null;
     return haversineKm(anchorCoord, c);
   };
+
+  const nearbyAvailable = split
+    ? available
+        .filter((p) => (distKm(p.id) ?? Infinity) <= NEAR_KM)
+        .sort((a, b) => (distKm(a.id) ?? Infinity) - (distKm(b.id) ?? Infinity))
+    : [];
+  const categoryAvailable = split
+    ? available.filter((p) => (distKm(p.id) ?? Infinity) > NEAR_KM)
+    : available;
 
 
   /** 장소 목록을 카테고리 순서대로 그룹핑 (데이터 있는 카테고리만) */
@@ -602,12 +614,7 @@ export function CourseForm({
       {groupByCat(list).map((g) => (
         <div key={g.cat} className="flex flex-col gap-1.5">
           <button type="button" aria-expanded={expandedCategory === g.cat} onClick={() => setExpandedCategory(expandedCategory === g.cat ? null : g.cat)} className="flex justify-between rounded-xl bg-stone-50 px-3 py-3 text-left text-xs font-semibold text-muted"><span>{g.cat} · {g.items.length}곳</span><span>{expandedCategory === g.cat ? '−' : '+'}</span></button>
-          {expandedCategory === g.cat && <div className="flex flex-wrap gap-1.5">
-            {split ? <div className="w-full space-y-3">{[
-              { label: `이 근처 · 직선거리 ${NEAR_KM}km 이내`, items: g.items.filter(p => (distKm(p.id) ?? Infinity) <= NEAR_KM) },
-              { label: "그 외 지역 · 거리 미확인 포함", items: g.items.filter(p => (distKm(p.id) ?? Infinity) > NEAR_KM) },
-            ].filter(section => section.items.length).map(section => <div key={section.label}><p className="mb-2 text-[11px] text-muted">{section.label}</p><div className="flex flex-wrap gap-2">{section.items.map(pickButton)}</div></div>)}</div> : g.items.map(pickButton)}
-          </div>}
+          {expandedCategory === g.cat && <div className="flex flex-wrap gap-1.5">{g.items.map(pickButton)}</div>}
         </div>
       ))}
     </div>
@@ -837,7 +844,20 @@ export function CourseForm({
         {(placeQuery || province || district) && <button type="button" onClick={() => { setPlaceQuery(""); setProvince(""); setDistrict(""); }} className="self-start text-xs text-muted underline underline-offset-4">검색·지역 초기화</button>}
         {available.length === 0 ? <p role="status" className="rounded-xl bg-stone-50 p-4 text-xs text-muted">추가할 장소가 없어요. 검색어나 지역을 바꿔보세요. 이미 담은 장소는 제외돼요.</p>
           : placeQuery.trim() ? <div><p role="status" className="mb-3 text-xs text-muted">검색 결과 {available.length}곳 · 선택한 지역 기준</p><div className="flex flex-wrap gap-2">{available.map(pickButton)}</div></div>
-          : categoryGroups(available)}
+          : nearbyLoading ? <p role="status" className="rounded-2xl bg-accent/5 p-4 text-xs text-accent">첫 장소 주변을 찾는 중…</p>
+          : <div className="space-y-4">
+              {nearbyAvailable.length > 0 && (
+                <section className="rounded-2xl bg-accent/5 p-3 ring-1 ring-accent/10">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-accent">첫 장소 주변</p>
+                    <span className="text-[10px] text-muted">직선거리 {NEAR_KM}km 이내 · 가까운 순</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">{nearbyAvailable.map(pickButton)}</div>
+                </section>
+              )}
+              {split && categoryAvailable.length > 0 && <p className="text-[11px] font-medium text-muted">그 외 장소 · 카테고리별 보기</p>}
+              {categoryGroups(categoryAvailable)}
+            </div>}
 
         {/* + 새 장소 추가 — 항상 맨 마지막 */}
         {!addingNew && (

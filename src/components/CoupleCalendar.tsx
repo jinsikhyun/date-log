@@ -246,7 +246,7 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
             <div className="flex items-center gap-3 border-t border-border p-3">
               {representativePhoto && representativePlace ? (
                 <Link href={`/places/${representativePlace.id}`} className="group w-20 shrink-0 text-center">
-                  <PhotoImage src={representativePhoto} alt={`${month + 1}월 대표 기록 · ${representativePlace.name}`} className="mx-auto h-16 w-16 rounded-xl object-cover ring-1 ring-border transition group-hover:brightness-95" />
+                  <PhotoImage src={representativePhoto} displayWidth={160} alt={`${month + 1}월 대표 기록 · ${representativePlace.name}`} className="mx-auto h-16 w-16 rounded-xl object-cover ring-1 ring-border transition group-hover:brightness-95" />
                   <span className="mt-1 block truncate text-[9px] font-medium text-muted-2 transition group-hover:text-accent">{representativePlace.name}</span>
                 </Link>
               ) : (
@@ -322,6 +322,7 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
                         {selectedRoutePhotoByPlace.get(place.id) && (
                           <PhotoImage
                             src={selectedRoutePhotoByPlace.get(place.id)}
+                            displayWidth={160}
                             alt={`${place.name}에서 찍은 사진`}
                             className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-white/80"
                           />
@@ -337,7 +338,7 @@ export function CoupleCalendar({ startDate, preview = false }: { startDate: stri
             {orderMessage && <p className={`text-[10px] font-medium ${orderMessage.includes("저장했어요") ? "text-accent" : "text-red-600"}`}>{orderMessage}</p>}
             {selectedPlaces.length > 0 && <div className="space-y-1.5"><p className="text-[10px] font-semibold text-muted-2">방문한 장소</p>{selectedPlaces.map((p, index) => <div key={p.id} className="flex items-center gap-2"><Link href={`/places/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-white/85 p-3"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[9px] font-bold text-accent">{index + 1}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><b className="truncate text-xs">{p.name}</b><span className={`rounded-full px-2 py-0.5 text-[9px] ${categoryStyle(p.category)}`}>{p.category}</span></span><span className="block truncate text-[10px] text-muted-2">{p.address}</span></span><span>›</span></Link>{orderEditing && <div className="flex shrink-0 flex-col gap-1"><button type="button" aria-label={`${p.name} 앞으로 이동`} disabled={index === 0 || orderSaving} onClick={() => moveSelectedPlace(index, -1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs text-accent ring-1 ring-border disabled:opacity-25">↑</button><button type="button" aria-label={`${p.name} 뒤로 이동`} disabled={index === selectedPlaces.length - 1 || orderSaving} onClick={() => moveSelectedPlace(index, 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs text-accent ring-1 ring-border disabled:opacity-25">↓</button></div>}</div>)}</div>}
             {selectedMemoriesInRouteOrder.length > 0 && <div><p className="mb-1.5 text-[10px] font-semibold text-muted-2">남긴 추억과 감정</p>{selectedMemoriesInRouteOrder.map((m) => <Link key={m.id} href={`/places/${m.placeId}`} className="mb-1.5 block rounded-xl bg-white/75 px-3 py-2.5"><span className="flex justify-between text-[11px]"><b className="text-accent">{m.mood || "그날의 추억"}</b><span className="text-muted-3">{m.author}</span></span>{m.content?.trim() && <p className="mt-1 line-clamp-2 text-[11px]">{m.content}</p>}</Link>)}</div>}
-            {selectedPhotos.length > 0 && <div><p className="mb-1.5 text-[10px] font-semibold text-muted-2">그날의 사진 {selectedPhotos.length}장</p><div className="flex gap-2 overflow-x-auto">{selectedPhotos.slice(0, 8).map((url) => <PhotoImage key={url} src={url} alt="그날의 기록" className="h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-border" />)}</div></div>}
+            {selectedPhotos.length > 0 && <div><p className="mb-1.5 text-[10px] font-semibold text-muted-2">그날의 사진 {selectedPhotos.length}장</p><div className="flex gap-2 overflow-x-auto">{selectedPhotos.slice(0, 8).map((url) => <PhotoImage key={url} src={url} displayWidth={320} alt="그날의 기록" className="h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-border" />)}</div></div>}
             {selectedCount > 0 && missingDetails && <p className="rounded-xl bg-white/55 px-3 py-2 text-[10px] text-muted-2">사진이나 한마디가 비어 있는 기록이 있어요. 장소를 눌러 가볍게 채워볼까요?</p>}
           </div>
         )}

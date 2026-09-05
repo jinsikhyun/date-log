@@ -35,6 +35,7 @@ export function PhotoThumbnails({
 
             <PhotoImage
               src={u}
+              displayWidth={320}
               alt=""
               loading="lazy"
               className="h-full w-full object-cover"

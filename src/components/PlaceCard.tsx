@@ -36,6 +36,7 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
 
           <PhotoImage
             src={place.image_url}
+            displayWidth={640}
             alt={place.name}
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"

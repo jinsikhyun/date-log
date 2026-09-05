@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { PHOTO_BUCKET, validPhotoPath } from "@/lib/photoUrls";
+import { PHOTO_BUCKET, validPhotoPath, validPhotoWidth } from "@/lib/photoUrls";
 
 export const dynamic = "force-dynamic";
 const headers = {
@@ -13,6 +13,7 @@ const headers = {
 
 export async function GET(request: Request) {
   const path = new URL(request.url).searchParams.get("path");
+  const width = validPhotoWidth(new URL(request.url).searchParams.get("w"));
   if (!path || !validPhotoPath(path)) {
     return new Response(null, { status: 400, headers });
   }
@@ -25,7 +26,16 @@ export async function GET(request: Request) {
   if (accessError) return new Response(null, { status: 503, headers });
   if (allowed !== true) return new Response(null, { status: 404, headers });
   // User session only: Storage RLS applies. Never use the service-role key here.
-  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).download(path);
+  const bucket = supabase.storage.from(PHOTO_BUCKET);
+  let { data, error } = await bucket.download(
+    path,
+    width ? { transform: { width, quality: 76, resize: "contain" } } : undefined,
+  );
+  // Image transformation may be unavailable on some Supabase plans. Keep the
+  // photo usable without weakening access control; Storage RLS still applies.
+  if ((error || !data) && width) {
+    ({ data, error } = await bucket.download(path));
+  }
   if (error || !data) return new Response(null, { status: 404, headers });
   if (!["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"].includes(data.type)) {
     return new Response(null, { status: 415, headers });

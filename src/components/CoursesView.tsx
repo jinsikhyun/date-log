@@ -48,7 +48,8 @@ export function CoursesView() {
     const ids = raw ? [...new Set(raw.split(',').filter(x => /^\d+$/.test(x)).map(Number).filter(x => Number.isSafeInteger(x) && x > 0))] : [];
     if (ids.length) {
       setSeedIds(ids);
-      setDraft({ title: saved?.title ?? "", concept: saved?.concept ?? "", placeIds: [...new Set([...(saved?.placeIds ?? []), ...ids])], courseOnlyPlaceIds: saved?.courseOnlyPlaceIds ?? [] });
+      // 장소 카드에서 진입한 장소가 주변 검색의 기준점이 되도록 맨 앞에 둔다.
+      setDraft({ title: saved?.title ?? "", concept: saved?.concept ?? "", placeIds: [...new Set([...ids, ...(saved?.placeIds ?? [])])], courseOnlyPlaceIds: saved?.courseOnlyPlaceIds ?? [] });
       setShowForm(true);
       const url = new URL(window.location.href); url.searchParams.delete('places');
       window.history.replaceState(window.history.state, '', url.pathname + url.search);

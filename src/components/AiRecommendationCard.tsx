@@ -47,6 +47,7 @@ export function AiRecommendationCard({
 
             <PhotoImage
               src={place.imageUrl}
+              displayWidth={640}
               alt={`${place.name} 대표 사진`}
               loading="lazy"
               className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"

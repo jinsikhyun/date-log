@@ -182,6 +182,7 @@ export function OnThisMonthBanner({
 
           <PhotoImage
             src={recall.image_url}
+            displayWidth={1280}
             alt=""
             aria-hidden
             className="absolute inset-0 h-full w-full object-cover opacity-35"
