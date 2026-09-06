@@ -134,7 +134,10 @@ export const PlaceShareCard = forwardRef<
   const region = placeRegion(place.address);
   // 공유 카드 상단은 좁기 때문에 행정구역 접미사를 덜어낸 감성형 표기 사용:
   // 서울 용산구 → 서울 용산, 경기 수원시 → 경기 수원.
-  const shortDistrict = region.district.replace(/[시군구]$/, "");
+  // 단, 중구/동구/서구/남구/북구처럼 접미사를 떼면 한 글자만 남는 지역명은
+  // 의미가 사라지므로(서울 중구 → 서울 중) 그대로 둔다.
+  const strippedDistrict = region.district.replace(/[시군구]$/, "");
+  const shortDistrict = strippedDistrict.length >= 2 ? strippedDistrict : region.district;
   const regionLabel = [region.province, shortDistrict].filter(Boolean).join(" ");
   const frameLabel = frameNumber != null ? `FRAME ${String(frameNumber).padStart(3, "0")}` : null;
   const dateLabel = place.first_visit_date ? place.first_visit_date.replace(/-/g, ".") : null;
