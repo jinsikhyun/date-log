@@ -49,7 +49,7 @@ export function SharePreviewModal({
   }, [ratio]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex flex-col bg-black/90 p-4">
+    <div className="fixed inset-0 z-[70] flex flex-col bg-black/90 px-3 py-4 sm:p-4">
       <div
         ref={containerRef}
         role="dialog"
@@ -96,11 +96,11 @@ export function SharePreviewModal({
               다시 시도
             </button>
           )}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={onChangeRatio}
-              className="flex-1 rounded-full bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+              className="min-w-0 whitespace-nowrap rounded-full bg-white/10 px-2 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 sm:px-4 sm:text-sm"
             >
               비율 변경
             </button>
@@ -108,7 +108,7 @@ export function SharePreviewModal({
               type="button"
               onClick={download}
               disabled={!previewUrl}
-              className="flex-1 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="min-w-0 whitespace-nowrap rounded-full bg-white px-2 py-2.5 text-xs font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50 sm:px-4 sm:text-sm"
             >
               이미지 저장
             </button>
@@ -117,7 +117,7 @@ export function SharePreviewModal({
                 type="button"
                 onClick={() => void share()}
                 disabled={!previewUrl || phase === "sharing"}
-                className="flex-1 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="min-w-0 whitespace-nowrap rounded-full bg-accent px-2 py-2.5 text-xs font-semibold text-white disabled:opacity-50 sm:px-4 sm:text-sm"
               >
                 {phase === "sharing" ? "공유 중…" : "공유하기"}
               </button>

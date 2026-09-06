@@ -2,6 +2,7 @@
 
 ## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-06)
 
+- **신규: iOS 공유 이미지 글자 밀림 수정(로컬 완료, commit/push/배포 전)**. iOS Safari가 화면 밖 1080px 캡처 DOM의 텍스트를 모바일 viewport 기준으로 자동 확대해 날짜·평점·OUR PICK/SAVED IN이 글자 단위로 줄바꿈되는 문제를 수정했다. `shareCapture`의 임시 host/clone과 장소·코스 공유 카드 루트에 `text-size-adjust:none`을 적용하고, 장소 카드 메타/날짜/평점/footer에 `white-space:nowrap`과 안전한 flex 축소 규칙을 추가했다. 미리보기 하단 3개 버튼은 모바일에서 3열 grid·작은 글자·nowrap으로 정렬했다. TypeScript, 변경 파일 ESLint, diff check, Webpack production build(28개 경로) 통과. 실제 iOS Safari 재검증은 아직 필요하다.
 - **신규: 공유 카드 개편 — 장소+코스 모두 완료 (로컬 완료 — commit/push 전, 사용자 확인 대기)**. 아래 "장소·코스 공유 카드 개편" 항목 참고. `date.log_공유기능개선.md` 스펙 기반, 비율 선택(4:5/9:16/1:1) → 전체화면 미리보기 → 저장/공유 흐름을 장소·코스 양쪽에 구현했다. `ShareRatioModal`/`SharePreviewModal`을 `renderCard` 콜백을 받는 범용 컴포넌트로 리팩터해 두 카드가 공유한다. 기존 `ShareCard.tsx`/`CourseShareCard.tsx`는 `ShareCaptureQA.tsx`(dev QA 하네스) 전용으로만 남음.
 - Git: `main`/`origin/main`이 `f36efd2 Add free-text place search and a map-based search-and-add flow`로 일치한다(직전 확인 기준은 `6f3fe2c`). `f36efd2`의 Production 배포·`datelog.kr` 반영 여부는 아직 확인 못함 — Vercel 대시보드 확인 필요.
 - **신규: 자유텍스트 검색 + 홈 지도 검색·추가**. 아래 "장소 검색 + 지도 검색·추가 (신규)" 항목 참고. `f36efd2`까지 push 완료, 배포 확인 대기.

@@ -315,7 +315,7 @@ export const ShareCourseCard = forwardRef<
 
   const rootBase: React.CSSProperties = {
     width, height, boxSizing: "border-box", overflow: "hidden", overflowWrap: "anywhere",
-    fontFamily: SC.font, color: SC.fg,
+    WebkitTextSizeAdjust: "none", textSizeAdjust: "none", fontFamily: SC.font, color: SC.fg,
   };
 
   if (ratio === "square-1x1") {

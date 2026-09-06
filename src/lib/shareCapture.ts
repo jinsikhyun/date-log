@@ -77,6 +77,10 @@ export async function captureCard(
     // iOS Safari 는 뷰포트 밖 멀리 떨어진 요소의 폭을 뷰포트 폭에 맞춰 줄여버린다 — 카드
     // 폭을 이미 아는 호출자는 opts.width 로 넘겨 이 축소를 아예 우회한다.
     ...(opts?.width ? { width: `${opts.width}px` } : {}),
+    // iOS Safari의 text autosizing이 1080px 캡처 카드를 좁은 기기 viewport에 맞춰
+    // 임의로 확대하면 날짜/푸터가 글자 단위로 줄바꿈된다.
+    WebkitTextSizeAdjust: "none",
+    textSizeAdjust: "none",
     pointerEvents: "none",
   });
   host.appendChild(clone);
@@ -86,6 +90,8 @@ export async function captureCard(
       minWidth: `${opts.width}px`,
       maxWidth: "none",
       boxSizing: "border-box",
+      WebkitTextSizeAdjust: "none",
+      textSizeAdjust: "none",
     });
   }
   document.body.appendChild(host);

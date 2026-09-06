@@ -149,6 +149,8 @@ export const PlaceShareCard = forwardRef<
         boxSizing: "border-box",
         overflow: "hidden",
         overflowWrap: "anywhere",
+        WebkitTextSizeAdjust: "none",
+        textSizeAdjust: "none",
         fontFamily: SC.font,
         background: SC.ivory,
         color: SC.fg,
@@ -173,8 +175,10 @@ export const PlaceShareCard = forwardRef<
           letterSpacing: 0.5,
         }}
       >
-        <span>{topLeft || "date.log"}</span>
-        {dateLabel && <span>{dateLabel}</span>}
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {topLeft || "date.log"}
+        </span>
+        {dateLabel && <span style={{ marginLeft: L.gap, flexShrink: 0, whiteSpace: "nowrap" }}>{dateLabel}</span>}
       </div>
 
       {/* 대표 사진 */}
@@ -269,7 +273,7 @@ export const PlaceShareCard = forwardRef<
 
         {/* 6. 숫자 평점 — 텍스트 기반, 별 아이콘 없음 */}
         {place.rating != null && (
-          <div style={{ marginTop: L.gap * 0.6, display: "flex", alignItems: "baseline" }}>
+          <div style={{ marginTop: L.gap * 0.6, display: "flex", alignItems: "baseline", whiteSpace: "nowrap" }}>
             <span style={{ fontSize: L.ratingSize, fontWeight: 800, lineHeight: "1", color: SC.fg }}>
               {place.rating.toFixed(1)}
             </span>
@@ -312,9 +316,9 @@ export const PlaceShareCard = forwardRef<
             letterSpacing: 0.5,
           }}
         >
-          {isPick && <span style={{ color: SC.accent, fontWeight: 700 }}>OUR PICK</span>}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ color: SC.muted }}>SAVED IN</span>
+          {isPick && <span style={{ color: SC.accent, fontWeight: 700, whiteSpace: "nowrap" }}>OUR PICK</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
+            <span style={{ color: SC.muted, whiteSpace: "nowrap" }}>SAVED IN</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand-wordmark.png" alt="date.log" style={{ width: L.logoWidth, height: "auto" }} />
           </div>
