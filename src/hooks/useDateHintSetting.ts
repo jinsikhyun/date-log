@@ -64,10 +64,11 @@ export function useDateHintSetting(): UseDateHintSettingResult {
       setSaving(true);
       setError(null);
       try {
-        const { error: err } = await supabase
-          .from("profiles")
-          .update({ date_hint_enabled: next })
-          .eq("id", user.id);
+        // profiles 는 REST 직접 UPDATE가 막혀 있다(실측 확인, PATCH 403) —
+        // display_name/birth_date 와 같은 SECURITY DEFINER RPC 패턴을 따른다.
+        const { error: err } = await supabase.rpc("update_my_date_hint_enabled", {
+          p_enabled: next,
+        });
         if (err) {
           setEnabledState(prev);
           setError(
