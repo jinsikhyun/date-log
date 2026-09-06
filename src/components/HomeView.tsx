@@ -33,6 +33,9 @@ import { normalizeVisitedCategory } from "@/lib/categories";
 import { NearbyPanel } from "@/components/NearbyPanel";
 import { useAnniversaries } from "@/hooks/useAnniversaries";
 import { anniversariesOn } from "@/lib/anniversaries";
+import { HomeWeatherWidget } from "@/components/HomeWeatherWidget";
+import { useHomeWeather } from "@/hooks/useHomeWeather";
+import { WEATHER_ICON, WEATHER_LABEL } from "@/lib/weatherDisplay";
 
 
 // 카카오맵은 window 에 의존 → 클라이언트에서만 렌더 (SSR 비활성화)
@@ -88,9 +91,27 @@ function withMemoryCount(row: PlaceListRow): Place {
   return withPreferences({ ...rest, memory_count: memories?.[0]?.count ?? 0 });
 }
 
+// 홈 날씨 위젯 팝오버용 — 상태별 짧고 사실 기반인 문구만(추천/감성 과잉 금지).
+const HOME_WEATHER_NOTE: Record<string, string> = {
+  clear: "맑은 하늘이에요.",
+  cloudy: "구름이 낀 하늘이에요.",
+  rain: "비가 오고 있어요.",
+  snow: "눈이 내리고 있어요.",
+  first_snow: "첫눈이 내리고 있어요.",
+  heat: "무더운 날씨예요.",
+  cold: "추운 날씨예요.",
+  dust: "미세먼지가 있는 날이에요.",
+};
+
+const HOME_WEATHER_TIME_FORMAT = new Intl.DateTimeFormat("ko-KR", {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 export function HomeView() {
   const courseSelection = useCourseSelection();
   const anniversaries = useAnniversaries();
+  const { weather } = useHomeWeather();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { orderNames, categories: officialCategories } = useCategories();
@@ -434,9 +455,22 @@ export function HomeView() {
     <>
       <div className="mb-5 flex flex-wrap items-stretch justify-between gap-4 sm:items-end">
         <div className="w-full sm:w-auto">
-          <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
-            우리가 다녀온 곳
-          </h1>
+          <div className="flex items-center justify-between gap-3 sm:justify-start">
+            <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">
+              우리가 다녀온 곳
+            </h1>
+            {weather && (
+              <HomeWeatherWidget
+                location="서울"
+                condition={WEATHER_LABEL[weather.state]}
+                temperatureC={Math.round(weather.tempC)}
+                icon={WEATHER_ICON[weather.state]}
+                message={HOME_WEATHER_NOTE[weather.state] ?? WEATHER_LABEL[weather.state]}
+                feelsLikeC={Math.round(weather.feelsLikeC)}
+                observedLabel={`${HOME_WEATHER_TIME_FORMAT.format(new Date(weather.cachedAt))} 기준`}
+              />
+            )}
+          </div>
           <p className="mt-1 text-sm text-muted-2">
             {loading
               ? "불러오는 중…"
