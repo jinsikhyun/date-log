@@ -447,26 +447,26 @@ export function HomeView() {
 
         <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 sm:flex sm:w-auto">
           <div className="grid min-w-0 grid-cols-2 rounded-full bg-card p-1 ring-1 ring-border">
-            {(
-              [
-                ["feed", "피드"],
-                ["map", "지도로 보기"],
-              ] as const
-            ).map(([mode, labelText]) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setParams({ view: mode })}
-                aria-pressed={view === mode}
-                className={`whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-1.5 sm:text-sm ${
-                  view === mode
-                    ? "bg-accent text-white shadow-sm"
-                    : "text-muted hover:text-accent"
-                }`}
-              >
-                {labelText}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={() => setParams({ view: "feed" })}
+              aria-pressed={view === "feed"}
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold transition-colors sm:px-4 ${
+                view === "feed" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-accent"
+              }`}
+            >
+              피드
+            </button>
+            <button
+              type="button"
+              onClick={() => setParams({ view: "map" })}
+              aria-pressed={view === "map"}
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold transition-colors sm:px-4 ${
+                view === "map" ? "bg-accent text-white shadow-sm" : "text-muted hover:text-accent"
+              }`}
+            >
+              지도<span className="hidden sm:inline">로 보기</span>
+            </button>
           </div>
 
           <span className="shrink-0"><PlaceSearchBox value={query} onChange={setQuery} /></span>
