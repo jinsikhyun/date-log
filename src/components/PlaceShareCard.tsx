@@ -134,7 +134,6 @@ export const PlaceShareCard = forwardRef<
   const region = placeRegion(place.address);
   const regionLabel = [region.province, region.district].filter(Boolean).join(" ");
   const frameLabel = frameNumber != null ? `FRAME ${String(frameNumber).padStart(3, "0")}` : null;
-  const topLeft = [regionLabel, frameLabel].filter(Boolean).join(" · ");
   const dateLabel = place.first_visit_date ? place.first_visit_date.replace(/-/g, ".") : null;
   const isPick = (place.favorite_by ?? []).length > 0;
 
@@ -175,9 +174,17 @@ export const PlaceShareCard = forwardRef<
           letterSpacing: 0.5,
         }}
       >
-        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {topLeft || "date.log"}
-        </span>
+        <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {regionLabel || "date.log"}
+          </span>
+          {frameLabel && (
+            <span style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
+              <span aria-hidden style={{ marginRight: 12 }}>·</span>
+              {frameLabel}
+            </span>
+          )}
+        </div>
         {dateLabel && <span style={{ marginLeft: L.gap, flexShrink: 0, whiteSpace: "nowrap" }}>{dateLabel}</span>}
       </div>
 
