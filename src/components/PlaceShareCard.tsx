@@ -132,7 +132,10 @@ export const PlaceShareCard = forwardRef<
   const L = layoutFor(ratio);
   const tag = catTag(place.category);
   const region = placeRegion(place.address);
-  const regionLabel = [region.province, region.district].filter(Boolean).join(" ");
+  // 공유 카드 상단은 좁기 때문에 행정구역 접미사를 덜어낸 감성형 표기 사용:
+  // 서울 용산구 → 서울 용산, 경기 수원시 → 경기 수원.
+  const shortDistrict = region.district.replace(/[시군구]$/, "");
+  const regionLabel = [region.province, shortDistrict].filter(Boolean).join(" ");
   const frameLabel = frameNumber != null ? `FRAME ${String(frameNumber).padStart(3, "0")}` : null;
   const dateLabel = place.first_visit_date ? place.first_visit_date.replace(/-/g, ".") : null;
   const isPick = (place.favorite_by ?? []).length > 0;
@@ -175,7 +178,7 @@ export const PlaceShareCard = forwardRef<
         }}
       >
         <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}>
             {regionLabel || "date.log"}
           </span>
           {frameLabel && (
