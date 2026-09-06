@@ -20,6 +20,7 @@ import { PlaceSearchBox } from "@/components/PlaceSearchBox";
 import { matchesQuery } from "@/lib/placeSearch";
 import { normalizeVisitedCategory } from "@/lib/categories";
 import { VisitMoodPrompt } from "@/components/VisitMoodPrompt";
+import { todayWeatherFields, type MemoryWeatherFields } from "@/lib/weatherDisplay";
 
 import { withPreferences } from "@/lib/preferences";
 
@@ -171,6 +172,24 @@ export function WishlistView() {
   const saveMood = async (mood: string) => {
     if (!converted || !authorName) return;
     setMoodSaving(true);
+
+    // "다녀왔어요"는 오늘 방문 처리라 당일 날씨를 조용히 자동 각인한다. 조회에
+    // 실패해도 방문 기록(추억 저장) 자체는 반드시 진행한다 — 날씨는 그냥 생략.
+    let weatherFields: MemoryWeatherFields = { weather_state: null, weather_temp: null };
+    try {
+      const res = await fetch("/api/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const w = await res.json();
+        weatherFields = todayWeatherFields({ state: w.state, tempC: w.tempC }, true);
+      }
+    } catch {
+      // 조용히 무시 — 날씨 없이 진행
+    }
+
     const { error } = await supabase.from("memories").insert({
       place_id: converted.id,
       date: converted.first_visit_date,
@@ -178,6 +197,7 @@ export function WishlistView() {
       mood_tag: mood,
       author: authorName,
       photo_urls: [],
+      ...weatherFields,
     });
     setMoodSaving(false);
     if (error) {

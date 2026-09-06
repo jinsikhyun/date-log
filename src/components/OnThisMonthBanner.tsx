@@ -4,6 +4,8 @@ import PhotoImage from "@/components/PhotoImage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { weatherRecallPhrase } from "@/lib/weatherDisplay";
+import type { WeatherState } from "@/lib/weather";
 
 type Recall = {
   id: number;
@@ -12,6 +14,8 @@ type Recall = {
   subtitle: string | null;
   date: string;
   exactAnniversary: boolean;
+  // 그 기록에 저장된 날씨가 있을 때만("작년 이맘때" 회고에서 "그날도 비가 왔었어요" 문구용).
+  weatherPhrase: string | null;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -56,7 +60,7 @@ export function OnThisMonthBanner({
           .lte("first_visit_date", last),
         supabase
           .from("memories")
-          .select("date, content, places(id, name, description, image_url)")
+          .select("date, content, weather_state, places(id, name, description, image_url)")
           .gte("date", first)
           .lte("date", last),
       ]);
@@ -69,6 +73,8 @@ export function OnThisMonthBanner({
         image_url: string | null;
         memoryContent: string | null;
         date: string;
+        // places 단독 방문 기록엔 날씨가 없다 — memories 행이 있을 때만 채워짐.
+        weatherState: string | null;
       };
       const byPlaceAndDate = new Map<string, Cand>();
 
@@ -88,11 +94,13 @@ export function OnThisMonthBanner({
             image_url: p.image_url,
             memoryContent: null,
             date: p.first_visit_date,
+            weatherState: null,
           });
       }
       for (const row of (memRes.data ?? []) as unknown as {
         date: string;
         content: string | null;
+        weather_state: string | null;
         places: {
           id: number;
           name: string;
@@ -112,9 +120,15 @@ export function OnThisMonthBanner({
             image_url: pl.image_url,
             memoryContent: row.content?.trim() || null,
             date: row.date,
+            weatherState: row.weather_state,
           });
-        } else if (!cur.memoryContent && row.content?.trim()) {
-          cur.memoryContent = row.content.trim();
+        } else {
+          if (!cur.memoryContent && row.content?.trim()) {
+            cur.memoryContent = row.content.trim();
+          }
+          if (!cur.weatherState && row.weather_state) {
+            cur.weatherState = row.weather_state;
+          }
         }
       }
 
@@ -148,6 +162,7 @@ export function OnThisMonthBanner({
         image_url: chosen.image_url,
         date: chosen.date,
         exactAnniversary: chosen.date === target,
+        weatherPhrase: weatherRecallPhrase(chosen.weatherState as WeatherState | null),
         subtitle: chosen.memoryContent
           ? snippet(chosen.memoryContent)
           : chosen.description?.trim()
@@ -218,6 +233,11 @@ export function OnThisMonthBanner({
           >
             {recall.subtitle}
           </p>
+        )}
+        {recall.weatherPhrase && (
+          <span className="text-[11px] font-medium text-white/55">
+            {recall.weatherPhrase}
+          </span>
         )}
         <span
           className={`inline-flex w-fit items-center gap-1 rounded-full bg-[#fffcf5] px-3.5 py-1.5 text-xs font-bold transition-transform group-hover:translate-x-0.5 ${

@@ -1,9 +1,17 @@
 "use client";
 
 import PhotoImage from "@/components/PhotoImage";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { extractPhotoTakenDate, uploadPhoto } from "@/lib/photos";
+import type { WeatherState } from "@/lib/weather";
+import {
+  WEATHER_ICON,
+  WEATHER_LABEL,
+  pastWeatherChoices,
+  pastWeatherFields,
+  todayWeatherFields,
+} from "@/lib/weatherDisplay";
 
 export interface NewMemoryInput {
   date: string;
@@ -11,6 +19,8 @@ export interface NewMemoryInput {
   mood_tag: string;
   author: string; // 저장 시 현재 선택된 사용자로 자동 주입 (폼 필드 아님)
   photo_urls: string[]; // 첨부 사진 URL (선택, 최대 6장)
+  weather_state: WeatherState | null; // 그날의 날씨 각인. 각인 안 하면 null.
+  weather_temp: number | null; // 오늘 자동 각인만 값 있음, 과거 수동 각인은 항상 null.
 }
 
 const MAX_PHOTOS = 6;
@@ -27,6 +37,8 @@ const empty = (): NewMemoryInput => ({
   mood_tag: "",
   author: "",
   photo_urls: [],
+  weather_state: null,
+  weather_temp: null,
 });
 
 const fieldClass =
@@ -53,6 +65,68 @@ export function AddMemoryForm({
   const [photoDateMsg, setPhotoDateMsg] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const dateManuallyEditedRef = useRef(false);
+
+  // ── 그날의 날씨 ──────────────────────────────────────────────
+  const isEdit = !!initial;
+  const todayStr = today();
+  const isToday = form.date === todayStr;
+
+  // 오늘 날짜에 자동으로 확인한 현재 날씨(있으면). 과거 날짜에서는 null.
+  const [weatherAuto, setWeatherAuto] = useState<{ state: WeatherState; tempC: number } | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  // 사용자가 4개(맑음/흐림/비/눈) 중 직접 고른 값. 오늘은 자동값 위의 수정, 과거는 유일한 입력.
+  const [weatherManual, setWeatherManual] = useState<WeatherState | null>(
+    isEdit ? (initial!.weather_state ?? null) : null,
+  );
+  // 수정 화면에서 날짜만 바꿔서 기존 날씨와 안 맞을 수 있을 때만 true — 사용자가 직접 다시
+  // 고르기 전까지는 저장된 값을 그대로 유지한다(조용히 덮어쓰지 않기).
+  const [weatherTouched, setWeatherTouched] = useState(!isEdit);
+  const prevDateRef = useRef(form.date);
+
+  useEffect(() => {
+    const prevDate = prevDateRef.current;
+    const isFirstRun = prevDate === form.date;
+    const wasToday = prevDate === todayStr;
+    prevDateRef.current = form.date;
+
+    if (!isToday) {
+      setWeatherAuto(null);
+      if (!isFirstRun && wasToday) setWeatherManual(null); // 오늘→과거: 자동 날씨 지우고 수동 선택으로
+      return;
+    }
+    if (!isFirstRun && !wasToday) setWeatherManual(null); // 과거→오늘: 새 제안으로 초기화
+    setWeatherLoading(true);
+    let cancelled = false;
+    fetch("/api/weather", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setWeatherAuto(data ? { state: data.state, tempC: data.tempC } : null);
+      })
+      .catch(() => {
+        if (!cancelled) setWeatherAuto(null); // 실패해도 폼 저장 자체는 막지 않음 — 각인만 생략
+      })
+      .finally(() => {
+        if (!cancelled) setWeatherLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // form.date 가 바뀔 때만(오늘/과거 전환 포함) 재실행 — 매 렌더 재조회 아님.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.date]);
+
+  const dateChangedFromSaved = isEdit && initial!.date !== form.date;
+  const showWeatherNotice = isEdit && dateChangedFromSaved && !weatherTouched;
+
+  const pickWeather = (state: WeatherState) => {
+    setWeatherManual(state);
+    setWeatherTouched(true);
+  };
 
   const set = <K extends keyof NewMemoryInput>(key: K, value: NewMemoryInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -136,8 +210,21 @@ export function AddMemoryForm({
 
     setSaving(true);
     try {
+      // 수정 화면에서 날짜도 안 바꾸고 날씨 버튼도 안 눌렀으면 저장된 값을 그대로 유지
+      // (조용히 덮어쓰지 않기). 그 외(신규 작성, 또는 날짜/날씨를 직접 바꾼 경우)엔
+      // 현재 화면 상태로 다시 계산한다.
+      const weatherFields =
+        isEdit && !dateChangedFromSaved && !weatherTouched
+          ? { weather_state: initial!.weather_state, weather_temp: initial!.weather_temp }
+          : isToday
+            ? weatherAuto
+              ? todayWeatherFields(weatherAuto, true, weatherManual)
+              : // 오늘인데 자동 조회 실패 — 사용자가 고른 상태만 저장, 기온은 확인 못 했으니 null.
+                { weather_state: weatherManual, weather_temp: null }
+            : pastWeatherFields(weatherManual);
+
       // 새 추억은 로그인한 사용자로. 기존 추억 수정 시엔 원 작성자 유지.
-      await onSubmit({ ...form, author });
+      await onSubmit({ ...form, author, ...weatherFields });
       setForm(initial ?? empty());
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 중 오류가 발생했어요.");
@@ -185,6 +272,72 @@ export function AddMemoryForm({
             placeholder="예: 설렘, 비 오는 날, 기념일"
           />
         </div>
+      </div>
+
+      {/* 그날의 날씨 — 오늘은 자동 제안+수정, 과거는 수동 선택만(선택 사항) */}
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClass}>그날의 날씨 (선택)</span>
+
+        {isToday ? (
+          weatherLoading && !weatherAuto ? (
+            <p className="text-xs text-muted-3">날씨를 확인하는 중…</p>
+          ) : weatherAuto ? (
+            <>
+              <div className="flex min-h-10 items-center justify-between gap-2 rounded-xl border border-accent-border bg-accent-soft/45 px-3 py-2">
+                <span className="text-sm font-semibold text-accent">
+                  {WEATHER_ICON[weatherManual ?? weatherAuto.state]}{" "}
+                  {WEATHER_LABEL[weatherManual ?? weatherAuto.state]}
+                  {` · ${Math.round(weatherAuto.tempC)}°`}
+                </span>
+                <span className="shrink-0 text-[10px] font-medium text-muted-2">
+                  서울 · 자동 확인
+                </span>
+              </div>
+              <p className="text-[11px] leading-5 text-muted-2">
+                오늘 날씨를 자동으로 가져왔어요. 다르게 기억한다면 바꿔주세요.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-3">
+              오늘 날씨를 확인하지 못했어요. 저장은 그대로 진행할 수 있어요.
+            </p>
+          )
+        ) : (
+          <p className="text-[11px] leading-5 text-muted-2">
+            지난 날짜의 날씨는 확인할 수 없어요. 기억나면 아래에서 골라주세요.
+          </p>
+        )}
+
+        {(isToday ? weatherAuto != null : true) && (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="날씨 선택">
+            {pastWeatherChoices().map((opt) => {
+              const pressed = isToday
+                ? (weatherManual ?? weatherAuto?.state) === opt.state
+                : weatherManual === opt.state;
+              return (
+                <button
+                  key={opt.state}
+                  type="button"
+                  aria-pressed={pressed}
+                  onClick={() => pickWeather(opt.state)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    pressed
+                      ? "bg-accent text-white"
+                      : "bg-background text-muted-2 ring-1 ring-border hover:text-accent"
+                  }`}
+                >
+                  {opt.icon} {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {showWeatherNotice && (
+          <p className="text-[11px] font-medium text-accent">
+            날짜를 바꾸면 날씨가 그날과 다를 수 있어요. 필요하면 다시 골라주세요.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1">

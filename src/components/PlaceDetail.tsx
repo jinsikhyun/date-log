@@ -60,6 +60,8 @@ function memoryToInput(m: Memory): NewMemoryInput {
     mood_tag: m.mood_tag ?? "",
     author: m.author ?? "", // 원 작성자 유지 (AddMemoryForm 이 비었을 때만 현재 사용자로 채움)
     photo_urls: m.photo_urls ?? [],
+    weather_state: m.weather_state,
+    weather_temp: m.weather_temp,
   };
 }
 
@@ -173,6 +175,8 @@ export function PlaceDetail({ id }: { id: number }) {
         mood_tag: input.mood_tag.trim() || null,
         author: input.author || null,
         photo_urls: input.photo_urls,
+        weather_state: input.weather_state,
+        weather_temp: input.weather_temp,
       };
 
       const { data, error: insErr } = await supabase
@@ -202,6 +206,8 @@ export function PlaceDetail({ id }: { id: number }) {
           mood_tag: input.mood_tag.trim() || null,
           author: input.author || null,
           photo_urls: input.photo_urls,
+          weather_state: input.weather_state,
+          weather_temp: input.weather_temp,
         })
         .eq("id", memoryId)
         .select(MEMORY_COLUMNS);

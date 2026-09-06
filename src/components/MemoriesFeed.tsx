@@ -12,6 +12,7 @@ import {
   MEMORY_WITH_PLACE_COLUMNS,
   byDateDesc,
 } from "@/lib/memories";
+import { weatherBadge } from "@/lib/weatherDisplay";
 
 const dot = (d: string | null) => (d ? d.split("-").join(".") : "날짜 미정");
 
@@ -98,6 +99,7 @@ export function MemoriesFeed() {
           {memories.map((m) => {
             const replyCount = m.memory_replies?.[0]?.count ?? 0;
             const photoCount = m.photo_urls?.length ?? 0;
+            const badge = weatherBadge(m.weather_state, m.weather_temp);
             const authorInitial =
               m.author?.trim().charAt(0).toUpperCase() || "·";
             const card = (
@@ -111,7 +113,10 @@ export function MemoriesFeed() {
                     <p className="text-sm font-bold leading-tight">
                       {m.author || "누군가"}
                     </p>
-                    <p className="text-[11px] text-muted-3">{dot(m.date)}</p>
+                    <p className="text-[11px] text-muted-3">
+                      {dot(m.date)}
+                      {badge && <> · {badge}</>}
+                    </p>
                   </div>
                   {m.places ? (
                     <div className="flex shrink-0 items-center gap-1.5">

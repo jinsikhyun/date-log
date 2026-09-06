@@ -1,3 +1,5 @@
+import type { WeatherState } from "@/lib/weather";
+
 // Supabase `memories` 테이블의 한 행.
 export interface Memory {
   id: number;
@@ -8,10 +10,14 @@ export interface Memory {
   author: string | null; // 작성한 사람 (커플 구성원 display_name)
   photo_urls: string[]; // 첨부 사진 영구 Storage 참조 또는 레거시 URL 목록 (place-photos 버킷). 없으면 []
   created_at: string;
+  // 저장 시점 날씨 각인. 오늘 기록은 자동 확인(기온 포함), 과거 기록은 수동 선택(기온 null).
+  // 각인 안 한 기존/신규 기록은 둘 다 null.
+  weather_state: WeatherState | null;
+  weather_temp: number | null;
 }
 
 export const MEMORY_COLUMNS =
-  "id, place_id, date, content, mood_tag, author, photo_urls, created_at";
+  "id, place_id, date, content, mood_tag, author, photo_urls, created_at, weather_state, weather_temp";
 
 // 추억 대댓글(답장)
 export interface MemoryReply {
@@ -27,7 +33,7 @@ export const MEMORY_REPLY_COLUMNS =
 
 // "추억 모아보기"(/memories) 용: 장소 정보 + 답글 개수를 함께 가져온다.
 export const MEMORY_WITH_PLACE_COLUMNS =
-  "id, place_id, date, content, mood_tag, author, photo_urls, created_at, places(id, name, category), memory_replies(count)";
+  "id, place_id, date, content, mood_tag, author, photo_urls, created_at, weather_state, weather_temp, places(id, name, category), memory_replies(count)";
 
 export interface MemoryWithPlace extends Memory {
   // FK memories.place_id → places.id (다대일). 장소가 지워졌다면 null 일 수 있어 방어.
