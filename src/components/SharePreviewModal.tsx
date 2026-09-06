@@ -126,8 +126,9 @@ export function SharePreviewModal({
         </div>
       </div>
 
-      {/* 화면 밖 캡처 전용 카드 */}
-      <div aria-hidden style={{ position: "absolute", left: "-9999px", top: "-9999px", width: "fit-content", pointerEvents: "none" }}>
+      {/* 화면 밖 캡처 전용 카드. width 는 "fit-content" 가 아니라 고정값 —
+          iOS Safari 는 뷰포트 밖 멀리 있는 요소의 fit-content 폭도 뷰포트 폭 기준으로 줄인다. */}
+      <div aria-hidden style={{ position: "absolute", left: "-9999px", top: "-9999px", width, pointerEvents: "none" }}>
         {renderCard(cardRef, ratio)}
       </div>
     </div>,

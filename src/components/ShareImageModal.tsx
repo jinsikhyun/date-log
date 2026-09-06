@@ -3,6 +3,7 @@
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useShareImage } from "@/lib/useShareImage";
+import { CARD_W } from "@/lib/shareCardStyle";
 
 function ShareIcon() {
   return (
@@ -174,14 +175,15 @@ export function ShareImageModal({
           document.body,
         )}
 
-      {/* 화면 밖 캡처 전용 카드 (display:none 이면 크기 측정 불가 → 밖으로만 밀어냄) */}
+      {/* 화면 밖 캡처 전용 카드. width 는 "fit-content" 가 아니라 고정값 —
+          iOS Safari 는 뷰포트 밖 멀리 있는 요소의 fit-content 폭도 뷰포트 폭 기준으로 줄인다. */}
       <div
         aria-hidden
         style={{
           position: "absolute",
           left: "-9999px",
           top: "-9999px",
-          width: "fit-content",
+          width: CARD_W,
           pointerEvents: "none",
         }}
       >
