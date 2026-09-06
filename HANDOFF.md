@@ -2,6 +2,7 @@
 
 ## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-06)
 
+- **신규: 날씨 API 라우트 + 상태 판정 로직 (로컬 완료, commit/push 완료 — 배포 확인 전)**. `src/lib/weather.ts`(순수 판정 로직, `classifyWeather`: first_snow > dust > heat/cold > snow/rain > cloudy/clear 우선순위) + `src/app/api/weather/route.ts`(OpenWeather 현재 날씨·대기질 조회, `kakao-candidates` 라우트와 동일한 auth.getUser 인증/zod 검증/서버 전용 키/한국어 에러 메시지 패턴, 좌표 2자리 반올림 기준 10분 인메모리 캐시) 신규 추가. `OPENWEATHER_API_KEY`는 `.env.local`에 서버 전용으로 추가됨(커밋 대상 아님, git-ignore 확인 완료). `npx tsc --noEmit`/ESLint 통과, 로그인 상태에서 `/api/weather` 빈 body POST 실측 검증 완료 — 200과 `{ state, tempC, feelsLikeC, conditionId, aqi }` 정상 반환(실측: 맑음+AQI 3 조합에서 `dust` 우선순위 판정도 확인). 아직 어떤 UI에서도 이 라우트를 호출하지 않음 — 프론트엔드 연동은 범위 밖으로 남겨둠.
 - **신규: iOS 공유 이미지 글자 밀림 수정(로컬 완료, commit/push/배포 전)**. iOS Safari가 화면 밖 1080px 캡처 DOM의 텍스트를 모바일 viewport 기준으로 자동 확대해 날짜·평점·OUR PICK/SAVED IN이 글자 단위로 줄바꿈되는 문제를 수정했다. `shareCapture`의 임시 host/clone과 장소·코스 공유 카드 루트에 `text-size-adjust:none`을 적용하고, 장소 카드 메타/날짜/평점/footer에 `white-space:nowrap`과 안전한 flex 축소 규칙을 추가했다. 미리보기 하단 3개 버튼은 모바일에서 3열 grid·작은 글자·nowrap으로 정렬했다. TypeScript, 변경 파일 ESLint, diff check, Webpack production build(28개 경로) 통과. 실제 iOS Safari 재검증은 아직 필요하다.
 - **후속: 공유 카드 상단 메타 3요소 분리(로컬 완료, commit/push/배포 전)**. `지역명 · FRAME 000 / 날짜`를 하나의 문자열로 처리해 지역명과 함께 FRAME이 `FRAME 0…`으로 잘리던 구조를 지역명·FRAME·날짜로 분리했다. 공간이 부족할 때는 지역명만 말줄임되며 FRAME과 날짜는 고정 표시된다.
 - **후속: 공유 카드 지역명 축약 방식 변경(로컬 완료, commit/push/배포 전)**. `서울 용산…` 같은 말줄임 대신 공유 카드에서만 시·군·구 접미사를 제거해 `서울 용산`, `경기 수원`, `부산 해운대`처럼 표시한다. 지역명 영역의 말줄임표도 제거했으며 FRAME과 날짜는 그대로 유지한다.
