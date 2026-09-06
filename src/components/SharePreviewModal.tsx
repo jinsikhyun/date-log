@@ -4,7 +4,7 @@ import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useShareImage } from "@/lib/useShareImage";
 import { useDialogA11y } from "@/lib/useDialogA11y";
-import type { ShareRatio } from "@/lib/shareOutputs";
+import { SHARE_OUTPUTS, type ShareRatio } from "@/lib/shareOutputs";
 
 function XIcon() {
   return (
@@ -31,10 +31,13 @@ export function SharePreviewModal({
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { width, height } = SHARE_OUTPUTS[ratio];
   const { phase, previewUrl, error, shareable, capture, download, share, reset } = useShareImage(
     cardRef,
     filename,
-    { pixelRatio: 1 },
+    // width/height 를 직접 넘겨 iOS Safari 의 "뷰포트 밖 요소 폭 축소" 버그를 우회한다
+    // (측정 대신 알고 있는 출력 크기를 그대로 쓴다).
+    { pixelRatio: 1, width, height },
   );
   useDialogA11y(true, onClose, containerRef);
 

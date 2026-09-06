@@ -64,19 +64,36 @@ async function preparedClone(source: HTMLElement) {
 export async function captureCard(
   source: HTMLElement,
   engine: CaptureEngine,
-  opts?: { pixelRatio?: number },
+  opts?: { pixelRatio?: number; width?: number; height?: number },
 ): Promise<Blob> {
   await timeout(document.fonts.ready, 12000, "글꼴 로딩이 오래 걸려요. 잠시 후 다시 시도해 주세요.");
   const clone = await preparedClone(source);
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
-  Object.assign(host.style, { position: "fixed", left: "-10000px", top: "0", pointerEvents: "none" });
+  Object.assign(host.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    // iOS Safari 는 뷰포트 밖 멀리 떨어진 요소의 폭을 뷰포트 폭에 맞춰 줄여버린다 — 카드
+    // 폭을 이미 아는 호출자는 opts.width 로 넘겨 이 축소를 아예 우회한다.
+    ...(opts?.width ? { width: `${opts.width}px` } : {}),
+    pointerEvents: "none",
+  });
   host.appendChild(clone);
+  if (opts?.width) {
+    Object.assign(clone.style, {
+      width: `${opts.width}px`,
+      minWidth: `${opts.width}px`,
+      maxWidth: "none",
+      boxSizing: "border-box",
+    });
+  }
   document.body.appendChild(host);
   try {
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    const width = Math.ceil(clone.getBoundingClientRect().width);
-    const height = Math.ceil(Math.max(clone.getBoundingClientRect().height, clone.scrollHeight));
+    // 폭/높이를 아는 호출자는 opts 로 직접 넘긴다 — 측정하면 기기(특히 iOS Safari)마다 달라진다.
+    const width = opts?.width ?? Math.ceil(clone.getBoundingClientRect().width);
+    const height = opts?.height ?? Math.ceil(Math.max(clone.getBoundingClientRect().height, clone.scrollHeight));
     if (!width || !height || height > 8000) throw new Error("카드가 너무 길거나 크기를 확인할 수 없어요. 내용을 나눠서 공유해 주세요.");
     // 모바일 메모리 사용 상한: 최대 2배, 12MP 이하.
     // opts.pixelRatio 가 주어지면(정확한 출력 픽셀 크기가 필요한 카드) 자동 계산을 건너뛴다.

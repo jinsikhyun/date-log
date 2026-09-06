@@ -4,7 +4,7 @@ import { captureCard, type CaptureEngine } from "@/lib/shareCapture";
 export function captureElement(
   el: HTMLElement,
   engine: CaptureEngine = "html-to-image",
-  opts?: { pixelRatio?: number },
+  opts?: { pixelRatio?: number; width?: number; height?: number },
 ): Promise<Blob> {
   return captureCard(el, engine, opts);
 }

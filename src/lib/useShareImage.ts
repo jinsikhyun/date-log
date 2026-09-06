@@ -17,7 +17,7 @@ export type SharePhase = "idle" | "capturing" | "ready" | "sharing";
 export function useShareImage(
   targetRef: RefObject<HTMLElement | null>,
   filename: string,
-  captureOpts?: { pixelRatio?: number },
+  captureOpts?: { pixelRatio?: number; width?: number; height?: number },
 ) {
   const [phase, setPhase] = useState<SharePhase>("idle");
   const [blob, setBlob] = useState<Blob | null>(null);

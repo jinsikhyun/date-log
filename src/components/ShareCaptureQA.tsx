@@ -10,6 +10,7 @@ import { captureElement, downloadBlob } from "@/lib/shareImage";
 import type { CaptureEngine } from "@/lib/shareCapture";
 import type { Place } from "@/lib/places";
 import { SHARE_RATIOS } from "@/lib/shareOutputs";
+import { CARD_W } from "@/lib/shareCardStyle";
 
 const photo = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#e3ece8"/><circle cx="400" cy="240" r="130" fill="#36585a"/><rect x="180" y="430" width="440" height="60" fill="#c9a46a"/></svg>',
@@ -49,7 +50,7 @@ export function ShareCaptureQA() {
       for (const [name, node] of [["장소", placeRef.current], ["코스", courseRef.current]] as const) {
         if (!node) throw new Error("카드를 찾지 못했어요.");
         for (const engine of ["html2canvas", "html-to-image"] as CaptureEngine[]) {
-          const blob = await captureElement(node, engine);
+          const blob = await captureElement(node, engine, { width: CARD_W });
           const url = URL.createObjectURL(blob); urls.current.push(url);
           const hash = crypto.subtle
             ? [...new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()))]
