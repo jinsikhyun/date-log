@@ -7,10 +7,17 @@ import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { processImageToJpeg } from "@/lib/photos";
 import { Lightbox } from "@/components/Lightbox";
+import { useDateHintSetting } from "@/hooks/useDateHintSetting";
 
 export function SettingsView() {
   const router = useRouter();
   const { user, profile, ready, refreshProfile } = useAuth();
+  const {
+    enabled: dateHintEnabled,
+    setEnabled: setDateHintEnabled,
+    saving: dateHintSaving,
+    error: dateHintError,
+  } = useDateHintSetting();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
@@ -261,6 +268,40 @@ export function SettingsView() {
           파트너가 아직 합류 안 했다면 이 코드를 공유하세요. “초대코드로
           합류하기”에서 입력하면 같은 커플로 연결돼요.
         </p>
+      </div>
+
+      {/* 데이트 힌트 팝업 — 개인 설정(profiles.date_hint_enabled) */}
+      <div className="rounded-3xl bg-card p-5 ring-1 ring-border/70">
+        <p className="text-xs font-medium text-muted">데이트 힌트</p>
+        <p className="mt-1 text-xs text-muted">
+          데이트하기 좋은 특별한 날에 둘만의 제안을 보여드려요.
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-4">
+          <span id="date-hint-toggle-label" className="text-sm font-medium">
+            데이트 힌트 받기
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={dateHintEnabled}
+            aria-labelledby="date-hint-toggle-label"
+            disabled={dateHintSaving}
+            onClick={() => void setDateHintEnabled(!dateHintEnabled)}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+              dateHintEnabled ? "bg-accent" : "bg-stone-300"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                dateHintEnabled ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+        {dateHintError && (
+          <p className="mt-2 text-xs font-medium text-red-600">{dateHintError}</p>
+        )}
       </div>
 
       {/* 관계 시작일 */}

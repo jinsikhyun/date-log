@@ -33,9 +33,15 @@ import { normalizeVisitedCategory } from "@/lib/categories";
 import { NearbyPanel } from "@/components/NearbyPanel";
 import { useAnniversaries } from "@/hooks/useAnniversaries";
 import { anniversariesOn } from "@/lib/anniversaries";
+import {
+  DateSuggestionPopup,
+  type DateSuggestion,
+} from "@/components/DateSuggestionPopup";
 import { HomeWeatherWidget } from "@/components/HomeWeatherWidget";
 import { useHomeWeather } from "@/hooks/useHomeWeather";
 import { WEATHER_ICON, WEATHER_LABEL } from "@/lib/weatherDisplay";
+import { useTodayHint } from "@/hooks/useTodayHint";
+import { useDateHintSetting } from "@/hooks/useDateHintSetting";
 
 
 // 카카오맵은 window 에 의존 → 클라이언트에서만 렌더 (SSR 비활성화)
@@ -127,6 +133,76 @@ export function HomeView() {
   const [searchOpen, setSearchOpen] = useState(false);
   const { authorName, user } = useAuth();
   const myId = user?.id ?? null;
+
+  const dateSuggestion = useMemo<DateSuggestion | null>(() => {
+    // API/트리거 판정은 별도 구현한다. 아래 분기는 UI 검토용 샘플만 제공한다.
+    const preview = searchParams.get("datePopup");
+
+    if (preview === "christmas") {
+      return {
+        id: "preview-holiday-christmas",
+        eyebrow: "OUR HOLIDAY · CHRISTMAS",
+        title: "곧 크리스마스예요.",
+        message:
+          "지난 크리스마스에 함께 다녀온 곳들을 다시 꺼내봤어요. 올해도 우리다운 하루를 만들어볼까요?",
+        note: "지난 크리스마스 · 함께 다녀온 곳 3곳",
+        href: "/",
+        ctaLabel: "지난 크리스마스 돌아보기",
+      };
+    }
+
+    if (preview === "season") {
+      return {
+        id: "preview-season-ipchun",
+        eyebrow: "24 SEASONS · 입춘",
+        title: "입춘이에요.",
+        message:
+          "아직 공기는 차지만, 오늘부터 봄이래요. 겨우내 미뤄둔 그 산책, 나가볼까요?",
+        note: "봄의 시작 · 산책하기 좋은 곳",
+        href: "/wishlist",
+        ctaLabel: "산책할 곳 찾아보기",
+      };
+    }
+
+    if (preview === "preview") {
+      return {
+        id: "preview-clear-day",
+        eyebrow: "A CLEAR DAY",
+        title: "오늘 하늘이 참 맑아요.",
+        message:
+          "이런 날은 실내에 있기 아깝잖아요. 잠깐이라도 함께 걸어볼까요?",
+        note: "저장해둔 곳에서 오늘의 목적지를 골라봐요.",
+        href: "/wishlist",
+        ctaLabel: "가고 싶은 곳 보기",
+      };
+    }
+
+    return null;
+  }, [searchParams]);
+
+  // 데이트 힌트 팝업 — 실제 트리거. /?datePopup=... 미리보기(위 dateSuggestion)와는
+  // 완전히 분리된 경로다: 미리보기가 있으면 그걸 우선 보여주고(개발 확인용),
+  // 없으면 실제 판정(useTodayHint) 결과를 보여준다.
+  const { enabled: dateHintSettingEnabled, loaded: dateHintSettingLoaded } =
+    useDateHintSetting();
+  // 설정값을 아직 못 읽었으면 일단 비활성 — 로딩 중 잠깐 떴다 사라지는 걸 방지.
+  const { hint: todayHint, dismiss: dismissTodayHint } = useTodayHint(
+    dateHintSettingLoaded && dateHintSettingEnabled,
+  );
+  const realDateSuggestion = useMemo<DateSuggestion | null>(() => {
+    if (!todayHint) return null;
+    return {
+      id: todayHint.type,
+      eyebrow: todayHint.eyebrow,
+      title: todayHint.title,
+      message: todayHint.message,
+      note: todayHint.meta,
+      href: todayHint.cta.href,
+      ctaLabel: todayHint.cta.label,
+    };
+  }, [todayHint]);
+  const isPreviewSuggestion = dateSuggestion != null;
+  const activeDateSuggestion = dateSuggestion ?? realDateSuggestion;
 
   // 지도 검색 (지도 뷰 전용) — 엔터/"다시 검색"에만 카카오를 부른다.
   const [mapQuery, setMapQuery] = useState(""); // 지도 전용 검색어
@@ -744,6 +820,11 @@ export function HomeView() {
         </section>
       )}
       {courseSelection.active && <div aria-hidden="true" className="h-20 lg:hidden" />}
+      <DateSuggestionPopup
+        suggestion={activeDateSuggestion}
+        forceOpen={activeDateSuggestion != null}
+        onDismiss={isPreviewSuggestion ? undefined : dismissTodayHint}
+      />
     </>
   );
 }
