@@ -39,7 +39,7 @@ import {
 } from "@/components/DateSuggestionPopup";
 import { HomeWeatherWidget } from "@/components/HomeWeatherWidget";
 import { useHomeWeather } from "@/hooks/useHomeWeather";
-import { WEATHER_ICON, WEATHER_LABEL } from "@/lib/weatherDisplay";
+import { WEATHER_ICON, WEATHER_LABEL, WEATHER_SHORT_NOTE } from "@/lib/weatherDisplay";
 import { useTodayHint } from "@/hooks/useTodayHint";
 import { useDateHintSetting } from "@/hooks/useDateHintSetting";
 
@@ -542,7 +542,11 @@ export function HomeView() {
                 temperatureC={Math.round(weather.tempC)}
                 icon={WEATHER_ICON[weather.state]}
                 message={HOME_WEATHER_NOTE[weather.state] ?? WEATHER_LABEL[weather.state]}
+                shortNote={WEATHER_SHORT_NOTE[weather.state]}
                 feelsLikeC={Math.round(weather.feelsLikeC)}
+                highC={weather.highC ?? undefined}
+                lowC={weather.lowC ?? undefined}
+                precipitationChance={weather.precipChance ?? undefined}
                 observedLabel={`${HOME_WEATHER_TIME_FORMAT.format(new Date(weather.cachedAt))} 기준`}
               />
             )}

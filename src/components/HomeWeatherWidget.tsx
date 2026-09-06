@@ -8,6 +8,8 @@ export type HomeWeatherWidgetProps = {
   temperatureC: number;
   icon: string;
   message: string;
+  /** 접힌 버튼용 짧은 맥락 문구(선택). 있으면 "아이콘 기온° · 문구"로 표시. */
+  shortNote?: string;
   feelsLikeC?: number;
   highC?: number;
   lowC?: number;
@@ -21,6 +23,7 @@ export function HomeWeatherWidget({
   temperatureC,
   icon,
   message,
+  shortNote,
   feelsLikeC,
   highC,
   lowC,
@@ -59,7 +62,7 @@ export function HomeWeatherWidget({
         type="button"
         aria-expanded={open}
         aria-controls="home-weather-details"
-        aria-label={`${location} 오늘 날씨 ${condition} ${temperatureC}도. 자세히 보기`}
+        aria-label={`${location} 오늘 날씨 ${condition} ${temperatureC}도.${shortNote ? ` ${shortNote}.` : ""} 자세히 보기`}
         onClick={() => setOpen((value) => !value)}
         className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
@@ -67,6 +70,11 @@ export function HomeWeatherWidget({
           {icon}
         </span>
         <span className="shrink-0">{temperatureC}°</span>
+        {shortNote && (
+          <span aria-hidden="true" className="hidden shrink-0 whitespace-nowrap sm:inline">
+            · {shortNote}
+          </span>
+        )}
       </button>
 
       {open && (

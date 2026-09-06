@@ -19,7 +19,7 @@ export const WEATHER_ICON: Record<WeatherState, string> = {
   rain: "🌧️",
   snow: "❄️",
   first_snow: "❄️",
-  heat: "🔥",
+  heat: "🥵",
   cold: "🥶",
   dust: "😷",
 };
@@ -154,3 +154,18 @@ export function pastWeatherFields(
   }
   return { weather_state: chosen, weather_temp: null };
 }
+
+/**
+ * 홈 위젯 접힌 버튼용 짧은 맥락 문구. 팝오버의 긴 문구와는 별개(그쪽은 그대로 둔다).
+ * 사용자 결정: 접힌 상태 "아이콘+기온만" 원칙을 의도적으로 완화 — HANDOFF.md 참고.
+ */
+export const WEATHER_SHORT_NOTE: Record<WeatherState, string> = {
+  clear: "걷기 좋은 날",
+  cloudy: "차분한 날",
+  rain: "실내가 좋은 날",
+  snow: "남기고 싶은 날",
+  first_snow: "첫눈 오는 날",
+  heat: "너무 더워요",
+  cold: "너무 추워요",
+  dust: "실내가 좋은 날",
+};

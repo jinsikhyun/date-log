@@ -16,6 +16,10 @@ export interface HomeWeather {
   state: WeatherState;
   tempC: number;
   feelsLikeC: number;
+  /** 오늘 남은 시간대 기준 예보치. 예보 실패 시 셋 다 null. */
+  highC: number | null;
+  lowC: number | null;
+  precipChance: number | null;
   cachedAt: number;
 }
 
@@ -39,6 +43,9 @@ export function useHomeWeather(): { weather: HomeWeather | null; loading: boolea
           state: data.state,
           tempC: data.tempC,
           feelsLikeC: data.feelsLikeC,
+          highC: data.highC ?? null,
+          lowC: data.lowC ?? null,
+          precipChance: data.precipChance ?? null,
           cachedAt: data.cachedAt,
         });
       })

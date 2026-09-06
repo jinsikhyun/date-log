@@ -144,3 +144,62 @@ export function toWeatherInput(
 //   - 눈(6xx) 감지 + 현재 겨울시즌이 저장된 값과 다르면 → 첫눈으로 보고 값 갱신
 //   - 시즌 경계는 대략 11월~다음해 3월. (지역·연도별 편차는 추후 조정)
 // 초기 버전에서는 isFirstSnowOfSeason=false 로 두고, snow 로만 처리해도 무방.
+
+/** OpenWeather /data/2.5/forecast 응답 중 우리가 쓰는 필드만. */
+export interface OpenWeatherForecast {
+  list?: {
+    main?: { temp_min?: number; temp_max?: number };
+    pop?: number; // 강수확률 0~1
+    dt_txt?: string; // "2026-09-06 15:00:00" (UTC)
+  }[];
+}
+
+export interface TodayForecast {
+  highC: number | null;
+  lowC: number | null;
+  /** 강수확률 % (0~100 정수). 없으면 null. */
+  precipChance: number | null;
+}
+
+/**
+ * 예보 응답에서 특정 날짜(YYYY-MM-DD)의 최고/최저/최대강수확률.
+ * todayDate 는 KST 기준 "YYYY-MM-DD".
+ *
+ * 주의: dt_txt 는 UTC 시각이다. KST 오늘과 UTC 날짜가 다를 수 있어
+ *   (한국 자정~오전 9시는 UTC 로 전날), 라우트에서 todayDate 를 KST 로 넘기되
+ *   슬롯 매칭은 dt_txt 의 날짜부분과 느슨하게 비교한다. 완벽한 경계 정합보다
+ *   "오늘 근처 슬롯들"의 최고/최저를 잡는 게 목적이라 실용상 충분.
+ */
+export function extractTodayForecast(
+  forecast: OpenWeatherForecast,
+  todayDate: string,
+): TodayForecast {
+  const slots = forecast.list ?? [];
+  let high = -Infinity;
+  let low = Infinity;
+  let maxPop = 0;
+  let matched = 0;
+
+  for (const s of slots) {
+    const dateOfSlot = (s.dt_txt ?? "").slice(0, 10); // "2026-09-06"
+    if (dateOfSlot !== todayDate) continue;
+    matched++;
+    const mx = s.main?.temp_max;
+    const mn = s.main?.temp_min;
+    if (typeof mx === "number") high = Math.max(high, mx);
+    if (typeof mn === "number") low = Math.min(low, mn);
+    if (typeof s.pop === "number") maxPop = Math.max(maxPop, s.pop);
+  }
+
+  // 오늘 슬롯이 하나도 안 남았으면(늦은 밤 등) 첫 미래 슬롯이라도 참고할 수 있으나,
+  // 여기선 단순하게 null 반환(팝오버가 그 줄을 생략).
+  if (matched === 0) {
+    return { highC: null, lowC: null, precipChance: null };
+  }
+
+  return {
+    highC: high === -Infinity ? null : Math.round(high),
+    lowC: low === Infinity ? null : Math.round(low),
+    precipChance: Math.round(maxPop * 100),
+  };
+}

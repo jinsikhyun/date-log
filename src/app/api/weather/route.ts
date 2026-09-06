@@ -6,8 +6,10 @@
 // - 날씨는 자주 바뀌지 않으므로 좌표 기준으로 10분 서버 캐싱 → OpenWeather 호출 절약.
 // - 위치 미지정 시 서울 중심 좌표로 폴백(date.log 는 아직 실시간 GPS 없음).
 //
-// 응답: { state, tempC, feelsLikeC, conditionId, aqi, cachedAt }
+// 응답: { state, tempC, feelsLikeC, conditionId, aqi, highC, lowC, precipChance, cachedAt }
 //   state 는 문구집 §6-5 상태 키. 문구 선택은 클라이언트/후속 판정 로직이 담당.
+//   highC/lowC/precipChance 는 5일 예보(3시간 슬롯) 중 오늘 남은 슬롯 기준 —
+//   실측값이 아니라 예보치이며, 예보 호출 실패 시 셋 다 null.
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -16,9 +18,12 @@ import { z } from "zod";
 import {
   classifyWeather,
   toWeatherInput,
+  extractTodayForecast,
   type WeatherState,
   type OpenWeatherCurrent,
   type OpenWeatherAir,
+  type OpenWeatherForecast,
+  type TodayForecast,
 } from "@/lib/weather";
 
 // 서울 시청 좌표 — 위치 미지정 시 폴백.
@@ -38,7 +43,22 @@ interface WeatherResult {
   feelsLikeC: number;
   conditionId: number;
   aqi: number | null;
+  /** 오늘 남은 시간대(3시간 슬롯) 기준 최고/최저/최대강수확률. 예보 실패 시 전부 null. */
+  highC: number | null;
+  lowC: number | null;
+  precipChance: number | null;
   cachedAt: number;
+}
+
+// 오늘(KST) "YYYY-MM-DD". UTC 기준 시각에 +9h 한 뒤 반드시 getUTC* 로만 읽는다 —
+// 서버 로컬 타임존이 이미 KST면 로컬 getter가 9시간을 중복 적용해 날짜가 하루
+// 밀리는 문제(특일 라우트에서 실측으로 발견된 버그)를 피하기 위함.
+function todayKST(): string {
+  const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const y = nowKst.getUTCFullYear();
+  const m = nowKst.getUTCMonth() + 1;
+  const d = nowKst.getUTCDate();
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 // 아주 단순한 인메모리 캐시. kakao rate-limit 와 마찬가지로 서버리스에선
@@ -60,10 +80,11 @@ async function fetchWeather(lat: number, lng: number, apiKey: string): Promise<W
   const base = "https://api.openweathermap.org/data/2.5";
   const common = `lat=${lat}&lon=${lng}&appid=${apiKey}`;
 
-  // 현재 날씨(섭씨) + 대기질을 병렬 호출.
-  const [curRes, airRes] = await Promise.all([
+  // 현재 날씨(섭씨) + 대기질 + 5일 예보(3시간 단위)를 병렬 호출.
+  const [curRes, airRes, forecastRes] = await Promise.all([
     fetch(`${base}/weather?${common}&units=metric`, { cache: "no-store" }),
     fetch(`${base}/air_pollution?${common}`, { cache: "no-store" }),
+    fetch(`${base}/forecast?${common}&units=metric`, { cache: "no-store" }),
   ]);
 
   if (!curRes.ok) {
@@ -80,12 +101,26 @@ async function fetchWeather(lat: number, lng: number, apiKey: string): Promise<W
     throw new WeatherApiError(502);
   }
 
+  // 예보도 대기질과 마찬가지로 실패해도 치명적이지 않다(최고/최저/강수확률만 null).
+  let todayForecast: TodayForecast = { highC: null, lowC: null, precipChance: null };
+  if (forecastRes.ok) {
+    try {
+      const forecast = (await forecastRes.json()) as OpenWeatherForecast;
+      todayForecast = extractTodayForecast(forecast, todayKST());
+    } catch {
+      // 파싱 실패해도 null 유지 — 위젯은 그 줄만 생략.
+    }
+  }
+
   const result: WeatherResult = {
     state: classifyWeather(input),
     tempC: input.temp,
     feelsLikeC: input.feelsLike,
     conditionId: input.conditionId,
     aqi: input.aqi ?? null,
+    highC: todayForecast.highC,
+    lowC: todayForecast.lowC,
+    precipChance: todayForecast.precipChance,
     cachedAt: Date.now(),
   };
   cache.set(key, result);
