@@ -103,6 +103,7 @@ export function HomeView() {
   // 카테고리(주 필터)와 AND 로 결합되는 보조 필터. URL 이 아닌 로컬 상태.
   const [favFilter, setFavFilter] = useState<FavoriteFilter>(EMPTY_FAVORITE_FILTER);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const { authorName, user } = useAuth();
   const myId = user?.id ?? null;
 
@@ -469,8 +470,10 @@ export function HomeView() {
             </button>
           </div>
 
-          <PlaceSearchBox value={query} onChange={setQuery} />
-          <span className="shrink-0 whitespace-nowrap" onClick={() => { if (!courseSelection.active) setParams({ view: "feed" }); }}>{courseSelection.trigger}</span>
+          <PlaceSearchBox value={query} onChange={setQuery} onOpenChange={setSearchOpen} />
+          {!searchOpen && (
+            <span className="shrink-0 whitespace-nowrap" onClick={() => { if (!courseSelection.active) setParams({ view: "feed" }); }}>{courseSelection.trigger}</span>
+          )}
           <button
             type="button"
             onClick={() => { setPrefillName(""); setShowForm((v) => !v); }}

@@ -28,16 +28,20 @@ export function PlaceSearchBox({
   value,
   onChange,
   placeholder = "이름 · 주소 · 한줄평 · 태그",
+  onOpenChange,
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
+    onOpenChange?.(open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const close = () => {
@@ -51,7 +55,7 @@ export function PlaceSearchBox({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="장소 검색"
-        className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-black/[0.04] hover:text-accent"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-black/[0.04] hover:text-accent"
       >
         <SearchIcon className="h-[18px] w-[18px]" />
       </button>
@@ -59,7 +63,7 @@ export function PlaceSearchBox({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-full bg-card px-3 py-1.5 ring-1 ring-border focus-within:ring-accent">
+    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-card px-3 py-1.5 ring-1 ring-border focus-within:ring-accent sm:flex-none">
       <SearchIcon className="h-4 w-4 shrink-0 text-muted" />
       <input
         ref={inputRef}
@@ -70,7 +74,7 @@ export function PlaceSearchBox({
         }}
         placeholder={placeholder}
         aria-label="장소 검색"
-        className="w-40 bg-transparent text-sm outline-none placeholder:text-muted-2 sm:w-56"
+        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-2 sm:w-56 sm:flex-none"
       />
       <button
         type="button"
