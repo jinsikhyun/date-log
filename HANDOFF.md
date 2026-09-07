@@ -1,3 +1,19 @@
+# ⚠️ 먼저 읽을 것 — place-photos P0는 해결됨
+
+**2026-09-07 운영 DB 직접 조회로 확인 완료.**
+
+- `storage.buckets.public = false` (비공개 버킷), `storage.objects` RLS 활성
+- 익명(anon) 접근 전면 차단 — `authentication guard` + `couple isolation`
+- 커플 격리 `can_access_place_photo(name)`, 소유권 `owner_id = auth.uid()`
+- 업로드 경로 정규식 `^{uuid}/{uuid}/{uuid}(-(?:160|320|640|960|1280))?\.jpg$` 강제
+- 앱은 `/api/place-photo` 로 인증 → 권한검사 → 다운로드하며 서비스 키를 쓰지 않음
+
+**이 문서나 다른 파일에 남아 있는 "공개 버킷 / 익명 업로드·삭제 허용" 서술은 과거 이력이며 현재 상태가 아니다.** 배포 차단 사유나 미해결 P0로 취급하지 말 것.
+
+⚠️ 정책 9개가 서로 얽혀 있어 임의 수정 시 사진 업로드가 깨진다. 건드리지 말 것.
+
+---
+
 # date.log — 인수인계 (Codex 이전용)
 
 ## 현재 기준 상태 — Claude Code는 이 항목부터 확인 (2026-09-06)
