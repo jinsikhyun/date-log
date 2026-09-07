@@ -70,6 +70,72 @@ export function extractKakaoId(url: string | null | undefined): string | null {
   return m ? m[1] : null;
 }
 
+// "프랜차이즈"/"브랜드" 다음 세그먼트는 브랜드명(예: "공차", "CU")이라 검색어로 안 쓴다 —
+// shortCategory()가 같은 이유로 parts[1]을 쓰는 것과 동일한 문제. 브랜드명으로 검색하면
+// 그 브랜드 매장만 나와 후보 폭이 오히려 좁아진다.
+const CATEGORY_BRAND_MARKER = /^(프랜차이즈|브랜드)$/;
+// 말단이 이런 값이면 구체성이 없으므로 그 앞 단계로 물러난다.
+const CATEGORY_GENERIC_LEAF = /^(기타|기타서비스)$/;
+
+/**
+ * Kakao category_name 전체 경로(예: "음식점 > 일식 > 일본식라면")에서 상세 후보 검색어로
+ * 쓸 가장 구체적인 항목을 고른다. 2026-09-08 실측(§3단계 진단): 실제 응답이
+ * "음식점 > 일식 > 일본식라면"(3단), "음식점 > 일식"(2단), "음식점 > 샤브샤브"(2단)처럼
+ * 깊이가 섞여 있어 "항상 말단" 또는 "항상 두 번째"로 고정할 수 없었다.
+ * - parts[0](최상위, "음식점"/"카페" 등)은 우리 앱 자체 대분류와 비슷한 수준이라 제외.
+ * - "프랜차이즈"/"브랜드" 세그먼트를 만나면 그 다음(브랜드명)은 쓰지 않는다.
+ * - 그러고도 남은 것 중 가장 구체적인(마지막) 항목을 쓰되, "기타"류면 건너뛴다.
+ * - 쓸 만한 게 없으면 null — 호출부는 기존 대분류 검색만 쓴다(억지로 만들지 않는다).
+ */
+export function deriveSpecificSearchTerm(categoryName: string): string | null {
+  const parts = categoryName
+    .split(">")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const usable: string[] = [];
+  for (let i = 1; i < parts.length; i++) {
+    if (CATEGORY_BRAND_MARKER.test(parts[i])) break;
+    usable.push(parts[i]);
+  }
+  for (let i = usable.length - 1; i >= 0; i--) {
+    if (!CATEGORY_GENERIC_LEAF.test(usable[i])) return usable[i];
+  }
+  return null;
+}
+
+/**
+ * 기준 장소 자신을 이름 + 좌표로 재검색해 Kakao 쪽 세부 category_name을 얻는다.
+ * Kakao Local API에는 place id로 직접 조회하는 엔드포인트가 없다(공식 문서 확인,
+ * 2026-09-08) — 이름 검색 + 좌표 편향 + kakao_map_link의 id 대조가 유일한 우회다.
+ * 좌표 편향(x/y/radius) 없이 이름만 검색하면 흔한 이름(예: "약수터")에서 전국의
+ * 동명 자연 지형만 나오고 실제 매칭이 실패하는 것을 실측으로 확인했다 — radius는
+ * 선택이 아니라 필수다. id가 일치하는 결과가 없으면 null — 추측해서 엉뚱한
+ * category_name을 쓰지 않는다.
+ */
+export async function findReferenceCategoryName(params: {
+  apiKey: string;
+  name: string;
+  lat: number;
+  lng: number;
+  expectedId: string;
+}): Promise<{ categoryName: string } | null> {
+  const url = new URL(KEYWORD_SEARCH_URL);
+  url.searchParams.set("query", params.name);
+  url.searchParams.set("x", String(params.lng));
+  url.searchParams.set("y", String(params.lat));
+  url.searchParams.set("radius", "500");
+  url.searchParams.set("sort", "distance");
+  url.searchParams.set("page", "1");
+  url.searchParams.set("size", String(PAGE_SIZE));
+  const res = await fetch(url, {
+    headers: { Authorization: `KakaoAK ${params.apiKey}` },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as KakaoKeywordResponse;
+  const match = body.documents.find((d) => d.id === params.expectedId);
+  return match ? { categoryName: match.category_name } : null;
+}
+
 /**
  * 키워드 검색 한 번(한 정렬 기준)으로 후보를 모으고 서울/경기 밖 주소는 제외한다.
  * 최대 maxPages 페이지 조회, 필터 후 앞에서부터 반환.

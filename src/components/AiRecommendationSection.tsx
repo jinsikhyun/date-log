@@ -61,6 +61,8 @@ export function AiRecommendationSection({ place }: { place: Place }) {
         body: JSON.stringify({
           category: place.category,
           tags: place.tags,
+          name: place.name,
+          kakaoMapLink: place.kakao_map_link,
           lat: place.lat,
           lng: place.lng,
           excludeAddress: place.address,

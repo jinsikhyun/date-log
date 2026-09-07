@@ -5,8 +5,10 @@ import { CourseContextSchema } from "@/lib/courseContext";
 import { diverseCandidates, isLocalCourse, searchQueries, contextPolicy, contextualQueries } from "@/lib/recommendationPolicy";
 import {
   collectCandidates,
+  deriveSpecificSearchTerm,
   excludeNearSelf,
   extractKakaoId,
+  findReferenceCategoryName,
   withDistance,
 } from "@/lib/kakaoLocal";
 
@@ -27,6 +29,10 @@ const RequestBodySchema = z.object({
   })).max(20).default([]),
   category: z.string().trim().min(1).max(100),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  // place_detail 전용(3단계): 기준 장소 자신을 Kakao에서 재검색해 세부 업종을 얻는 데만 쓴다.
+  // course 모드는 무시한다(courseStops 기반 역할 검색이 이미 있음).
+  name: z.string().trim().min(1).max(200).optional(),
+  kakaoMapLink: z.string().url().max(500).nullable().optional(),
   lat: z.number().finite().min(-90).max(90),
   lng: z.number().finite().min(-180).max(180),
   radiusMeters: z.number().finite().min(1).max(MAX_RADIUS_METERS).optional(),
@@ -104,7 +110,41 @@ export async function POST(req: NextRequest) {
   const local = body.mode === "course" && isLocalCourse(body.courseStops);
   const context = body.mode === "course" ? body.context : undefined;
   const policy = contextPolicy(local, context);
-  const queries = contextualQueries(searchQueries(body.mode, category, [], body.courseStops), context);
+  const baseQueries = searchQueries(body.mode, category, [], body.courseStops);
+
+  // place_detail 전용 3단계 개선: "카페"/"맛집" 같은 우리 앱의 대분류 하나로만 검색하면
+  // 실측상 반경 수백m를 못 벗어난다(진단 결과 참고). 기준 장소를 이름+좌표로 재검색해
+  // Kakao 쪽 세부 category_name(예: "일본식라면")을 확인되면 검색어에 추가한다.
+  // course 모드는 이미 역할 기반 다중 검색어가 있어 건드리지 않는다.
+  let specificTerm: string | null = null;
+  if (body.mode !== "course" && body.name) {
+    const expectedId = extractKakaoId(body.kakaoMapLink);
+    if (expectedId) {
+      try {
+        const found = await findReferenceCategoryName({
+          apiKey,
+          name: body.name,
+          lat: body.lat,
+          lng: body.lng,
+          expectedId,
+        });
+        specificTerm = found ? deriveSpecificSearchTerm(found.categoryName) : null;
+        // 식별정보(장소명·좌표) 없이 성공/실패와 실제 쓰인 검색어만 남긴다 — §0단계 원칙.
+        console.log(
+          `[kakao-candidates] 세부업종 검색어: ${specificTerm ? `"${specificTerm}" 사용` : found ? "category_name은 확인했으나 쓸 만한 세부 항목 없음" : "기준 장소 재검색 매칭 실패 — 대분류만 사용"}`,
+        );
+      } catch (err) {
+        console.error("[kakao-candidates] 기준 장소 세부업종 조회 실패(대분류로 계속):", err);
+      }
+    } else {
+      console.log("[kakao-candidates] kakaoMapLink 없음 — 대분류만 사용");
+    }
+  }
+
+  const queries = contextualQueries(
+    specificTerm ? [specificTerm, ...baseQueries] : baseQueries,
+    context,
+  );
 
   let raw;
   try {
