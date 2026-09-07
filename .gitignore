@@ -47,3 +47,14 @@ Date.log*.pdf
 Design*.pdf
 Design*.zip
 *.dc.html
+
+# 로컬 작업물 (저장소에 넣지 않음)
+*.zip
+*.swp
+supporting-photos/
+
+# AI 추천 고도화 비교 실행 결과 (가상 데이터 실행 결과물, 재생성 가능)
+scripts/eval/results.json
+scripts/eval/results-reps.json
+scripts/eval/regression-results.json
+scripts/eval/regression-results-reps.json

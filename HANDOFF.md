@@ -1,16 +1,100 @@
-# ⚠️ 먼저 읽을 것 — place-photos P0는 해결됨
+# AI 추천 고도화 — 0단계 + 4단계 단독 측정 (2026-09-08, 로컬만 — 배포/커밋 없음)
 
-**2026-09-07 운영 DB 직접 조회로 확인 완료.**
+기준 문서: `CLAUDE_AI_RECOMMENDATION_UPGRADE_HANDOFF.md`. 아래는 그 문서의 "Claude Code 첫 작업" 지시(0단계 대조 → 4단계만 적용해 측정 → 이후 단계 재설계)의 결과다. 운영 SQL·커밋·푸시·배포는 하지 않았다.
+
+- **0단계 대조**: 문서 §2 표를 `src/app/api/ai-recommend/route.ts`, `src/app/api/kakao-candidates/route.ts`, `src/lib/recommendationPolicy.ts`, `src/lib/recommendationFeedback.ts` 실제 코드와 대조했다. 표의 13개 항목 모두 코드와 일치했다(불일치 없음) — 문서가 작성 당일 코드 확인 후 쓰였기 때문으로 보인다.
+- **fixture/평가**: `scripts/eval/fixtures.ts`에 문서 §0이 요구한 8개 케이스(기록 없음/한쪽만 기록/취향 충돌/별점-감정 충돌/오래된 단골/업종 반복/적합한 먼 후보/부적합한 가까운 후보)를 가상 데이터로 만들었다. 실존 상호명은 쓰지 않았다.
+- **4단계 `buildTasteProfile`**: `src/lib/tasteProfile.ts`에 순수 함수로 구현(현재 `route.ts`에는 연결 안 함 — 측정 전용). 단위 테스트 `scripts/taste-profile.test.mjs` 11개, 기존 테스트 포함 총 21개 통과. `npx tsc --noEmit`/`eslint` 통과.
+- **측정 방법**: `scripts/eval/run-taste-profile-eval.mjs`가 같은 8개 fixture로 (a) 현재 `route.ts` 로직을 그대로 재구성한 baseline과 (b) `confirmedPlaceTraits`/`memberPreferences`/`visitFeedback` 자리에 `buildTasteProfile` 출력만 넣은 experiment를 각각 실제 OpenAI 호출로 비교했다(모델은 route.ts와 동일한 `gpt-5.6-luna`, 8×2=16회 유료 호출, 결과는 `scripts/eval/results.json`— gitignore 처리함).
+- **케이스별 결과 요약** (n=1/케이스라 방향성 참고용이며 통계적 결론 아님):
+  - 기록 없음/오래된 단골/적합한 먼 후보/부적합한 가까운 후보: 두 방식 모두 이미 기대대로 동작(허구 취향 없음, 먼 적합 후보 채택, 가까운 부적합 후보 배제). experiment 쪽이 추억 원문을 reason에 더 자연스럽게 인용하는 차이 정도.
+  - **취향 충돌(한쪽은 조용함, 한쪽은 활기참)**: baseline은 한쪽(활기찬 술집) 근거만 반영하고 조용한 쪽 근거를 추천에서 완전히 누락했다. experiment는 두 근거를 모두 반영해 각 member 취향에 맞는 후보를 하나씩 반환했다 — 문서 §4/§5가 요구한 "커플 균형"에서 가장 뚜렷한 개선.
+  - **별점 4.8·감정 충돌**: baseline reason은 "한 분은 긍정, 한 분은 부정으로 엇갈렸다"고 명시적으로 언급했는데, experiment는 같은 사실(negativeEvidence에 존재)을 갖고도 reason에서 언급하지 않았다 — buildTasteProfile 구조가 상충을 자동으로 더 잘 드러내 준다고 볼 수 없다는 반례. 5단계에서 프롬프트가 이 구조를 어떻게 요약하게 할지 별도 검증 필요.
+  - **업종(카페) 반복**: baseline은 카페 2개+전시 1개로 다양화했는데 experiment는 카페 2개만 반환해 다양화가 오히려 덜했다(재현 1회, 노이즈일 가능성 있음).
+  - 토큰: experiment가 프로필 JSON이 더 길어 input 토큰이 케이스당 대략 300~600 더 든다. 절대량은 작아 비용 영향은 미미.
+- **결론(잠정)**: `buildTasteProfile`은 "근거 없는 취향 생성 방지"나 "적합한 먼 후보/부적합한 가까운 후보 판단"에서는 baseline과 동급이고, "취향 충돌 시 양쪽 반영"에서는 명확히 낫다. 반면 "상충 사실을 reason에서 숨기지 않기"는 오히려 baseline이 나은 사례가 1건 있었다 — 데이터 구조 개선(4단계)만으로는 해결 안 되고 5단계 프롬프트 설계에서 별도로 다뤄야 할 문제로 보인다. n=1 재현이므로 각 케이스 반복 실행 후 재확인이 필요하다.
+- **현재 route.ts와의 실제 필드 격차**: `buildTasteProfile`을 실제로 연결하려면 `route.ts`의 `places` SELECT에 `is_regular`, `first_visit_date`, `created_at`을 추가하고 `memories` SELECT에 `content`, `date`를 추가해야 한다(현재는 감정 태그만 조회 — 문서 §2 표와 일치하는 현재 상태). 이 확장 자체는 아직 하지 않았다.
+- **미검증**: 실제 커플의 진짜 기록 볼륨(수백 건 이상)에서의 동작, 코스(course) 모드에서의 동일 비교, 5단계(근거-후보 연결) 프롬프트와 결합했을 때의 결과, 각 케이스 반복 샘플링을 통한 재현성.
+- **다음 단계 제안**: 사용자 승인 필요 — (1) 별점-감정 충돌 사례를 5단계 프롬프트 설계에서 어떻게 다룰지 먼저 정할지, (2) `buildTasteProfile`을 `route.ts`에 실제로 연결(위 필드 확장 포함)하며 1단계(solo 시작)로 넘어갈지, 아니면 (3) 케이스 3(취향 충돌) 개선 효과를 더 많은 반복으로 먼저 검증할지.
+
+## 재현성 검증 사이클 (같은 날 후속, 사용자 지시로 진행)
+
+사용자가 위 n=1 결과를 보고 "재현성 확인 → 원인 파악(데이터 vs 프롬프트) → 원인에 맞는 수정 → 재측정" 한 사이클을 요구해 케이스 3/4/6을 각 변형(baseline/experiment)당 4회씩(`EVAL_REPS=4`) 재실행했다. 결과: `scripts/eval/results-reps.json`(gitignore 처리).
+
+- **원인 진단(별점·감정 충돌)**: `results.json`의 실제 페이로드를 직접 확인한 결과, experiment의 `tasteProfile.representativePlaces[0].facts`에 `"member_1 방문 후 긍정 반응"`과 `"member_2 방문 후 아쉬운 반응"`이 나란히 들어 있었고 `negativeEvidence`에도 별도로 잡혀 있었다 — **데이터는 상충을 이미 정확히 노출하고 있었다.** 즉 원인은 데이터 구조가 아니라 프롬프트: facts가 한 배열에 미리 합쳐져 있으니 모델이 요약하면서 상충을 굳이 문장으로 안 짚어도 되는 것으로 보인다.
+- **수정**: `scripts/eval/run-taste-profile-eval.mjs`의 experiment 쪽 규칙에 한 줄 추가 — "그 장소의 facts나 negativeEvidence에 상충하는 반응이 있으면 reason에서 반드시 함께 언급하라". route.ts는 아직 안 건드림(이 스크립트가 독립 실행용이라).
+- **재측정 — 케이스 4(별점·감정 충돌)**: 수정 후 4회 중 4회 모두 상충을 reason에 명시(같은 배치의 baseline은 4회 중 3회). 프롬프트 한 줄로 격차가 해소됐다 — 원인 진단이 맞았다는 뜻.
+- **재측정 — 케이스 3(취향 충돌, 애초 "가장 뚜렷한 개선"이라 보고했던 것)**: **철회한다.** 4회 재실행한 baseline이 4회 모두 두 카테고리(술집·포차 + 술집·바)를 반영해 두 사람 취향을 다 살렸다 — 애초 1회 실행에서 baseline이 한쪽만 반영했던 건 재현되지 않는 일회성 변동으로 보인다. experiment도 비슷한 비율(4회 중 3회 2카테고리, 1회 3카테고리)이라 이 케이스에서 experiment가 baseline보다 체계적으로 낫다는 근거는 없다. **"커플 균형 개선"이라는 최초 결론은 n=1의 착시였다** — 정정해서 기록한다.
+- **재측정 — 케이스 6(업종 반복)**: baseline 평균 pick 2.5개(전시 다양화 2/4회), experiment 평균 2.0개(전시 다양화 2/4회) — 다양화 비율 자체는 동일(2/4)했고 pick 개수만 소폭 적었다. 애초 1회 실행에서 본 "experiment가 다양화를 덜 한다"는 것도 뚜렷한 회귀라기보다는 정상 변동 범위에 가깝다. pick 개수가 약간 적은 경향은 남아 있어 완전히 무시하진 않되, 결정적 신호로 보지 않는다.
+- **정정된 결론**: 이번 A/B(같은 사실을 다른 구조로 포장했을 때 최종 추천이 달라지는지)에서 재현 가능한 차이는 사실상 케이스 4 하나였고, 그것도 원인이 데이터가 아니라 프롬프트 문장 한 줄이라 밝혀져 고쳤다. **"구조만 바꿔도 추천이 좋아진다"는 가설은 이번 8케이스 기준으로는 강하게 지지되지 않는다.** 반면 `buildTasteProfile`의 더 확실한 가치는 A/B 승패가 아니라 **현재 route.ts가 아예 조회하지 않는 데이터**(단골 지정 여부, 방문일 기반 최근성, 추억 원문 인용)를 쓸 수 있게 해준다는 것과, 코드 차원의 구조적 보장(같은 장소 중복 가산 방지, "단골=방문횟수 아님" 등, `scripts/taste-profile.test.mjs` 11개로 테스트됨)이다 — 이건 출력 diff로는 안 보이고 데이터 접근성/불변식 문제라 별도로 가치가 있다.
+- **아직 하지 않음**: `route.ts` 연결. 사용자가 "연결은 이 사이클이 끝난 뒤 계획부터 보고"라고 명시해, 계획만 아래에 제시하고 실행은 승인 대기 중이다.
+
+## route.ts 연결 완료 (같은 날 후속, 사용자 승인 후 진행 — commit/push는 별도 논의)
+
+사용자가 계획을 승인하면서 조건 두 가지를 걸었다: (1) 추억 원문(memories.content) 노출 기준을 코드에 명시하고 보고, (2) SELECT 확장의 조회 부담을 추정해 보고. 점수 가중치·후보 로직은 변경하지 않았다(사용자 명시 제약).
+
+- **(1) 추억 원문 노출 기준**: `src/lib/tasteProfile.ts` 상단에 명시. ① 장소당 최대 1개 원문(가장 최근 것)만 쓴다. ② 이미 대표/관련/개인/공통 근거로 선별된 장소에만 원문이 붙을 수 있다(전체 추억을 훑지 않음). ③ 그중에서도 요청 전체를 통틀어 강도 점수 상위 `QUOTE_BUDGET_TOTAL=10`곳까지만 원문을 붙이고 나머지는 facts(사실)는 남기되 원문만 뺀다 — 같은 장소는 어느 섹션에 나오든 원문 노출 여부가 일관되게 적용된다(장소 단위로 한 번만 결정). ④ 각 원문은 `QUOTE_MAX_CHARS=80`자로 자르되 문장 경계(마침표류/"요")를 우선해 부정어가 잘려 의미가 뒤집히는 걸 피한다. 단위테스트로 개수 상한을 검증(`scripts/taste-profile.test.mjs`, 12개 통과).
+- **(2) 조회 부담 추정**: `places`/`memories` 테이블 정의(`supabase/schema.sql`)와 기존 migrations 전체를 확인한 결과 **`couple_id`에 인덱스가 아예 없다**(이 작업 이전부터 그랬음, 내가 만든 문제는 아니다). 인덱스가 없으면 couple_id 필터 쿼리는 "그 커플의 행 수"가 아니라 "테이블 전체 행 수"에 비례해 느려진다(순차 스캔) — 커플·장소가 늘수록 모든 사용자의 조회가 함께 느려지는 구조다. 지금 데이터량에서는 체감 차이가 없을 정도로 작다(이 세션에서 실제 운영 DB에 EXPLAIN ANALYZE를 돌리진 않았다 — 그건 운영 조회라 별도 승인 없이 하지 않았고, 이번 결론은 스키마 구조 기반 추정이다). 내가 넓힌 컬럼(is_regular/first_visit_date/created_at/content/date) 자체의 추가 비용은 작다(행당 수백 바이트, 요청당 수십 KB 수준 — 스캔 비용을 바꾸지 않고 전송량만 약간 늘림). 두 가지로 대응했다: ① `places` 쿼리에 기존에 없던 `LIMIT 300`을 추가(코드 변경, 즉시 적용됨 — memories는 이미 `limit(200)`이 있었음). ② `couple_id` 복합 인덱스 2개를 `supabase/migrations/20260908000000_add_couple_id_indexes.sql`로 작성만 해 두었다(**실행 안 함** — 사용자 승인 후 별도 적용).
+- **route.ts 변경**: `places` SELECT에 `is_regular, first_visit_date, created_at` 추가, `memories` SELECT에 `content, date` 추가. `confirmedPlaceTraits`/`memberPreferences`/`visitFeedback`/(비활성 상태였던) `favoriteTags` 조립 블록 전체를 `buildTasteProfile()` 호출로 교체했다. 시스템 프롬프트도 그 데이터 설명 규칙을 `src/lib/recommendationPrompt.ts`(신규, `buildCommonRules`/`buildPlaceDetailScoringRules`/`buildCourseScoringRules`)로 옮기면서 재현성 검증에서 확정한 "상충 시 reason에 반드시 언급" 규칙을 포함시켰다. `recommendationFeedback.ts`는 이제 route.ts에서 쓰지 않지만 파일·테스트는 남겨뒀다(삭제는 별도 승인 필요, 이번 범위 아님).
+- **회귀 확인 방식**: 이전 A/B 스크립트는 시스템 프롬프트 규칙을 손으로 다시 옮겨 적어 실제 코드와 갈라질 위험이 있었다. 그래서 `scripts/eval/run-route-regression.mjs`는 `recommendationPrompt.ts`의 `buildCommonRules`/`buildPlaceDetailScoringRules`와 `tasteProfile.ts`의 `buildTasteProfile`을 **route.ts와 동일하게 직접 가져와** 호출한다 — 즉 이 스크립트가 실제로 부르는 건 production 코드 그 자체다(순수 Node에서 확장자 없는 `@/lib` 내부 import를 풀기 위한 로더 훅 `scripts/ts-extension-hook.mjs`를 추가했다 — production 코드는 안 건드림).
+- **회귀 확인 중 실제 버그 발견·수정**: 8-fixture 회귀 1회차에서 `preference_conflict` 케이스가 reason에 `"member_2 pick"`을 그대로 노출했다 — `RECOMMENDATION_VOICE_RULES`에 "내부 필드명을 출력하지 마라"는 규칙이 이미 있었는데도 발생했다. 과거 baseline(5회 실행, `results.json`+`results-reps.json`)에서는 이 유출이 한 번도 없었던 반면 tasteProfile 쪽(5회 중 3회)에서만 발생한 것을 직접 대조해, `facts.push(\`${label} pick\`)`처럼 라벨과 단어를 한 문자열로 붙인 게 원인임을 특정했다. 프롬프트만으로 완전히 막힌다는 보장이 없어 `stripInternalMemberLabels()`(신규, `recommendationPrompt.ts`)로 후처리 방어망을 추가했다 — 기존에 있던 "마지막 정거장"→"마지막 장소" 치환과 같은 패턴. 단위테스트(`scripts/recommendation-prompt.test.mjs`, 실제 유출 문장으로 검증) 통과. 수정 후 `preference_conflict`를 5회 반복 재실행해 원본에서 1회 더 유출이 있었지만 최종 사용자 노출 텍스트에서는 5/5 모두 깨끗하게 정리됨을 확인했다.
+- **최종 8-fixture 회귀(수정 반영 후, 1회씩)**: 전부 통과 — 기록 없음/한쪽만 기록 케이스에서 허구 취향 없음, 취향 충돌 케이스에서 두 사람 근거 모두 반영(정확한 균형 여부는 이전 절 참고 — 실행마다 다를 수 있음), 별점·감정 충돌 케이스에서 상충을 자연스러운 문장으로 명시(“다만 한 분은 방문 후 아쉬운 반응을 남겼고”), 오래된 단골이 근거로 계속 쓰임(다만 “단골”이라는 단어 자체가 reason에 항상 등장하진 않음 — 근거 배제와는 별개), 먼 적합 후보(11.2km)가 거리 이유로 탈락하지 않고 선택됨, 가까운 부적합 후보가 선택되지 않음. 내부 라벨 유출 0건. `npx tsc --noEmit`/`eslint` 통과, 관련 테스트 24개 통과(`node --test --import ./scripts/register-ts-extension-hook.mjs scripts/*.test.mjs`).
+- **미검증**: 실제 로그인 세션으로 브라우저에서 `/api/ai-recommend`를 직접 호출한 적은 없다(이번 검증은 fixture 기반 독립 호출). course 모드(코스 추천)는 `buildCourseScoringRules` 추출만 했고 course fixture로 별도 회귀하지 않았다. `PLACE_TASTE_ROWS_LIMIT=300`이 실제 수백 개 장소를 가진 커플에게 적절한지는 실측하지 못했다. `couple_id` 인덱스는 작성만 하고 실행하지 않았다.
+- **커밋 전 확인할 변경 파일**: `src/app/api/ai-recommend/route.ts`(수정), `src/lib/tasteProfile.ts`(신규), `src/lib/recommendationPrompt.ts`(신규), `scripts/eval/*`(신규, 비교/회귀 스크립트 — 결과 JSON은 gitignore 처리), `scripts/taste-profile.test.mjs`·`scripts/recommendation-prompt.test.mjs`(신규), `scripts/ts-extension-hook.mjs`·`scripts/register-ts-extension-hook.mjs`(신규, 평가 스크립트 전용 로더), `supabase/migrations/20260908000000_add_couple_id_indexes.sql`(신규, 미실행), `.gitignore`(평가 결과 JSON 3종 추가).
+
+## 커밋 전 확인 사항 2건 완료 (같은 날 후속)
+
+### (1) 내부 라벨 유출 — 후처리가 아니라 입력 쪽에서 원천 차단
+
+사용자 지적: 정규식 후처리는 유지하되, `facts`에 `"member_2 pick"`류 내부 라벨을 애초에 만들지 말라 — 실제 표시 이름 또는 라벨 없는 문장으로.
+
+- **선택**: 라벨 없는 문장 쪽을 택했다(실제 표시 이름은 안 씀). 이유: `memberPreferences`(구 baseline)도 원래 실명을 OpenAI에 보내지 않고 `member_1`/`member_2`로 익명화했었다 — 이건 기존에 있던 프라이버시 설계였다. 실명을 쓰면 라벨 유출은 막아도 대신 실제 이름이 매 요청마다 OpenAI로 나가는 새로운 트레이드오프가 생긴다. `RECOMMENDATION_VOICE_RULES`의 기존 규칙("본인과 파트너 중 누구인지 추정하지 마세요")도 애초에 개인 식별을 안 하는 쪽을 의도한 것으로 보여, 그 설계 의도를 유지했다.
+- **구현** (`src/lib/tasteProfile.ts`): 장소 하나에 신호를 남긴 사람이 한 명뿐이면 주어 자체를 생략한다("pick함", "방문 후 아쉬운 반응을 남김" — 실제로 이렇게 써도 자연스러운 한국어다). 두 사람이 서로 다르게 반응했을 때만 그 장소 안에서 등장 순서대로 "한 사람"/"다른 사람"이라는 완전한 자연어 대명사로 구분한다(`pronounMap`/`personPhrase`). `member_1`/`member_2` 문자열은 facts·quote 어디에도 나타나지 않는다. `negativeEvidence`도 같은 방식으로 고쳤다(거기도 라벨을 그대로 쓰고 있었다).
+- **구조적 필드는 그대로 둠**: `personalPreferences[].member`("member_1")와 `wishlistOrientation[].wantedBy`는 프로즈에 섞여 있지 않은 JSON 필드라 안전하다고 판단해 유지했다 — 실제로 baseline 5회 실행에서 이 구조(별도 `member` 키)는 한 번도 유출된 적이 없었다(대조 근거는 이전 절 참고).
+- **부수적으로 발견해 고친 버그**: `personalPreferences`의 원문(quote)이 실제로는 "그 member 본인 것"인지 확인하지 않고 그 장소의 대표 원문을 그대로 붙이고 있었다 — 상대방 원문이 "내 취향" 목록에 섞여 나올 수 있는 버그였다. `agg.bestQuote?.member === label`로 본인 것일 때만 붙이도록 고쳤다. 이 지점을 바로 다시 쓰는 김에 함께 고쳤고, 단위테스트로 검증했다(`scripts/taste-profile.test.mjs`, 이제 26개 통과).
+- **재검증 기준 = "원본 유출 0회"**: `scripts/eval/run-route-regression.mjs`로 `preference_conflict`(원래 유출이 나왔던 케이스)를 5회 재실행 — **정리 전 원본 기준으로 5/5 모두 유출 없음**(이전엔 정리 전 기준 실패율이 높았다). 별도 단위테스트로 실제 관측했던 유출 문장 4개를 그대로 재현·검증(`scripts/recommendation-prompt.test.mjs`).
+
+### (2) 실제 로그인 브라우저 종단 검증
+
+fixture가 아니라 진식/지민 실계정의 실제 데이터(장소 46개, 위시 4개, 추억 13개)로 확인했다.
+
+- **장소 상세 AI 추천**(place_detail): "코오모라멘"(단골 표시 있음, 픽 있음, 별점 4.5, 실제 추억 1건 포함) 페이지에서 2회 새로 생성 — 매번 `POST /api/ai-recommend` 200, 콘솔 에러 없음. reason에 "두 분이 pick했고", "단골로 지정했으며" 등 실제 데이터가 라벨 없이 자연스럽게 반영됨. `member_1`/`member_2` 유출 없음.
+- **데이트 코스 AI 추천**(course): "코오모라멘"을 1번 장소로 코스를 새로 만들고 "우리 취향으로 추천" 실행 — `POST /api/ai-recommend` 200. "마지막 장소"(정거장 아님) 표현 정상, 위시 항목("바 능소화")은 "위시에 담은 기록"으로 방문 만족과 구분해서 표현됨. 라벨 유출 없음.
+- 두 경우 모두 `is_regular`/`first_visit_date`/`memories.date` 등 null이거나 형식이 섞여 있을 실제 데이터를 실제로 통과시켰지만 500·크래시·콘솔 에러 없었다 — 별도의 null 가드 코드를 추가하지 않아도 기존 옵셔널 체이닝(`??`, `?.`)으로 충분했다.
+- **미검증으로 남는 것**: 서버 프로세스(dev server) 자체의 stdout 로그는 별도로 tail하지 않았다(이 세션에서 새로 띄운 게 아니라 이미 떠 있던 dev server를 재사용함) — 200 응답과 콘솔 무오류로 간접 확인했을 뿐 서버 로그 직접 확인은 아니다. 여러 장소·여러 번 반복해 null 조합을 폭넓게 훑지는 않았다(대표 사례 1곳만 확인).
+
+### couple_id 인덱스는 범위 밖 확인
+
+마이그레이션 파일(`supabase/migrations/20260908000000_add_couple_id_indexes.sql`)은 작성된 상태 그대로 두고 실행하지 않았다. 별도로 처리한다는 사용자 방침에 따름.
+
+---
+
+# 현재 사진 저장소 상태 — 2026-09-08 갱신
+
+**place-photos의 과거 공개·익명 CRUD 문제는 해결됨 — 사용자 제공 운영 조회 결과의 설정·정책·함수 정의 검토 완료.**
+
+- 근거: 사용자가 제공한 `security_audit` JSON 원문을 검토했다. 조회 시각은 `2026-09-07T15:22:35.595376+00:00` (한국시간 2026-09-08 00:22:35). 에이전트의 운영 DB 직접 접속이 아닌 사용자 제공 SQL 조회 결과 검토다.
+- 이번 로컬 코드 대조: `src/app/api/place-photo/route.ts`의 사용자 인증 → `can_access_place_photo` 권한 검사 → 사용자 세션의 Storage 다운로드 흐름과 보안 마이그레이션의 private 설정을 확인했다. 이는 현재 운영 DB 설정의 독립 검증을 대신하지 않는다.
+
+### 제공된 운영 조회 결과에서 확인한 설정
 
 - `storage.buckets.public = false` (비공개 버킷), `storage.objects` RLS 활성
 - 익명(anon) 접근 전면 차단 — `authentication guard` + `couple isolation`
 - 커플 격리 `can_access_place_photo(name)`, 소유권 `owner_id = auth.uid()`
 - 업로드 경로 정규식 `^{uuid}/{uuid}/{uuid}(-(?:160|320|640|960|1280))?\.jpg$` 강제
+- 전체 Storage 정책 중 place-photos 관련 정책 9개 확인. 인증·커플 격리 가드는 RESTRICTIVE이며 `public` 역할 표기는 모든 역할에 제한을 적용한다는 의미다. 공개 접근 허용을 뜻하지 않는다. 나머지 정책은 profile-avatars 버킷으로 한정되어 있다.
+- `can_access_place_photo` 함수 정의 확인: 현재 사용자의 커플이 있는 경우에만 해당 커플 경로 또는 해당 커플의 레거시 접근 매핑을 허용한다. `SECURITY DEFINER`, 빈 `search_path`, 명시적 스키마 참조를 확인했다.
+- 수정·삭제는 기존 객체의 소유자만 허용하며 수정 후 소유권도 검사한다. 신규 업로드는 본인 owner_id와 경로의 사용자 ID를 검사한다.
 - 앱은 `/api/place-photo` 로 인증 → 권한검사 → 다운로드하며 서비스 키를 쓰지 않음
 
-**이 문서나 다른 파일에 남아 있는 "공개 버킷 / 익명 업로드·삭제 허용" 서술은 과거 이력이며 현재 상태가 아니다.** 배포 차단 사유나 미해결 P0로 취급하지 말 것.
+아래 사진 보안 작업 이력의 미적용·미검증·후속 작업 문구는 각 기록 작성 당시의 상태다. 현재 상태는 이 절과 이후의 날짜·근거가 명시된 검증 결과로 판단한다. 새로운 상충 증거가 나오면 해당 증거를 확인하고 상태를 갱신한다.
 
-⚠️ 정책 9개가 서로 얽혀 있어 임의 수정 시 사진 업로드가 깨진다. 건드리지 말 것.
+### 이번 문서 정리의 검증 범위
+
+- 완료: 사용자 제공 운영 조회 원문에서 private 설정, RLS 활성, 익명 접근 제한, 소유권 및 커플 격리 정책·함수 정의를 검토했다. 과거 경고의 공개 버킷·익명 CRUD 허용 설명은 이 조회 시점의 설정과 일치하지 않는다. 문서 변경 공백 검사 통과.
+- 미검증: 이번 검토에서는 실제 Storage API 요청으로 읽기·쓰기 차단을 재현하거나 레거시 매핑 데이터 및 과거 접근 로그를 감사하지 않았다. 과거 침해 유무와 앱 전체 보안에 대한 결론은 포함하지 않는다.
+- 한계: 앱 안전 경고의 내부 판정 및 재발 여부는 검증하지 못했다. 이 문서 갱신은 안전 검토를 해제하거나 경고를 무시하도록 승인하는 조치가 아니다.
+- 운영 SQL·실제 데이터·commit/push/배포 변경 없음.
 
 ---
 
@@ -124,7 +208,7 @@
 - 격리 4개가 사용 중인 사진인지 판단하기 위해 파일명/URL/개인정보 없이 원인별 건수만 반환하는 `supabase/security/diagnose-quarantined-place-photos-readonly.sql` 추가. 결과 대기.
 - 앱 코드는 아직 배포하지 않음. 격리 원인 확인 후 사진 누락 위험을 평가하고 배포 진행 필요.
 
-## 최신 작업 — 비공개 사진 표시 및 커플 조회 격리 (로컬 완료, 운영 반영 대기)
+## 과거 이력 — 비공개 사진 표시 및 커플 조회 격리 (당시 운영 반영 대기, 현재 상태는 문서 첫 절 참조)
 
 - 사진 표시를 `/api/place-photo?path=...`로 통일. SSR 쿠키의 사용자 인증 → `can_access_place_photo` 검사 → 사용자 권한의 Storage download 순서. 서비스 키 사용 없음. 응답은 private/no-store, 같은 출처로 제한하고 HTML/SVG 등 능동 콘텐츠는 거부. SQL 함수가 없으면 503으로 닫힌 상태 유지.
 - `PhotoImage`로 장소 카드/상세/코스/달력/추억 썸네일/라이트박스/업로드 미리보기/AI 추천을 연결. 공유 카드 배경도 변환하며 shareCapture는 same-origin 쿠키를 전송. 기존 public URL은 표시 시 변환하고 DB에는 그대로 보존. 신규 업로드는 `{couple_id}/{user_id}/{uuid}.jpg`, DB 저장값은 `storage://place-photos/...`. 로그인 페이지 실제 개인 사진은 예시 그래픽으로 교체.
@@ -133,14 +217,14 @@
 - 운영 반영 순서: 새 SQL 실행 → legacy_total/legacy_assigned/legacy_quarantined 결과 확인 → 별도 승인 후 앱 배포. SQL 적용부터 새 앱 배포 사이에는 구버전의 루트 경로 신규 업로드가 거부됨. 공개 권한으로 되돌리지 말 것. 현재 운영 앱은 비공개 URL 표시 변경 전 상태.
 - 미검증: 실제 운영 계정 2개/다른 커플에서 사진 표시·업로드·공유 캡처·소속 변경 확인. 운영 매핑 건수도 아직 미확인. 실제 사진 업로드/수정/삭제, 운영 SQL 실행, commit/push/배포는 이번 작업에서 수행하지 않음.
 
-## 최신 검증 완료 — place-photos 익명 접근 차단(운영 설정 기준)
+## 과거 이력 — place-photos 익명 접근 차단 검증 (커플 격리 적용 전)
 
 - 사용자 제공 운영 조회 결과: storage.buckets의 place-photos public=false, storage.objects RLS=true. 앞서 제공된 전체 Storage 정책에서 인증/소유권 restrictive guard 및 authenticated 권한 확인.
 - 결론: P0 anonymous upload, replacement, deletion allowed는 해결됨(Resolved, 사용자 제공 운영 설정 조회 기준). private 버킷이므로 공개 URL의 익명 다운로드도 허용되지 않는 설정 확인. 과거 운영 미적용/버킷 공개 여부 미확인 기록은 이 항목으로 갱신됨.
 - 검증 범위: 사용자 제공 실제 DB 조회 결과 검토 및 격리 DB 정책 테스트. 에이전트가 수행한 기존 공개 URL HEAD는 HTTP 400. 실제 Storage API 업로드/교체/삭제 요청 테스트 및 정상 로그인 사용자 사진 기능 검증은 미실시. 과거 침해 여부는 판단하지 않음.
 - 후속: 로그인 사용자 전체 사진 조회 허용은 유지되어 커플별 사진 조회 격리가 필요하며, 비공개 사진 표시용 signed URL 연동과 기존 owner_id 없는 파일 처리는 별도 작업. 이번 기록 갱신에서 운영 변경/commit/push/배포 없음.
 
-## 최신 운영 정책 조회 검토 — 사용자 제공 결과
+## 과거 이력 — 운영 정책 조회 검토 (후속 검증 전의 사용자 제공 결과)
 
 - 사용자가 제공한 `pg_policies` 결과에서 place-photos 7개 보안 정책과 기존 한글 정책 3개 확인. 이전 `place-photos: public read/insert/update/delete` 정책 없음. 이전 사용자 조회에서 storage.objects RLS=true 확인.
 - 정책 수준 검증: anon의 SELECT/INSERT/UPDATE/DELETE 차단. authenticated 조회 허용, INSERT의 owner_id는 auth.uid()와 일치해야 함. UPDATE/DELETE는 기존 행 소유자만 가능하고 UPDATE 후 소유권 변경도 제한됨. {public} authentication guard는 RESTRICTIVE 제한 정책이며 공개 접근 허용 정책이 아님.
@@ -148,7 +232,7 @@
 - 잔여 범위: 로그인 사용자 전체 조회가 가능하여 커플별 사진 조회 격리는 미해결. 이번 첨부에는 storage.buckets의 public 값이 없어 private 상태의 직접 조회 확인은 대기. HTTP 400만으로 private을 확정하지 않음. 실제 Storage API 쓰기 요청 차단/정상 로그인 업로드는 미검증.
 - 결론: P0 익명 쓰기 허용은 제공된 운영 RLS 정책 수준에서 해결 확인. 익명 공개 다운로드까지 포함한 전체 검증 완료는 아직 아님.
 
-## 최신 확인: place-photos 운영 SQL 실행 성공
+## 과거 이력 — place-photos 운영 SQL 실행 성공 (후속 검증 전)
 
 - 사용자가 수정된 보안 마이그레이션 실행 후 "성공했어"라고 보고함. 아래 운영 미실행/미확인 기록은 이 보고 이전의 이력이며 이 항목이 우선함.
 - RLS=true, 실행 역할 postgres, 소유자 supabase_storage_admin은 사용자 조회 화면으로 확인.
@@ -394,7 +478,7 @@
   9. `src/components/PlaceDetail.tsx`
   10. `src/components/CourseDetail.tsx` + `CourseForm.tsx`
 
-## place-photos 실제 권한 검증 진행
+## 과거 이력 — place-photos 실제 권한 검증 (이후 사용자 완료 확인)
 
 - 기존 소스에 포함된 공개 사진 URL을 인증 없는 HEAD 요청으로 확인: HTTP 400, 캐시 BYPASS. 공개 응답 실패는 확인했으나 파일 부재 가능성 때문에 RLS 차단의 확정 증거로 보지 않음. 사진 본문 다운로드/업로드/수정/삭제 없음.
 - 이후 사용자가 운영 버킷 private 전환과 RLS 정책 적용 완료를 확인했으므로 위 내용은 과거 검증 이력이다. `place-photos` P0는 **해결됨(Resolved)**으로 관리한다.
