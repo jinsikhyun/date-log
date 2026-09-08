@@ -44,7 +44,8 @@ async function main() {
   }
 
   // 3) collectCandidates 병합(라운드로빈) 결과 — 실제 route.ts 순서 그대로
-  const raw = await collectCandidates({ apiKey, queries, lat: origin.lat, lng: origin.lng, radiusMeters: RADIUS, limitPerCall: 15 });
+  const taggedQueries = queries.map((q) => ({ query: q, kind: "base" }));
+  const { candidates: raw } = await collectCandidates({ apiKey, queries: taggedQueries, lat: origin.lat, lng: origin.lng, radiusMeters: RADIUS, limitPerCall: 15 });
   const withD = withDistance(raw, origin);
   const nearFiltered = excludeNearSelf(withD, { address }, 50);
   printList("병합 + 자기/근접 제외 (트렁케이션 전, merge 순서 그대로)", nearFiltered);

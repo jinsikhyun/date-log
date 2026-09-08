@@ -60,6 +60,9 @@ interface AiCourseRec {
   reason: string;
   matchedTags: string[];
   kakaoMapUrl: string | null;
+  // §5단계(우리 위시 활용): 카카오 신규 후보가 아니라 이미 우리 위시리스트에 있던 장소.
+  alreadyOnWishlist: boolean;
+  wishPlaceId: number | null;
 }
 
 const NEAR_KM = 2; // "이 근처" 기준 반경
@@ -443,6 +446,8 @@ export function CourseForm({
           lat: coord.lat,
           lng: coord.lng,
           excludeAddress: origin.address,
+          // §5단계: 이미 이 코스에 담긴 장소(위시 포함)를 위시 후보로 또 추천하지 않는다.
+          excludePlaceIds: placeIds,
           limit: 20,
         }),
       });
@@ -494,7 +499,7 @@ export function CourseForm({
     } finally {
       if (version === aiVersion.current) setAiLoading(false);
     }
-  }, [selected, resolveCoord, aiContext]);
+  }, [selected, placeIds, resolveCoord, aiContext]);
 
   const aiInputKey = JSON.stringify([selected, aiContext]);
   useEffect(() => {
@@ -509,9 +514,16 @@ export function CourseForm({
     setAiOpen((o) => !o);
   };
 
-  /** AI 추천 카드의 "+ 코스에 추가" — 새 장소로 저장(이번 코스에만) 후 바로 코스에 담는다. */
+  /** AI 추천 카드의 "+ 코스에 추가" — 새 장소로 저장(이번 코스에만) 후 바로 코스에 담는다.
+   * 위시 후보(alreadyOnWishlist)는 이미 있는 장소이므로 새로 insert하지 않고 기존
+   * pickButton과 같은 경로(addToCourse)로 바로 담는다 — 중복 insert 방지(§5단계). */
   const addAiCandidate = async (rec: AiCourseRec) => {
     if (placeIds.length >= MAX_COURSE_PLACES) { setAiError(`최대 ${MAX_COURSE_PLACES}곳까지 담을 수 있어요.`); return; }
+    if (rec.alreadyOnWishlist && rec.wishPlaceId != null) {
+      addToCourse(rec.wishPlaceId);
+      setAiAll((prev) => (prev ?? []).filter((r) => r.kakaoPlaceId !== rec.kakaoPlaceId));
+      return;
+    }
     if (!authorName) {
       setAiError("프로필 이름이 없어요. 설정에서 이름을 먼저 정해 주세요.");
       return;
@@ -771,6 +783,11 @@ export function CourseForm({
                             <span className="shrink-0 rounded-full bg-[#10a37f] px-2 py-0.5 text-[10px] font-semibold text-white">
                               ✦ AI
                             </span>
+                            {r.alreadyOnWishlist && (
+                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${statusBadgeClass("wishlist")}`}>
+                                {statusLabel("wishlist")}
+                              </span>
+                            )}
                             <span className="min-w-0 flex-1 truncate text-sm font-medium">
                               {r.name}
                             </span>

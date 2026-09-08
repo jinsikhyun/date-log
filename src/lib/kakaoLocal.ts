@@ -184,6 +184,27 @@ export async function searchKakaoPlaces(params: {
   return results.slice(0, limit);
 }
 
+// 후보가 어느 검색어에서 왔는지 구분하는 유일한 차원 — "구체 검색어"(deriveSpecificSearchTerm
+// 결과) vs "그 외 전부"(대분류·태그조합·역할 검색어). 정렬(accuracy/distance)은 별도 차원으로
+// 나누지 않는다 — §3단계 진단에서 distance 정렬 기여도가 지역마다 0~4건으로 들쭉날쭉해,
+// 차원을 늘리면 실험 공간만 커지고 결론이 안 나기 때문(2026-09-08).
+export type QueryKind = "specific" | "base";
+
+/** 최종 채택된 후보 하나가 어느 검색어·정렬·원래 순위에서 왔는지. 로그/진단 전용 —
+ * KakaoCandidate 필드로 붙이지 않고 별도 Map으로만 관리해 AI 프롬프트·응답 바디에
+ * 구조적으로 섞일 수 없게 한다(§3단계 지시: 내부 라벨 유출 패턴 재발 방지). */
+export interface CandidateSource {
+  query: string;
+  kind: QueryKind;
+  sort: KakaoSort;
+  rank: number; // 그 검색어×정렬 조합 안에서의 원래 순위(1-based)
+}
+
+export interface CollectCandidatesResult {
+  candidates: KakaoCandidate[];
+  sources: Map<string, CandidateSource>; // candidate id -> 최초 채택된 출처
+}
+
 /**
  * 여러 검색어 × 정확도순/거리순을 모두 조회해 카카오 place id 기준으로 합친다.
  * 검색어 하나만, 거리순만 쓰던 방식보다 후보 폭과 다양성을 넓힌다.
@@ -191,44 +212,59 @@ export async function searchKakaoPlaces(params: {
  */
 export async function collectCandidates(params: {
   apiKey: string;
-  queries: string[];
+  queries: Array<{ query: string; kind: QueryKind }>;
   lat: number;
   lng: number;
   radiusMeters?: number;
   limitPerCall?: number;
-}): Promise<KakaoCandidate[]> {
+}): Promise<CollectCandidatesResult> {
   const sorts: KakaoSort[] = ["accuracy", "distance"];
-  const uniqueQueries = Array.from(
-    new Set(params.queries.map((q) => q.trim()).filter(Boolean)),
+  const seen = new Set<string>();
+  const uniqueQueries: Array<{ query: string; kind: QueryKind }> = [];
+  for (const q of params.queries) {
+    const query = q.query.trim();
+    if (!query || seen.has(query)) continue;
+    seen.add(query);
+    uniqueQueries.push({ query, kind: q.kind });
+  }
+
+  const calls = uniqueQueries.flatMap(({ query, kind }) =>
+    sorts.map((sort) => ({ query, kind, sort })),
   );
 
-  const calls = uniqueQueries.flatMap((query) =>
-    sorts.map((sort) =>
+  const settled = await Promise.allSettled(
+    calls.map((c) =>
       searchKakaoPlaces({
         apiKey: params.apiKey,
-        query,
+        query: c.query,
         lat: params.lat,
         lng: params.lng,
         radiusMeters: params.radiusMeters,
         limit: params.limitPerCall ?? PAGE_SIZE,
-        sort,
+        sort: c.sort,
         maxPages: 1, // 검색어 여러 개를 합치므로 조합당 1페이지면 충분
       }),
     ),
   );
 
-  const settled = await Promise.allSettled(calls);
-  const lists = settled.flatMap(r => r.status === "fulfilled" ? [r.value] : []);
+  const lists = settled.flatMap((r, i) =>
+    r.status === "fulfilled" ? [{ ...calls[i], docs: r.value }] : [],
+  );
   if (!lists.length) throw new Error("모든 장소 검색 요청이 실패했습니다.");
+
   const merged = new Map<string, KakaoCandidate>();
+  const sources = new Map<string, CandidateSource>();
   for (let i = 0; i < PAGE_SIZE; i++) {
-    for (const list of lists) {
-      const c = list[i];
+    for (const { query, kind, sort, docs } of lists) {
+      const c = docs[i];
       if (!c) continue;
-      if (!merged.has(c.id)) merged.set(c.id, c);
+      if (!merged.has(c.id)) {
+        merged.set(c.id, c);
+        sources.set(c.id, { query, kind, sort, rank: i + 1 });
+      }
     }
   }
-  return Array.from(merged.values());
+  return { candidates: Array.from(merged.values()), sources };
 }
 
 export interface KakaoCandidateWithDistance extends KakaoCandidate {

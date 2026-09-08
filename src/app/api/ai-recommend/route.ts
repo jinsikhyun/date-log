@@ -78,6 +78,11 @@ const CandidateInputSchema = z.object({
   lng: Longitude,
   distanceMeters: z.number().finite().min(0).max(100_000).optional(),
   kakaoMapUrl: z.string().url().max(500).nullable().optional(),
+  // §5단계(우리 위시 활용): 카카오가 아니라 우리 위시리스트에서 온 후보인지. AI 프롬프트와
+  // 최종 응답까지 그대로 통과시켜 "새로 발견한 곳"으로 오표시되지 않게 한다 — 검색어 출처
+  // 메타(specific/base)와 달리 이건 사용자에게 그대로 보여줘야 하는 정보라 숨기지 않는다.
+  alreadyOnWishlist: z.boolean().default(false),
+  wishPlaceId: z.number().int().optional(),
 });
 const CourseStopInputSchema = z.object({
   name: ShortText,
@@ -296,6 +301,7 @@ export async function POST(req: NextRequest) {
       lat: c.lat,
       lng: c.lng,
       distanceMeters: c.distanceMeters,
+      alreadyOnWishlist: c.alreadyOnWishlist,
     })),
   };
 
@@ -364,6 +370,8 @@ export async function POST(req: NextRequest) {
         reason: stripInternalMemberLabels(pick.reason).replaceAll("마지막 정거장", "마지막 장소"),
         matchedTags: pick.matchedTags,
         kakaoMapUrl: c.kakaoMapUrl ?? null,
+        alreadyOnWishlist: c.alreadyOnWishlist,
+        wishPlaceId: c.wishPlaceId ?? null,
       };
     })
     .filter((r): r is NonNullable<typeof r> => r != null)

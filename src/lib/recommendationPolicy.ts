@@ -62,3 +62,53 @@ export function diverseCandidates<T extends { category: string; distanceMeters: 
   }
   return result;
 }
+
+// §3단계 배분 정책: 구체 검색어(deriveSpecificSearchTerm 결과, 예: "일본식라면") 최소 보장 슬롯.
+// 2026-09-08 실측(쿄오모라멘, 3회 반복 안정값)에서 diverseCandidates가 카테고리로만 자를 때
+// specific 출처 생존율이 50%(base는 90.9%)까지 떨어지는 것을 확인했다 — 다만 그 실측에서도
+// 합계는 10/10으로 우연히 맞아떨어져, 이 10을 그대로 하한으로 채택했다. 실측 표본이 이 장소
+// 1건뿐이라 잠정치다(황재벌은 정답 후보 자체가 두 검색어 어느 쪽 raw 상위에도 없어 배분
+// 정책으로 검증 불가 — HANDOFF.md 참고). 표본이 늘면 재조정한다.
+export const MIN_SPECIFIC_SLOTS = 10;
+
+/**
+ * 후보를 출처 종류(specific/base)로 나눠 slot을 배분한다: specific 몫 = max(최소 보장
+ * 슬롯, limit의 절반) — "최소 슬롯 보장 + 나머지 균등"에서 균등 분할 자체가 이미 최소
+ * 보장을 겸하므로 한 번에 계산한다. 각 kind 안에서는 기존 diverseCandidates(카테고리
+ * 다양화)로 채운다. 한쪽 풀이 자기 몫을 못 채우면 남는 슬롯은 반대쪽 남은 후보로 채운다
+ * (§3단계 지시: 이미 확보된 후보를 재배분하는 것이며 새 후보를 만들지 않는다).
+ *
+ * 처음엔 "specific 최소 보장분만 먼저 떼고, 나머지는 (남은 specific + base)를 합쳐
+ * 카테고리로 다시 나눈다"로 구현했으나, 그 합친 나머지 라운드가 다시 카테고리 다양성으로
+ * 돌면서 specific의 카테고리 폭(일식/아시아음식/술집/중식)이 base의 폭(한식 편중)보다
+ * 넓다는 이유로 나머지까지 더 많이 가져가 specific 65% vs base 63.6%로 역전되는 과교정이
+ * 실측(쿄오모라멘, n=3)으로 확인됐다(2026-09-08). kind 간 배분은 kind 단계에서 한 번만
+ * 정하고, category 다양화는 각 kind 내부로만 한정해야 이 재귀적 편향을 피할 수 있다.
+ */
+export function allocateBySourceKind<T extends { id: string; category: string; distanceMeters: number }>(
+  items: T[],
+  kindOf: (id: string) => "specific" | "base",
+  limit: number,
+  local: boolean,
+  minSpecificSlots: number = MIN_SPECIFIC_SLOTS,
+): T[] {
+  const specificPool = items.filter((c) => kindOf(c.id) === "specific");
+  if (!specificPool.length) return diverseCandidates(items, limit, local);
+  const basePool = items.filter((c) => kindOf(c.id) !== "specific");
+
+  const evenShare = Math.floor(limit / 2);
+  const specificTarget = Math.min(Math.max(minSpecificSlots, evenShare), specificPool.length, limit);
+  const specificPicked = diverseCandidates(specificPool, specificTarget, local);
+
+  const baseTarget = limit - specificPicked.length;
+  const basePicked = diverseCandidates(basePool, Math.min(baseTarget, basePool.length), local);
+
+  // base 풀이 자기 몫을 못 채우면(예: base 후보 자체가 적음) 남는 슬롯을 specific의
+  // 나머지 후보로 채운다 — 새 후보를 만드는 게 아니라 이미 확보된 specific 풀 안에서만.
+  const filled = specificPicked.length + basePicked.length;
+  if (filled >= limit) return [...specificPicked, ...basePicked];
+  const pickedIds = new Set([...specificPicked, ...basePicked].map((c) => c.id));
+  const specificLeftover = specificPool.filter((c) => !pickedIds.has(c.id));
+  const extra = diverseCandidates(specificLeftover, limit - filled, local);
+  return [...specificPicked, ...basePicked, ...extra];
+}
