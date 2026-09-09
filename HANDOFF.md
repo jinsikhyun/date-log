@@ -1,3 +1,22 @@
+# categories 커플 스코프 분리 (2026-09-09, 운영 SQL 실행·검증 완료 — commit/push 진행)
+
+**배경**: 커플 10개 중 2팀은 실제 사용자(친구 커플, 가족) — 테스트 계정 전제가 무효화됨. 운영 직접 조회로 `categories` 정책이 `"categories: authenticated access" for all using(true) with check(true)`임을 확인 — 로그인한 누구나 모든 커플의 카테고리를 읽고 수정·삭제 가능했다. `add-couple-rls.sql`/`02_enforce_membership.sql` 둘 다 "카테고리의 커플별 분리는 별도 제품 결정"이라며 의도적으로 미뤄뒀던 부분. 위험은 삭제가 아니라 이름 변경 — 다른 커플이 "맛집"을 바꾸면 내 `places.category`(문자열, FK 없음)는 그대로 남아 필터·AI 추천 검색어가 조용히 어긋난다.
+
+**진단 핵심**: `CategoriesProvider`/`CategoriesManager`의 모든 read/write가 이미 `couple_id` 조건 없이 순수하게 동작해, RLS만 교체하면 **앱 코드 변경 없이** 커플 스코프가 적용됨을 확인. `places` rename-cascade(`places.update({category}).eq("category", cat.name)`)도 `places` 자체의 기존 RLS(`couple_id = my_couple_id()`)가 이미 다른 커플 행을 걸러줘 별도 수정 불필요.
+
+**실행 파일 2개**(둘 다 `supabase/migrations/`, 운영 실행 완료):
+1. `20260909000000_categories_couple_scope.sql` — `couple_id` 컬럼 추가 → unique 제약을 `(couple_id, name)`으로 교체 → 시드 7개(쇼핑 제외) 전체 10개 커플에 백필 → "쇼핑"은 진식지민 커플(`a6b01b81-3d74-43ef-92dd-4dbd00ba7123`, 사용자가 조회로 직접 지정)에만 백필 → 원본 공유 8행 삭제 → `couple_id NOT NULL` 잠금 → 인덱스 → `set_couple_id()` 트리거 재사용 → RLS를 `places`와 동일한 4-정책 패턴으로 교체. 롤백용 백업 테이블(`categories_pre_couple_scope_backup`)은 RLS+revoke all로 잠가둠.
+   - **1차 실행 실패·수정**: 유일성 제약 교체를 백필보다 뒤에 뒀다가 `duplicate key value violates unique constraint "categories_name_key"`로 트랜잭션 전체 롤백(사용자 실측, 데이터 안전 확인됨). 원인: 전역 `unique(name)`이 살아있는 채로 10개 커플에 같은 이름을 반복 삽입해 두 번째 커플에서 충돌. 수정: 제약 교체를 `couple_id` 컬럼 추가 직후, 백필 이전으로 이동(원본 8행은 전부 `couple_id is null`이라 Postgres UNIQUE의 NULLS DISTINCT 기본 동작으로 서로 충돌하지 않음 — 안전하게 먼저 교체 가능). 재검토한 3가지(cross join 서브쿼리의 자기-삽입 재참조 여부, NOT NULL 잠금 위치, 트리거의 백필 개입 여부) 전부 문제없음 확인 후 재실행 성공.
+2. `20260909000100_categories_seed_on_couple_create.sql` — `connect_couple()` RPC의 신규 커플 생성 분기에 시드 7개(쇼핑 제외) insert 추가. 마이그레이션 후 신규 가입 커플이 `categories` 0행 상태에서 `/settings/categories`의 이름변경·삭제·순서변경이 (음수 합성 fallback id로 인해) 에러 없이 조용히 무반응하는 문제를 막기 위함. 같은 트랜잭션에 안 넣은 이유: 온보딩 관심사 vs categories 스키마 관심사 분리(이 프로젝트 기존 파일 구성 관례).
+
+**검증**: 사용자가 SQL Editor에서 직접 실행 후 파일 하단 검증 쿼리(커플별 카테고리 수, places.category와 categories 이름 대응, 원본 공유 행 삭제 여부, 쇼핑 소속)로 확인 완료. 구체적 쿼리 결과값은 이 세션에 기록되지 않음(사용자가 직접 확인).
+
+**미검증**: 신규 커플 가입 플로우(2번 파일)로 실제 새 커플을 만들어 카테고리 7개가 심어지는지는 실제 가입으로 재현하지 않음 — RPC 정의만 교체 확인. 마이그레이션 커밋 순간 `/categories` 편집 폼을 열어둔 사용자가 있었는지는 알 수 없음(가능성은 극히 낮다고 판단했던 부분, 재확인 안 함).
+
+**앱 배포**: 불필요(위 진단 참고, 코드 변경 자체가 없음) — 이번 작업은 SQL만으로 완결.
+
+---
+
 # AI 추천 고도화 — 5단계: 우리 위시 활용 (2026-09-09, 로컬 완료 — commit/push 안 함)
 
 `CLAUDE_AI_RECOMMENDATION_UPGRADE_HANDOFF.md` §5 "코스 구성에는 우리 위시리스트를 별도 후보로 포함한다. 현재 전체 저장 장소 제외 로직을 목적별로 조정한다"·"새로운 발견과 재방문 추천은 구분하고, 이미 아는 장소를 새로 발견한 것처럼 표시하지 않는다" 이행. §3단계(배분 정책)는 이 작업으로 완전히 닫혔다(아래 3단계 후속 절 참고).
