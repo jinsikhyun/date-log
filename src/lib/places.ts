@@ -23,8 +23,9 @@ export interface Place {
   first_visit_date: string | null; // 'YYYY-MM-DD'
   description: string | null;
   tags: string[]; // 취향 태그 (AI_RECOMMENDATION_HANDOFF.md §6 확정 체계 + 사용자 직접 추가)
-  image_url: string | null; // 대표 사진 (place-photos 버킷 영구 Storage 참조 또는 레거시 URL). 없으면 placeholder.
+  image_url: string | null; // 사용자 업로드 대표 사진 (place-photos 버킷 영구 Storage 참조 또는 레거시 URL). wishlist 도 가질 수 있다. 없으면 위시는 Google 자동 대표사진, 그 외엔 placeholder.
   image_captured_date: string | null; // 대표사진 EXIF 촬영일. 방문일과 같을 때만 그날의 사진에 포함.
+  google_place_id: string | null; // Google Places 자동 대표사진 매칭 캐시(GOOGLE_PLACES_PHOTO_FEATURE_HANDOFF.md). 사진 자체는 저장하지 않음.
   lat: number | null; // 위도 (장소 검색 자동완성으로 채워짐). 없으면 지도가 주소를 지오코딩.
   lng: number | null; // 경도
   status: PlaceStatus; // 'visited'(다녀온 곳) | 'wishlist'(가고 싶은 곳)
@@ -146,9 +147,12 @@ export interface PlaceRowInput {
 // favorite_by(픽) / is_regular(단골) 는 이 폼에서 다루지 않는다.
 // 장소 상세 페이지의 토글로만 켜고 끄며, 여기서 보내면 수정 저장 시 덮어써지므로 제외.
 
-/** 폼 입력을 DB row 로. wishlist/course_only 면 방문 전용 필드(별점/방문일/한줄평/사진)는 비운다. */
+/** 폼 입력을 DB row 로. wishlist/course_only 면 방문 전용 필드(별점/방문일/한줄평)는 비운다.
+ *  사진만은 예외 — wishlist는 사용자가 직접 첨부할 수 있다(없으면 Google 자동 대표사진으로
+ *  대체, GOOGLE_PLACES_PHOTO_FEATURE_HANDOFF.md). course_only는 여전히 사진도 비운다. */
 export function placeInputToRow(input: PlaceRowInput) {
   const lite = input.status === "wishlist" || input.status === "course_only";
+  const noPhoto = input.status === "course_only";
   return {
     name: input.name.trim(),
     category: input.category,
@@ -164,8 +168,8 @@ export function placeInputToRow(input: PlaceRowInput) {
     rating: lite || !input.rating ? null : Number(input.rating),
     first_visit_date: lite ? null : input.first_visit_date || null,
     description: lite ? null : input.description.trim() || null,
-    image_url: lite ? null : input.image_url.trim() || null,
-    image_captured_date: lite || !input.image_url ? null : input.image_captured_date || null,
+    image_url: noPhoto ? null : input.image_url.trim() || null,
+    image_captured_date: noPhoto || !input.image_url ? null : input.image_captured_date || null,
     tags: input.tags ?? [], // 방문/위시/코스전용 모두 취향 태그는 유지
     ...(input.confirmed_tags !== undefined ? { confirmed_tags: input.confirmed_tags } : {}),
   };

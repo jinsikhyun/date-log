@@ -1,3 +1,39 @@
+# Google Places 자동 대표사진 (2026-09-12, 로컬 구현 완료 · 운영 SQL(컬럼 1개) 적용 · 실브라우저 검증 완료 · commit/push 안 함)
+
+기준 문서: `GOOGLE_PLACES_PHOTO_FEATURE_HANDOFF.md`. AI 추천 고도화와 완전히 별개 기능 — 위 "AI 추천 고도화" 섹션은 이 작업으로 손대지 않았다.
+
+**목표**: 사용자 사진이 없는 장소에 Google Places 사진을 그 자리에서 조회해 자동 표시. 사진 자체·URL·resource name은 절대 저장하지 않고 표시 시점마다 서버가 재조회(`google_place_id`만 캐시 — Google 정책상 캐싱 제한의 명시적 예외).
+
+**2026-09-12 범위 확장(사용자 확정)**: 기준 문서는 위시리스트로 한정했지만, 실사용 중 "장소 추가했을 때 사진 첨부 안 한 경우에도 자동으로 들어가야 한다"는 요청으로 **다녀온 곳(visited)도 동일하게 적용** — `course_only`만 제외. `route.ts`/`PlaceCard.tsx`/`PlaceDetail.tsx`의 상태 조건을 `status === "wishlist"` → `status !== "course_only"`로 변경.
+
+**구현**:
+- `supabase/migrations/20260912000000_add_google_place_id.sql` — `places.google_place_id text` 1개. **사용자 승인 후 운영 적용 완료(Supabase MCP, `supabase_migrations` 이력에도 등록됨)**. RLS 변경 없음(기존 places RLS가 그대로 적용).
+- `src/lib/places.ts` — `placeInputToRow`가 wishlist의 `image_url`을 무조건 null로 지우던 기존 동작을 발견 → wishlist만 예외로 열었다(course_only는 그대로 null). 이게 없으면 "사용자 사진이 항상 우선"이 애초에 성립 불가능했음.
+- `src/lib/googlePlaceMatch.ts` — 순수 매칭 로직(좌표 300m 이내 AND 이름 유사). 좌표 없는 장소는 매칭 시도 자체를 안 함.
+- `src/lib/googlePlacePhoto.ts` — 서버 전용. Text Search(Pro tier, photos 필드 요청 안 함) → Place Details(photos+googleMapsUri만, 가장 싼 Photos SKU) → Photo Media(데이터 URL로 반환). "확인했는데 없음(no_match)"과 "확인 자체 실패(error)"를 구분해서 반환 — 로그·재시도 판단에 씀. 같은 placeId 동시 요청은 in-flight Map으로 합침.
+- `src/app/api/place-google-photo/route.ts` — POST { placeId }만 받고 서버가 DB에서 직접 name/address/lat/lng 조회(클라이언트가 임의 텍스트로 다른 장소 사진을 긁을 수 없게). 매칭 성공 시 `google_place_id`를 best-effort로 캐싱.
+- `src/components/GooglePlacePhoto.tsx` — IntersectionObserver로 실제 노출될 때만 호출, 세션 메모리 캐시(새로고침하면 사라짐 — 영속 저장 아님). `PlaceCard.tsx`/`WishlistView.tsx`/`PlaceDetail.tsx`에 연결(사용자 사진 → Google 사진 → 기존 placeholder 순). `course_only`만 제외, 위시리스트·다녀온 곳 공통.
+- `src/components/AddPlaceForm.tsx` — 위시리스트 상태에 최소 UI 추가("사진 없이 저장" / "내 사진 첨부"), 문서 §7 그대로.
+- 손 안 댐(의도): `CourseDetail.tsx`(48px 인라인 썸네일이라 attribution 표시 공간이 없어 정책상 부적합), `RecapDashboard.tsx`(애초에 `image_url`을 조회하지 않아 Google 사진이 통계에 섞일 경로가 없음).
+
+**검증**:
+- 단위테스트(fixture/mock, 네트워크 없음) `scripts/google-place-match.test.mjs`(7개) + `scripts/google-place-photo.test.mjs`(7개, `global.fetch` mock으로 성공/이름불일치/5xx재시도/캐시스킵/캐시만료재매칭/동시요청합침 케이스) — 전체 62개 통과.
+- `npx tsc --noEmit`, 변경 파일 `eslint` 0 에러. `npm run build` 통과(33개 경로, `/api/place-google-photo` 등록 확인).
+- 클라이언트 번들에 `GOOGLE_PLACES_API_KEY` 문자열이 없음을 `.next/static` grep으로 확인(서버 청크에만 존재).
+- **실제 API 키로 장소 1개(경복궁, 공개 랜드마크) 검증** — 매칭·사진·attribution·photo-level googleMapsUri까지 전부 실측 성공.
+- **실브라우저 검증(실제 위시리스트 장소 1곳, id=136)**: 저장된 위시 → Google 사진 자동 표시 → 사진 클릭 시 정확히 그 장소·그 사진의 Google Maps URL로 새 탭 이동 → 테스트 사진 업로드 시 사용자 사진이 즉시 우선 표시(Google attribution 사라짐) → 사진 제거로 원상복구까지 확인. 확인 후 테스트로 올린 사진은 삭제해 실제 데이터는 건드리지 않음(`google_place_id` 캐시 값만 남음, 무해).
+- **실브라우저 중 실제 버그 1건 발견·수정**: `GooglePlacePhoto.tsx`의 `useEffect` 의존성 배열에 `state.kind`가 들어있어, `load()`의 `setState({kind:"loading"})`가 그 즉시 effect를 재실행시키고 cleanup이 진행 중인 fetch의 `cancelled`를 true로 만들어 응답이 와도 무시되는 자기 자신을 취소하는 버그였음(API는 200으로 정상 응답하고 DB에 `google_place_id`도 정상 기록되는데 화면은 "불러오는 중…"에 멈춤). `state.kind`를 deps에서 빼고 "마운트 시점 캐시 여부"는 `useRef`로 따로 들고 가도록 수정, 재확인 완료.
+- **범위 확장 실브라우저 검증(다녀온 곳, id=100 "서관면옥 교대본점")**: 사진 없는 실제 visited 장소에서도 Google 사진 자동 표시 확인.
+- **테스트 중 발견한 무관한 이상 현상(이번 기능과 무관, 별도 기록만)**: 처음 접속한 브라우저 세션이 `/settings`가 보여주는 실제 로그인 계정(jasonhyun03, 커플 `a6b01b81`=JINJIM-0628, 다녀온 곳 46)과 다른 커플(`a9fdc457`, 다녀온 곳 2·위시 1, invite code가 UUID 형태라 다른 경로로 만들어진 듯한 소규모 커플)의 위시리스트 장소(id=136)를 보여주고 수정까지 허용한 순간이 있었음 — RLS(`couple_id = my_couple_id()`)상 정상이라면 안 보여야 함. 재현을 시도했으나 이후 세션은 계속 정상적으로 실제 계정 데이터만 보였고, 같은 브라우저를 사용자가 동시에 쓰고 있었을 가능성이 높아 세션/계정 전환으로 추정 — 이번 세션에서는 원인을 확정하지 못함. 재현되면 RLS 세션 격리 문제일 수 있으니 다음에 관찰되면 바로 보고할 것.
+
+**미검증**:
+- 매칭 실패(좌표 멀리 떨어진 동명 장소 등) 케이스의 실브라우저 확인은 안 함 — mock 테스트로만 커버.
+- Photo Media(바이트 다운로드) 자체가 "Place Details Photos" SKU 외 별도로 과금되는지는 공식 문서에 명시가 없어 확인 못 함 — GCP 콘솔 실측 필요.
+- Vercel 환경변수 `GOOGLE_PLACES_API_KEY`는 **사용자가 직접 추가함**(2026-09-12) — 배포 후 프로덕션에서의 동작은 미확인.
+
+**다음**: commit/push는 사용자 확인 후. 실사용 보고 Text Search 반경(300m)·이름 유사 판정 기준 조정.
+
+---
 # categories 커플 스코프 분리 (2026-09-09, 운영 SQL 실행·검증 완료 — commit/push 진행)
 
 **배경**: 커플 10개 중 2팀은 실제 사용자(친구 커플, 가족) — 테스트 계정 전제가 무효화됨. 운영 직접 조회로 `categories` 정책이 `"categories: authenticated access" for all using(true) with check(true)`임을 확인 — 로그인한 누구나 모든 커플의 카테고리를 읽고 수정·삭제 가능했다. `add-couple-rls.sql`/`02_enforce_membership.sql` 둘 다 "카테고리의 커플별 분리는 별도 제품 결정"이라며 의도적으로 미뤄뒀던 부분. 위험은 삭제가 아니라 이름 변경 — 다른 커플이 "맛집"을 바꾸면 내 `places.category`(문자열, FK 없음)는 그대로 남아 필터·AI 추천 검색어가 조용히 어긋난다.

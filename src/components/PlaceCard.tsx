@@ -9,6 +9,7 @@ import {
 } from "@/lib/places";
 import { StarRating } from "@/components/StarRating";
 import { PlaceTagBadges } from "@/components/PlaceTagBadges";
+import { GooglePlacePhoto } from "@/components/GooglePlacePhoto";
 import type { Anniversary } from "@/lib/anniversaries";
 
 const CARD =
@@ -50,24 +51,15 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
             size="sm"
           />
         </div>
-      ) : (
-        // 사진 없음 — 크림 스트라이프 placeholder. 클릭 시 네이버 이미지 검색(새 탭).
-        <a
-          href={naverImageSearchUrl(place.name, place.address)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`${place.name} 네이버 이미지 검색`}
-          title="네이버 이미지 검색"
-          className="photo-placeholder relative z-20 flex h-44 cursor-pointer items-center justify-center transition hover:brightness-[0.98]"
-        >
-          <span className="text-5xl opacity-70" aria-hidden>
-            {categoryIcon(place.category)}
-          </span>
-          <span
-            className={`${CAT_CHIP} bg-white/85 text-foreground/70`}
-            style={{ zIndex: 1 }}
-          >
+      ) : place.status !== "course_only" ? (
+        // 사용자 사진 없음(다녀온 곳·위시리스트 공통) — Google 대표사진을 시도하고, 없으면 placeholder.
+        <div className="relative z-20 h-44 overflow-hidden bg-[#e6decf]">
+          <GooglePlacePhoto
+            placeId={place.id}
+            alt={place.name}
+            placeholder={<NaverSearchPlaceholder place={place} />}
+          />
+          <span className={`${CAT_CHIP} bg-white/85 text-foreground/70`}>
             {place.category}
           </span>
           <PlaceTagBadges
@@ -75,7 +67,19 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
             isRegular={place.is_regular}
             size="sm"
           />
-        </a>
+        </div>
+      ) : (
+        <div className="relative z-20 h-44 overflow-hidden">
+          <NaverSearchPlaceholder place={place} />
+          <span className={`${CAT_CHIP} bg-white/85 text-foreground/70`}>
+            {place.category}
+          </span>
+          <PlaceTagBadges
+            favoriteBy={place.favorite_by}
+            isRegular={place.is_regular}
+            size="sm"
+          />
+        </div>
       )}
 
       <div className="flex flex-1 flex-col gap-[7px] px-[18px] pb-[18px] pt-4">
@@ -119,5 +123,24 @@ export function PlaceCard({ place, visitAnniversaries = [] }: { place: Place; vi
         </div>
       </div>
     </article>
+  );
+}
+
+/** 사진 없음(Google 자동사진도 없거나 대상 아님) — 크림 스트라이프. 클릭 시 네이버 이미지 검색(새 탭). */
+function NaverSearchPlaceholder({ place }: { place: Place }) {
+  return (
+    <a
+      href={naverImageSearchUrl(place.name, place.address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      aria-label={`${place.name} 네이버 이미지 검색`}
+      title="네이버 이미지 검색"
+      className="photo-placeholder flex h-full w-full cursor-pointer items-center justify-center transition hover:brightness-[0.98]"
+    >
+      <span className="text-5xl opacity-70" aria-hidden>
+        {categoryIcon(place.category)}
+      </span>
+    </a>
   );
 }

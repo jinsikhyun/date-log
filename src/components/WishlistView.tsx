@@ -13,6 +13,8 @@ import {
   wantedByLabelFromIds,
 } from "@/lib/places";
 import { AddPlaceForm, blankPlaceInput, type NewPlaceInput } from "@/components/AddPlaceForm";
+import PhotoImage from "@/components/PhotoImage";
+import { GooglePlacePhoto } from "@/components/GooglePlacePhoto";
 import { useAuth } from "@/components/AuthProvider";
 import { useCategories } from "@/components/CategoriesProvider";
 import { CategoryChips } from "@/components/CategoryChips";
@@ -25,7 +27,7 @@ import { todayWeatherFields, type MemoryWeatherFields } from "@/lib/weatherDispl
 import { withPreferences } from "@/lib/preferences";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, google_place_id, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -357,29 +359,47 @@ export function WishlistView() {
                 key={place.id}
                 className="relative flex h-full flex-col overflow-hidden rounded-[20px] border border-dashed border-border-dashed bg-card transition-colors hover:border-accent"
               >
-                {/* 미방문 placeholder — 클릭 시 네이버 이미지 검색 (새 탭) */}
+                {/* 사용자 사진 → Google 자동 대표사진 → 네이버 이미지 검색 placeholder */}
                 {courseSelection.selector(place.id, place.name)}
                 <div inert={courseSelection.active} className="flex h-full flex-col">
-                <a
-                  href={naverImageSearchUrl(place.name, place.address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`${place.name} 네이버 이미지 검색`}
-                  title="네이버 이미지 검색"
-                  className="photo-placeholder relative flex h-36 cursor-pointer items-center justify-center transition hover:brightness-[0.98]"
-                >
-                  <span className="text-5xl opacity-70" aria-hidden>
-                    {categoryIcon(place.category)}
-                  </span>
+                <div className="relative h-36 overflow-hidden bg-[#e6decf]">
+                  {place.image_url ? (
+                    <PhotoImage
+                      src={place.image_url}
+                      displayWidth={320}
+                      alt={place.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <GooglePlacePhoto
+                      placeId={place.id}
+                      alt={place.name}
+                      placeholder={
+                        <a
+                          href={naverImageSearchUrl(place.name, place.address)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`${place.name} 네이버 이미지 검색`}
+                          title="네이버 이미지 검색"
+                          className="photo-placeholder flex h-full w-full cursor-pointer items-center justify-center transition hover:brightness-[0.98]"
+                        >
+                          <span className="text-5xl opacity-70" aria-hidden>
+                            {categoryIcon(place.category)}
+                          </span>
+                        </a>
+                      }
+                    />
+                  )}
                   <span
-                    className={`absolute left-3.5 top-3.5 rounded-full px-3 py-1 text-[11px] font-semibold ${categoryStyle(
+                    className={`absolute left-3.5 top-3.5 z-[1] rounded-full px-3 py-1 text-[11px] font-semibold ${categoryStyle(
                       place.category,
                     )}`}
                   >
                     {place.category}
                   </span>
-                </a>
+                </div>
 
                 <div className="flex flex-1 flex-col gap-1.5 px-[18px] pb-[18px] pt-4">
                   <Link

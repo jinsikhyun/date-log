@@ -134,6 +134,9 @@ export function AddPlaceForm({
   const [photoDateMsg, setPhotoDateMsg] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const dateManuallyEditedRef = useRef(false);
+  // 위시리스트 최소 사진 UI(GOOGLE_PLACES_PHOTO_FEATURE_HANDOFF.md §7): "내 사진 첨부"를 고르면
+  // 그때만 파일 선택을 보여준다. 이미 사진이 있는 위시(수정 화면)는 처음부터 이 모드로 시작.
+  const [wishOwnPhoto, setWishOwnPhoto] = useState(!!base.image_url);
 
   // ── 카카오 장소 검색 자동완성 ──────────────────────────────
   const placesSvcRef = useRef<kakao.maps.services.Places | null>(null);
@@ -502,6 +505,80 @@ export function AddPlaceForm({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {form.status === "wishlist" && (
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <span className={labelClass}>대표 이미지 (선택)</span>
+          <div className="flex gap-2">
+            {(
+              [
+                [false, "사진 없이 저장"],
+                [true, "내 사진 첨부"],
+              ] as const
+            ).map(([value, text]) => (
+              <button
+                key={String(value)}
+                type="button"
+                aria-pressed={wishOwnPhoto === value}
+                onClick={() => {
+                  setWishOwnPhoto(value);
+                  if (!value) {
+                    setForm((current) => ({ ...current, image_url: "", image_captured_date: "" }));
+                  }
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition-colors ${
+                  wishOwnPhoto === value
+                    ? "bg-accent/10 text-accent ring-accent/50"
+                    : "bg-white text-stone-500 ring-border hover:text-accent"
+                }`}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+          {wishOwnPhoto && (
+            <div className="mt-1 flex items-center gap-3">
+              {form.image_url ? (
+                <>
+                  <PhotoImage
+                    src={form.image_url}
+                    alt="대표 사진 미리보기"
+                    className="h-16 w-16 rounded-lg object-cover"
+                  />
+                  <label className="cursor-pointer rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 hover:bg-stone-200">
+                    다른 사진으로 교체
+                    <input
+                      type="file"
+                      accept="image/*,.heic,.heif"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => void handleFile(e.target.files?.[0])}
+                    />
+                  </label>
+                </>
+              ) : (
+                <label className="cursor-pointer rounded-full bg-stone-100 px-4 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-200">
+                  파일 선택
+                  <input
+                    type="file"
+                    accept="image/*,.heic,.heif"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => void handleFile(e.target.files?.[0])}
+                  />
+                </label>
+              )}
+              {uploading && <span className="text-xs text-muted">업로드 중…</span>}
+              {photoError && <span className="text-xs text-red-600">{photoError}</span>}
+            </div>
+          )}
+          {!wishOwnPhoto && (
+            <span className="text-[11px] text-muted-3">
+              직접 올리지 않으면 Google 지도 사진을 자동으로 보여줘요.
+            </span>
+          )}
         </div>
       )}
 

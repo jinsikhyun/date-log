@@ -22,7 +22,7 @@ const basePlace: Place = {
   rating: 4.5, image_url: photo, image_captured_date: "2025-06-28", first_visit_date: "2025-06-28",
   naver_map_link: null, kakao_map_link: null, lat: null, lng: null, status: "visited",
   wanted_by: null, wanted_by_ids: [], added_by: "테스트", favorite_by: ["u1"], is_regular: false,
-  memory_count: 0, created_at: "2025-06-28T00:00:00Z", via_course: false, tags: [],
+  memory_count: 0, created_at: "2025-06-28T00:00:00Z", via_course: false, tags: [], google_place_id: null,
 };
 const stops = Array.from({ length: 12 }, (_, i) => ({ id: i + 1,
   name: i === 1 ? "아주긴이름공백없이도옆의카테고리를밀어내지않아야하는전시공간" : `${i + 1}번째 함께 걷는 서촌의 장소`,

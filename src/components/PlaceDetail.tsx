@@ -1,6 +1,7 @@
 "use client";
 
 import PhotoImage from "@/components/PhotoImage";
+import { GooglePlacePhoto } from "@/components/GooglePlacePhoto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { withPreferences } from "@/lib/preferences";
 import Link from "next/link";
@@ -45,7 +46,7 @@ import {
 } from "@/components/AddPlaceForm";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, google_place_id, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 const POLICY_HINT =
   "저장 권한이 없거나 세션이 만료됐어요. 다시 로그인하거나 커플 연결 상태를 확인해 주세요.";
@@ -430,6 +431,14 @@ export function PlaceDetail({ id }: { id: number }) {
                   className="h-full w-full object-cover transition duration-200 group-hover:brightness-90"
                 />
               </button>
+            )}
+            {!place.image_url && place.status !== "course_only" && (
+              <GooglePlacePhoto
+                placeId={place.id}
+                alt={place.name}
+                allowRetry
+                placeholder={null}
+              />
             )}
             <span
               className={`absolute left-5 top-5 z-[1] rounded-full px-3 py-1 text-xs font-semibold ${categoryStyle(

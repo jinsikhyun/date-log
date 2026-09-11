@@ -34,6 +34,7 @@ create table if not exists public.places (
   memory_count     integer not null default 0,
   visit_order      integer,
   image_captured_date date,
+  google_place_id  text,                             -- Google Places 자동 대표사진 캐시(place_id만, 사진 자체는 저장 안 함)
   created_at       timestamptz not null default now()
   -- 장소 유일성은 커플 단위 (couple_id, name, address) — couple_id 컬럼이 생긴 뒤
   -- 아래 "멀티 커플 모델" 섹션에서 places_couple_name_address_key 로 건다.
