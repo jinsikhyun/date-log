@@ -34,6 +34,54 @@
 **다음**: commit/push는 사용자 확인 후. 실사용 보고 Text Search 반경(300m)·이름 유사 판정 기준 조정.
 
 ---
+
+# AI 추천 고도화 — 6단계: "관심 없어요" (2026-09-11 로컬 구현 → 2026-09-12 운영 SQL 적용 확인 · commit/push 안 함)
+
+`CLAUDE_AI_RECOMMENDATION_UPGRADE_HANDOFF.md` §6단계 이행. 구현 전 사용자와 확정한 정책 4가지:
+
+| 항목 | 확정 |
+| --- | --- |
+| 개인 귀속 | **누른 사람에게만 숨긴다.** 파트너는 그대로 본다. RLS SELECT 를 `user_id = auth.uid()` 로 잠가 구조적으로 보장(앱 코드가 파트너 행을 "안 쓰는" 게 아니라 "못 읽는다"). |
+| 사유 UX | **버튼 클릭 즉시 숨기고, 사유는 선택 사항.** 카드 자리에 "OO을(를) 숨겼어요 · [너무 멀어요][취향이 아니에요][이미 알아요] · 취소" 한 줄이 남는다. 사유 없이도 기록됨. |
+| 재노출 기간 | **사유별 차등** — 취향이 아니에요 180일 / 이미 알아요 90일 / 사유 없음 90일 / 너무 멀어요 30일. "너무 멀어요"는 추가로 **거절했을 때의 출발지 1km 안에서 시작한 요청에서만** 숨긴다(영구 불호 아님 — 문서 §6 원칙). 사유를 나중에 고르면 그 사유 기간으로 "지금 기준" 만료를 재계산. |
+| 취소 | **카드 자리 즉시 취소만**(1차). 설정 페이지의 "숨긴 추천" 목록은 이번 범위 아님. |
+
+그 외 문서 §6 원칙 반영: 미저장·미클릭은 기록하지 않음(명시적 클릭에서만 POST). "이미 알아요"는 불호가 아님 — 재노출만 줄이고 **AI 프롬프트에는 어떤 거절도 전달하지 않는다**(후보 수집 단계 필터링만). 한 사람의 거절이 상대 선호를 지우지 않음(개인 귀속으로 자동 충족).
+
+## 구현
+
+| 파일 | 변경 |
+| --- | --- |
+| `supabase/migrations/20260911000000_ai_recommend_dismissals.sql` | **운영 적용 확인(2026-09-12, Supabase MCP로 직접 조회).** `ai_recommend_dismissals(id, couple_id, user_id default auth.uid(), candidate_id, mode, reason nullable check, origin_lat/lng, created_at, expires_at)`. `set_couple_id()` 트리거 재사용. RLS 4개 전부 `user_id = auth.uid()`(insert/update 는 `couple_id = my_couple_id()` 추가). 인덱스 `(user_id, expires_at desc)`. 테이블·인덱스·트리거·RLS 정책 4개 모두 운영에 존재하고 실사용 dismissal 1건(2026-09-11 17:32 UTC)이 이미 쌓여 있음을 확인 — 이전 세션이 "미실행"이라 남긴 기록은 stale. 이 세션에서 같은 SQL을 idempotent 재실행해 `supabase_migrations` 이력에도 등록함(전엔 SQL Editor 수동 실행이라 이력에 없었음). 롤백은 파일 상단 주석. |
+| `src/lib/recommendationDismissal.ts` | **신규, 순수 로직.** 사유 상수·라벨, `DISMISS_DURATION_DAYS`, `TOO_FAR_ORIGIN_RADIUS_KM=1`, `dismissalExpiresAt`, `isDismissalActive`(만료 + too_far 출발지 근접 판정, 출발지 기록 없으면 보수적으로 숨기지 않음), `filterDismissed`. `haversineKm`(courses.ts) 재사용. |
+| `scripts/recommendation-dismissal.test.mjs` | **신규.** 7개 — 사유별 기간, 사유 검증, 만료 경계, too_far 반경 안/밖(0.89km/1.11km)·다른 출발지(수원), 출발지 없음, 다른 사유는 출발지 무관, filterDismissed 순서 보존·만료 제외. |
+| `src/app/api/ai-dismiss/route.ts` | **신규.** POST(기록, expires_at 서버 계산) / PATCH(사유 변경 + 만료 재계산) / DELETE(취소). 로그인 필수, zod 검증, 한국어 에러. 테이블 없음(PGRST205/42P01)은 "저장소가 아직 준비되지 않았어요"로 구분. user_id 검사는 RLS 에 위임. |
+| `src/app/api/kakao-candidates/route.ts` | 요청자의 유효 거절(`expires_at > now()`)을 한 번 조회해 카카오 후보(`eligible`, **배분 전**이라 숨긴 자리를 다른 후보가 채움)와 위시 후보(`wish-<id>`) 양쪽에서 `filterDismissed`. 조회 실패는 rate limit 과 같이 막지 않고 통과(가용성 우선, 로그만). 기존 tally 로그에 `dismissed` 건수 추가(식별정보 없음). |
+| `src/lib/useAiDismiss.ts` | **신규.** 장소 상세·코스 공용 클라이언트 훅: 낙관적 숨김 → POST, 실패 시 카드 복구. setReason(PATCH)·undo(DELETE)·reset(새 목록 시 로컬만 초기화, 서버 기록 유지). |
+| `src/components/AiDismissedNotice.tsx` | **신규.** 카드 자리에 남는 한 줄(사유 칩 3개 + 취소). 서버 id 오기 전엔 버튼 비활성. `compact` 변형은 코스 리스트용. |
+| `src/components/AiRecommendationCard.tsx` | `onDismiss` 옵션 prop → "관심 없어요" 버튼(QA 미리보기는 prop 안 넘기므로 영향 없음). 2026-09-12 UI 반복: (1) 사진 없는 카드에서 상단 플레이스홀더와 하단 "사진 ↗"가 같은 네이버 이미지 검색 URL로 중복 연결되던 것 수정 — "사진" 버튼은 `imageUrl`이 실제로 있을 때만 노출. (2) 액션 버튼(사진/위시리스트/정보) `min-w-0` 누락으로 좁은 화면에서 텍스트가 카드 `overflow-hidden`에 잘리던 것 수정 — 각 버튼에 `min-w-0` + `truncate` span 적용. (3) "관심 없어요"를 액션 버튼 줄과 별도로 카드 하단 전체 폭 중앙 정렬 텍스트 버튼으로 배치(기본 상태에서도 보이도록 hover 의존 스타일 제거). |
+| `src/components/AiRecommendationSection.tsx` | 숨긴 후보를 그리드에서 빼고(뒤 후보가 앞으로) 아래에 notice 나열. "더보기" 조건을 남은 후보 기준으로. 전부 숨기면 안내 문구. `load()` 가 로컬 숨김 상태 초기화. 기준점 = 그 장소 좌표. |
+| `src/components/CourseForm.tsx` | 동일 패턴. "정보 ↗" 옆에 "관심 없어요". 기준점 = 마지막 정거장(`aiOriginCoord` ref, resolveCoord 결과). `aiInputKey` 효과에서도 숨김 상태 초기화. 위시 후보도 숨길 수 있음(위시 자체는 남음). |
+
+## 검증
+
+- **통과(이 세션, Anthropic 클라우드 작업공간의 `origin/main` 동일 복제본)**: 순수 로직 단위테스트 `node --test --import ./scripts/register-ts-extension-hook.mjs scripts/*.test.mjs` → **41개 통과**(기존 34 + 신규 7).
+- **통과(Mac 작업 트리, Cowork 로컬 VM에서 실행)**: `npx tsc --noEmit` 오류 0, 변경 파일 8개 `npx eslint` 오류·경고 0, 단위테스트 41개 통과.
+- **통과(2026-09-12, Mac Terminal)**: `npm run build` 정상 완료(32개 경로).
+- **통과(2026-09-12, Supabase MCP로 운영 DB 직접 조회)**: `ai_recommend_dismissals` 테이블·컬럼·인덱스(`ai_recommend_dismissals_user_expires_idx`)·트리거(`trg_ai_recommend_dismissals_couple_id`)·RLS 정책 4개(select/insert/update/delete, 전부 `user_id = auth.uid()`) 전부 운영에 존재. 실사용 dismissal 1건(2026-09-11 17:32 UTC 생성) 확인 — 누군가 실제로 "관심 없어요"를 눌러 정상 기록됐다는 뜻. `supabase_migrations` 이력에는 없어(SQL Editor 수동 실행 추정) 이 세션에서 동일 SQL을 idempotent 재실행해 이력에 등록.
+- **미검증 — 브라우저(이 세션 기준)**: 사유 선택 PATCH · 취소 DELETE · 카드 복귀, 그리고 "다시 추천받기"에서 숨긴 후보가 실제로 재노출되지 않는지(코드·DB 상태로는 정상 작동해야 함, but 직접 클릭 재현은 안 함). 파트너 계정으로 같은 후보가 그대로 보이는지(개인 귀속, RLS 정책상 보장되어야 함).
+- **미검증 — RLS 실측**: 파트너 세션에서 남의 행 SELECT 0건 / PATCH·DELETE 0건 매치를 별도 세션으로 재현하지 않음. 격리 DB 테스트(PGlite)는 작성하지 않음.
+- 운영 SQL 적용 확인됨(위 참고). **commit/push/배포는 아직 안 함** — 로컬 워킹트리에 다수 미커밋 변경 존재.
+
+## 다음
+
+1. ~~Mac Terminal 에서 `npm run build` 통과 확인~~ — 완료.
+2. ~~운영 SQL 적용~~ — 완료(이미 적용되어 있었음, 2026-09-12 idempotent 재실행으로 이력 등록까지 마침).
+3. 위 "미검증 — 브라우저" 항목 실측 → commit/push.
+4. 표본 없이 정한 값들(기간 4종, 1km 반경)은 실사용 보고 조정. 설정 페이지 "숨긴 추천" 목록은 필요해지면 2차.
+
+---
+
 # categories 커플 스코프 분리 (2026-09-09, 운영 SQL 실행·검증 완료 — commit/push 진행)
 
 **배경**: 커플 10개 중 2팀은 실제 사용자(친구 커플, 가족) — 테스트 계정 전제가 무효화됨. 운영 직접 조회로 `categories` 정책이 `"categories: authenticated access" for all using(true) with check(true)`임을 확인 — 로그인한 누구나 모든 커플의 카테고리를 읽고 수정·삭제 가능했다. `add-couple-rls.sql`/`02_enforce_membership.sql` 둘 다 "카테고리의 커플별 분리는 별도 제품 결정"이라며 의도적으로 미뤄뒀던 부분. 위험은 삭제가 아니라 이름 변경 — 다른 커플이 "맛집"을 바꾸면 내 `places.category`(문자열, FK 없음)는 그대로 남아 필터·AI 추천 검색어가 조용히 어긋난다.
@@ -53,7 +101,7 @@
 
 ---
 
-# AI 추천 고도화 — 5단계: 우리 위시 활용 (2026-09-09, 로컬 완료 — commit/push 안 함)
+# AI 추천 고도화 — 5단계: 우리 위시 활용 (2026-09-09 완료 — commit `3c34e22`, 현재 `origin/main` 포함)
 
 `CLAUDE_AI_RECOMMENDATION_UPGRADE_HANDOFF.md` §5 "코스 구성에는 우리 위시리스트를 별도 후보로 포함한다. 현재 전체 저장 장소 제외 로직을 목적별로 조정한다"·"새로운 발견과 재방문 추천은 구분하고, 이미 아는 장소를 새로 발견한 것처럼 표시하지 않는다" 이행. §3단계(배분 정책)는 이 작업으로 완전히 닫혔다(아래 3단계 후속 절 참고).
 

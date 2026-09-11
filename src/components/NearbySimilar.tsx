@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { ensureKakaoLoaded, geocode } from "@/lib/kakao";
 import { haversineKm } from "@/lib/courses";
 import type { Place } from "@/lib/places";
+import { excludeCourseOnly } from "@/lib/placeScope";
 import { useCategories } from "@/components/CategoriesProvider";
 
 type Coord = { lat: number; lng: number };
@@ -55,12 +56,13 @@ export function NearbySimilar({ place }: { place: Place }) {
           : await geocode(place.address).catch(() => null);
 
       // ── 1) 우리 리스트에서 — 같은 카테고리, 본인 제외, 거리순 ──
-      const { data: sameCat } = await supabase
-        .from("places")
-        .select("id, name, category, address, lat, lng")
-        .eq("category", place.category)
-        .neq("id", place.id)
-        .neq("status", "course_only"); // 코스 전용 장소는 다른 곳에 노출 안 함
+      const { data: sameCat } = await excludeCourseOnly(
+        supabase
+          .from("places")
+          .select("id, name, category, address, lat, lng")
+          .eq("category", place.category)
+          .neq("id", place.id),
+      ); // 코스 전용 장소는 다른 곳에 노출 안 함 (기준: lib/placeScope)
 
       const rows: OurRow[] = [];
       for (const p of sameCat ?? []) {

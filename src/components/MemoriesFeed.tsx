@@ -102,93 +102,97 @@ export function MemoriesFeed() {
             const badge = weatherBadge(m.weather_state, m.weather_temp);
             const authorInitial =
               m.author?.trim().charAt(0).toUpperCase() || "·";
-            const card = (
-              <figure className="relative overflow-hidden rounded-[20px] bg-card px-[30px] py-[26px] ring-1 ring-border transition-shadow group-hover:shadow-[0_16px_32px_-22px_rgba(40,70,70,0.5)]">
-                {/* 상단: 작성자 + 날짜 + 장소 */}
-                <div className="flex items-center gap-3">
-                  <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-foreground/60">
-                    {authorInitial}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-tight">
-                      {m.author || "누군가"}
-                    </p>
-                    <p className="text-[11px] text-muted-3">
-                      {dot(m.date)}
-                      {badge && <> · {badge}</>}
-                    </p>
-                  </div>
-                  {m.places ? (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryStyle(
-                          m.places.category,
-                        )}`}
-                      >
-                        {m.places.category}
-                      </span>
-                      <span className="max-w-[9rem] truncate text-xs font-medium text-muted-2 transition-colors group-hover:text-accent">
-                        {m.places.name}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="shrink-0 text-xs text-muted-3">
-                      삭제된 장소
-                    </span>
-                  )}
-                </div>
-
-                {/* 본문 인용구 — 이 화면의 주인공.
-                    따옴표는 텍스트 뒤 은은한 배경 장식(투명도 낮춤) + 본문은 살짝 들여쓰기. */}
-                <blockquote className="relative mt-6 pl-6">
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute -left-1 -top-8 select-none font-serif text-[4.5rem] leading-none text-accent/[0.07]"
-                  >
-                    &ldquo;
-                  </span>
-                  <p className="relative text-[19px] leading-[1.75] text-foreground/90">
-                    {m.content?.trim() || "(내용 없음)"}
-                  </p>
-                </blockquote>
-
-                {/* 하단 메타 */}
-                {(m.mood_tag || photoCount > 0 || replyCount > 0) && (
-                  <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-2">
-                    {m.mood_tag && (
-                      <span className="rounded-full bg-[#f1eadc] px-2 py-0.5 font-medium text-[#7a5f31]">
-                        {m.mood_tag}
-                      </span>
-                    )}
-                    {photoCount > 0 && <span>사진 {photoCount}</span>}
-                    {replyCount > 0 && <span>답글 {replyCount}</span>}
-                  </div>
-                )}
-
-                <PhotoThumbnails urls={m.photo_urls} className="relative mt-4" />
-
-                <div className="relative">
-                  <Reactions
-                    targetType="memory"
-                    targetId={m.id}
-                    initial={reactions.filter((r) => r.target_id === m.id)}
-                  />
-                </div>
-              </figure>
-            );
-
+            // 카드 전체를 <Link> 로 감싸지 않는다 — 안에 사진 버튼·반응 버튼이 있어
+            // <a> 안에 <button> 이 들어가는 무효 HTML 이었고, 키보드/스크린리더 사용자에게
+            // "카드 하나가 링크 하나"로 읽혀 안의 버튼에 닿기 어려웠다.
+            // 링크는 장소명 하나에만 두고, 카드는 일반 article 로 둔다.
             return (
               <li key={m.id}>
-                {m.places ? (
-                  <Link
-                    href={`/places/${m.places.id}`}
-                    className="group block rounded-[20px]"
-                  >
-                    {card}
-                  </Link>
-                ) : (
-                  <div className="group">{card}</div>
-                )}
+                <article className="relative overflow-hidden rounded-[20px] bg-card px-[30px] py-[26px] ring-1 ring-border">
+                  {/* 상단: 작성자 + 날짜 + 장소 */}
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-foreground/60">
+                      {authorInitial}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold leading-tight">
+                        {m.author || "누군가"}
+                      </p>
+                      <p className="text-[11px] text-muted-3">
+                        {dot(m.date)}
+                        {badge && <> · {badge}</>}
+                      </p>
+                    </div>
+                    {m.places ? (
+                      <Link
+                        href={`/places/${m.places.id}`}
+                        aria-label={`${m.places.name} 장소 상세 보기`}
+                        className="group flex shrink-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-1.5 outline-none transition-colors hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${categoryStyle(
+                            m.places.category,
+                          )}`}
+                        >
+                          {m.places.category}
+                        </span>
+                        <span className="max-w-[9rem] truncate text-xs font-medium text-muted-2 transition-colors group-hover:text-accent">
+                          {m.places.name}
+                        </span>
+                        <span
+                          aria-hidden
+                          className="text-[11px] text-muted-2 transition-colors group-hover:text-accent"
+                        >
+                          →
+                        </span>
+                      </Link>
+                    ) : (
+                      <span className="shrink-0 text-xs text-muted-3">
+                        삭제된 장소
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 본문 인용구 — 이 화면의 주인공.
+                    따옴표는 텍스트 뒤 은은한 배경 장식(투명도 낮춤) + 본문은 살짝 들여쓰기. */}
+                  <blockquote className="relative mt-6 pl-6">
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute -left-1 -top-8 select-none font-serif text-[4.5rem] leading-none text-accent/[0.07]"
+                    >
+                      &ldquo;
+                    </span>
+                    <p className="relative text-[19px] leading-[1.75] text-foreground/90">
+                      {m.content?.trim() || "(내용 없음)"}
+                    </p>
+                  </blockquote>
+
+                  {/* 하단 메타 */}
+                  {(m.mood_tag || photoCount > 0 || replyCount > 0) && (
+                    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-2">
+                      {m.mood_tag && (
+                        <span className="rounded-full bg-[#f1eadc] px-2 py-0.5 font-medium text-[#7a5f31]">
+                          {m.mood_tag}
+                        </span>
+                      )}
+                      {photoCount > 0 && <span>사진 {photoCount}</span>}
+                      {replyCount > 0 && <span>답글 {replyCount}</span>}
+                    </div>
+                  )}
+
+                  <PhotoThumbnails
+                    urls={m.photo_urls}
+                    className="relative mt-4"
+                  />
+
+                  <div className="relative">
+                    <Reactions
+                      targetType="memory"
+                      targetId={m.id}
+                      initial={reactions.filter((r) => r.target_id === m.id)}
+                    />
+                  </div>
+                </article>
               </li>
             );
           })}

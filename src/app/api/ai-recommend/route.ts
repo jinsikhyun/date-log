@@ -372,6 +372,10 @@ export async function POST(req: NextRequest) {
         kakaoMapUrl: c.kakaoMapUrl ?? null,
         alreadyOnWishlist: c.alreadyOnWishlist,
         wishPlaceId: c.wishPlaceId ?? null,
+        // 카카오 원본 분류 경로("음식점 > 일식 > 일본식라면"). AI 프롬프트에는 이미 넣고 있었지만
+        // 카드에는 중분류(category)만 보여줘 "왜 이 후보인지"의 근거가 얇았다. 위시 후보는
+        // 우리 카테고리와 같은 값이라 카드 쪽에서 중복 표시를 걸러낸다.
+        kakaoCategoryName: c.categoryName ?? null,
       };
     })
     .filter((r): r is NonNullable<typeof r> => r != null)

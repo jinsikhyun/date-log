@@ -16,7 +16,8 @@ export function CourseRecommendationControls({ value, onChange, categories, load
   ] as const;
   return <div className="mb-4">
     <div className="flex flex-wrap gap-2">
-      <button type="button" disabled={loading} onClick={onRecommend} className="min-h-11 flex-1 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{loading ? "추천하는 중…" : summary ? "이 조건으로 추천" : "우리 취향으로 추천"}</button>
+      {/* 로딩 중 문구는 바로 아래 AiLoadingSteps 가 단계별로 보여주므로 버튼은 비활성만 한다(이중 표시 방지). */}
+      <button type="button" disabled={loading} aria-busy={loading} onClick={onRecommend} className="min-h-11 flex-1 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{summary ? "이 조건으로 추천" : "우리 취향으로 추천"}</button>
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 rounded-full border border-border bg-white px-4 py-3 text-sm font-medium text-accent">조건 설정 {open ? "−" : "+"}</button>
     </div>
     {summary && <p className="mt-3 text-xs leading-5 text-accent">{summary}</p>}

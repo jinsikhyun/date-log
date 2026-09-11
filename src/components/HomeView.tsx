@@ -83,9 +83,10 @@ function today(): string {
 }
 
 import { withPreferences } from "@/lib/preferences";
+import { notifyDataChanged, visitedScope } from "@/lib/placeScope";
 
 const PLACE_COLUMNS =
-  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
+  "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, google_place_id, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
 
 // 목록 조회 시엔 memories(count) 를 임베딩해서 장소별 실제 추억 개수를 가져온다.
 const PLACE_LIST_SELECT = `${PLACE_COLUMNS}, memories(count)`;
@@ -280,10 +281,9 @@ export function HomeView() {
     let cancelled = false;
 
     (async () => {
-      const { data, error } = await supabase
-        .from("places")
-        .select(PLACE_LIST_SELECT)
-        .eq("status", "visited") // 위시리스트는 홈에서 제외 (/wishlist 에서만)
+      const { data, error } = await visitedScope(
+        supabase.from("places").select(PLACE_LIST_SELECT),
+      ) // 위시리스트·코스 전용은 홈에서 제외 — 사이드바 카운트와 같은 기준(lib/placeScope)
         .order("first_visit_date", { ascending: false, nullsFirst: false })
         .order("id", { ascending: false });
 
@@ -332,6 +332,7 @@ export function HomeView() {
       }
 
       const saved = withPreferences(data as unknown as Place);
+      notifyDataChanged();
       setShowForm(false);
 
       if (saved.status === "wishlist") {
@@ -494,6 +495,7 @@ export function HomeView() {
         );
       }
       const saved = withPreferences(data as unknown as Place);
+      notifyDataChanged();
       if (status === "visited") setPlaces((prev) => [saved, ...prev]);
       // 후보 목록에서 즉시 제거 → 중복 클릭 방지
       setCandidates((prev) => prev.filter((x) => x.kakaoId !== c.kakaoId));

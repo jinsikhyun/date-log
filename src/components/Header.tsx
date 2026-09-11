@@ -10,6 +10,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { NotificationBell } from "@/components/NotificationBell";
 import { daysTogether } from "@/lib/recap";
 import {
+  PLACE_DATA_CHANGED_EVENT,
+  visitedScope,
+  wishlistScope,
+} from "@/lib/placeScope";
+import {
   hasBatchim,
   withConjunctionParticle,
   withSubjectParticle,
@@ -170,24 +175,25 @@ export function Header() {
   }, [authReady, profile?.couple_id]);
   const days = startDate ? daysTogether(startDate) : null;
 
-  // 내비 카운트 (라우트 이동마다 갱신)
+  // 내비 카운트 — 라우트 이동 + 같은 화면에서 데이터가 바뀌었다는 신호(notifyDataChanged)마다 갱신.
+  // 집계 기준은 lib/placeScope 에 있는 것만 쓴다(위시리스트·기록 화면과 동일).
   const [counts, setCounts] = useState<Partial<Record<NavKey, number>>>({});
+  const [countsTick, setCountsTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setCountsTick((n) => n + 1);
+    window.addEventListener(PLACE_DATA_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(PLACE_DATA_CHANGED_EVENT, bump);
+  }, []);
   useEffect(() => {
     if (!authUser) return;
     let cancelled = false;
     (async () => {
+      const head = { count: "exact" as const, head: true };
       const [home, wishlist, courses, memories] = await Promise.all([
-        supabase
-          .from("places")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "visited"),
-        supabase
-          .from("places")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "wishlist")
-          .eq("via_course", false),
-        supabase.from("courses").select("id", { count: "exact", head: true }),
-        supabase.from("memories").select("id", { count: "exact", head: true }),
+        visitedScope(supabase.from("places").select("id", head)),
+        wishlistScope(supabase.from("places").select("id", head)),
+        supabase.from("courses").select("id", head),
+        supabase.from("memories").select("id", head),
       ]);
       if (cancelled) return;
       setCounts({
@@ -200,7 +206,7 @@ export function Header() {
     return () => {
       cancelled = true;
     };
-  }, [authUser, pathname]);
+  }, [authUser, pathname, countsTick]);
 
   const loggedIn = authReady && !!authUser;
 

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { CourseContextSchema } from "@/lib/courseContext";
 import { allocateBySourceKind, isLocalCourse, searchQueries, contextPolicy, contextualQueries } from "@/lib/recommendationPolicy";
+import { filterDismissed, isDismissReason, type DismissalRecord } from "@/lib/recommendationDismissal";
 import {
   collectCandidates,
   deriveSpecificSearchTerm,
@@ -124,6 +125,32 @@ export async function POST(req: NextRequest) {
   );
   for (const id of body.excludeKakaoIds ?? []) excludeIds.add(id);
 
+  // §6단계("관심 없어요"): 요청한 사람이 직접 숨긴 후보를 제외한다. RLS 가 본인 행만 돌려주므로
+  // 파트너의 거절은 여기 안 섞인다(개인 귀속). 만료·"너무 멀어요"의 출발지 근접 판정은
+  // filterDismissed(순수 로직)가 맡는다. 테이블이 아직 없거나(마이그레이션 미적용) 조회가
+  // 실패하면 막지 않고 통과 — rate limit 과 같은 가용성 우선 원칙.
+  let dismissals: DismissalRecord[] = [];
+  {
+    const { data: rows, error: dismissErr } = await supabase
+      .from("ai_recommend_dismissals")
+      .select("candidate_id, reason, origin_lat, origin_lng, expires_at")
+      .eq("user_id", user.id)
+      .gt("expires_at", new Date().toISOString());
+    if (dismissErr) {
+      console.error("[kakao-candidates] 관심 없어요 조회 실패(무시하고 계속):", dismissErr.code, dismissErr.message);
+    } else {
+      dismissals = (rows ?? []).map((r) => ({
+        candidateId: r.candidate_id,
+        // 알 수 없는 사유 값은 "사유 없음"으로 취급(그래도 숨김) — 기간 정책만 none 을 따른다.
+        reason: isDismissReason(r.reason) ? r.reason : null,
+        originLat: typeof r.origin_lat === "number" ? r.origin_lat : null,
+        originLng: typeof r.origin_lng === "number" ? r.origin_lng : null,
+        expiresAt: String(r.expires_at),
+      }));
+    }
+  }
+  const dismissCtx = { originLat: body.lat, originLng: body.lng };
+
   // 카테고리 하나로만 검색하지 않고, 태그를 조합한 검색어도 함께 써서 후보 폭을 넓힌다.
   const category = body.category.trim();
   const local = body.mode === "course" && isLocalCourse(body.courseStops);
@@ -162,7 +189,8 @@ export async function POST(req: NextRequest) {
       body.minDistanceMeters ?? DEFAULT_MIN_DISTANCE_METERS,
     ).filter((c) => !context?.travel || c.distanceMeters <= policy.radiusMeters);
     wishFiltered.sort((a, b) => a.distanceMeters - b.distanceMeters);
-    wishPicked = wishFiltered.slice(0, WISH_MAX_SLOTS);
+    // 내가 숨긴 위시 후보("wish-<id>")도 여기서 제외 — 위시 자체는 그대로 남고 AI 카드에만 안 뜬다.
+    wishPicked = filterDismissed(wishFiltered, dismissals, dismissCtx).kept.slice(0, WISH_MAX_SLOTS);
   }
 
   // place_detail 전용 3단계 개선: "카페"/"맛집" 같은 우리 앱의 대분류 하나로만 검색하면
@@ -230,8 +258,14 @@ export async function POST(req: NextRequest) {
     { address: body.excludeAddress },
     body.minDistanceMeters ?? DEFAULT_MIN_DISTANCE_METERS,
   );
-  const eligible = nearFiltered.filter(
+  const eligibleBeforeDismiss = nearFiltered.filter(
     (c) => !excludeIds.has(c.id) && (!context?.travel || c.distanceMeters <= policy.radiusMeters),
+  );
+  // §6단계: 배분(allocateBySourceKind) 전에 빼서, 숨긴 자리를 다른 후보가 자연스럽게 채우게 한다.
+  const { kept: eligible, hiddenCount: dismissedHidden } = filterDismissed(
+    eligibleBeforeDismiss,
+    dismissals,
+    dismissCtx,
   );
   // 위시가 먼저 자리를 예약하고(없으면 0자리, 카카오 한도 그대로), 나머지만 기존
   // specific/base 배분 로직에 맡긴다 — 위시는 이 경쟁에 섞이지 않는다.
@@ -266,7 +300,7 @@ export async function POST(req: NextRequest) {
   };
   console.log(
     "[kakao-candidates] 검색어 종류별 후보/생존:",
-    JSON.stringify({ pool: kindTally(eligible, false), survived: kindTally(eligible, true), wish: wishPicked.length }),
+    JSON.stringify({ pool: kindTally(eligible, false), survived: kindTally(eligible, true), wish: wishPicked.length, dismissed: dismissedHidden }),
   );
 
   return NextResponse.json({ candidates });

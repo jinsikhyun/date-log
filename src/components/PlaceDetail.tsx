@@ -7,6 +7,7 @@ import { withPreferences } from "@/lib/preferences";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { notifyDataChanged } from "@/lib/placeScope";
 import {
   type Place,
   addedByLabel,
@@ -192,6 +193,7 @@ export function PlaceDetail({ id }: { id: number }) {
       }
 
       setMemories((prev) => [...prev, data as Memory].sort(byDateAsc));
+      notifyDataChanged();
       setShowMemoryForm(false);
     },
     [id],
@@ -250,6 +252,7 @@ export function PlaceDetail({ id }: { id: number }) {
       window.alert(`삭제되지 않았어요. ${POLICY_HINT}`);
       return;
     }
+    notifyDataChanged();
     setMemories((prev) => prev.filter((mm) => mm.id !== memoryId));
   }, []);
 
@@ -344,6 +347,7 @@ export function PlaceDetail({ id }: { id: number }) {
     }
 
     // 연결된 memories 는 FK ON DELETE CASCADE 로 함께 삭제됨
+    notifyDataChanged();
     router.push(place.status === "wishlist" ? "/wishlist" : "/");
   }, [id, place, memories.length, router]);
 
@@ -555,7 +559,7 @@ export function PlaceDetail({ id }: { id: number }) {
                   rel="noopener noreferrer"
                   className="rounded-full bg-[#03C75A] px-3 py-1 text-xs font-semibold text-[#003B1B] transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#008A3E]"
                 >
-                  Naver Map
+                  네이버에서 보기
                 </a>
               )}
               {place.kakao_map_link && (
@@ -565,7 +569,7 @@ export function PlaceDetail({ id }: { id: number }) {
                   rel="noopener noreferrer"
                   className="rounded-full bg-[#FEE500] px-3 py-1 text-xs font-semibold text-[#191919] transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#806E00]"
                 >
-                  Kakao Map
+                  카카오에서 보기
                 </a>
               )}
               <a
@@ -576,7 +580,7 @@ export function PlaceDetail({ id }: { id: number }) {
                 rel="noopener noreferrer"
                 className="rounded-full bg-[#E8F0FE] px-3 py-1 text-xs font-semibold text-[#1967D2] ring-1 ring-inset ring-[#4285F4]/40 transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1967D2]"
               >
-                Google Map
+                구글에서 보기
               </a>
               <DirectionsButton
                 name={place.name}

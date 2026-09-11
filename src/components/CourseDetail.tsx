@@ -68,7 +68,7 @@ function Connector({
         rel="noopener noreferrer"
         className="rounded-full bg-background px-2 py-0.5 font-medium text-muted-2 transition-colors hover:brightness-95"
       >
-        길찾기
+        카카오 길찾기
       </a>
     </div>
   );

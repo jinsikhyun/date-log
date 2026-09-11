@@ -25,6 +25,7 @@ import { VisitMoodPrompt } from "@/components/VisitMoodPrompt";
 import { todayWeatherFields, type MemoryWeatherFields } from "@/lib/weatherDisplay";
 
 import { withPreferences } from "@/lib/preferences";
+import { notifyDataChanged, wishlistScope } from "@/lib/placeScope";
 
 const PLACE_COLUMNS =
   "id, name, category, address, naver_map_link, kakao_map_link, rating, first_visit_date, description, image_url, image_captured_date, google_place_id, lat, lng, status, wanted_by, wanted_by_ids, added_by, place_preferences(user_id, kind), is_regular, via_course, memory_count, created_at, tags";
@@ -79,11 +80,9 @@ export function WishlistView() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("places")
-        .select(PLACE_COLUMNS)
-        .eq("status", "wishlist")
-        .eq("via_course", false) // 코스 미니폼으로 만든 곳은 여기 안 보임
+      const { data, error } = await wishlistScope(
+        supabase.from("places").select(PLACE_COLUMNS),
+      ) // 코스 전용(코스 미니폼으로 만든 곳)은 여기 안 보임 — 사이드바 카운트와 같은 기준
         .order("created_at", { ascending: false });
       if (cancelled) return;
       if (error) {
@@ -125,6 +124,7 @@ export function WishlistView() {
     }
 
     const saved = withPreferences(data as unknown as Place);
+    notifyDataChanged();
     setAdding(false);
     if (saved.status === "wishlist") {
       setPlaces((prev) => [saved, ...prev]);
@@ -167,6 +167,7 @@ export function WishlistView() {
       const saved = withPreferences(data[0] as unknown as Place);
       setPlaces((prev) => prev.filter((item) => item.id !== saved.id));
       setConverted(saved);
+      notifyDataChanged(); // 사이드바 "다녀온 곳/가고 싶은 곳" 숫자 즉시 갱신
     },
     [officialCategories],
   );

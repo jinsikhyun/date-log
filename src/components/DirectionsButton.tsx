@@ -47,7 +47,7 @@ export function DirectionsButton({
   if (!coord) {
     return (
       <span className={className} aria-disabled>
-        길찾기
+        카카오 길찾기
       </span>
     );
   }
@@ -59,7 +59,7 @@ export function DirectionsButton({
       rel="noopener noreferrer"
       className={className}
     >
-      길찾기
+      카카오 길찾기
     </a>
   );
 }

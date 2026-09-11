@@ -5,6 +5,11 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { statusLabel } from "@/lib/places";
 import { daysTogether } from "@/lib/recap";
+import {
+  excludeCourseOnly,
+  isVisitedPlace,
+  isWishlistPlace,
+} from "@/lib/placeScope";
 import { useAuth } from "@/components/AuthProvider";
 import { OnThisMonthBanner } from "@/components/OnThisMonthBanner";
 import { withSubjectParticle } from "@/lib/korean";
@@ -14,7 +19,7 @@ type PlaceRow = {
   id: number;
   name: string;
   status: string;
-  image_url: string | null;
+  via_course: boolean | null;
   added_by: string | null;
   first_visit_date: string | null;
 };
@@ -126,10 +131,12 @@ export function RecapDashboard() {
     let cancelled = false;
     (async () => {
       const [pRes, mRes] = await Promise.all([
-        supabase
-          .from("places")
-          .select("id, name, status, image_url, added_by, first_visit_date")
-          .neq("status", "course_only"), // 코스 전용 장소는 통계에서 제외
+        // 코스 전용 장소는 통계에서 제외 — 사이드바·위시리스트와 같은 기준(lib/placeScope)
+        excludeCourseOnly(
+          supabase
+            .from("places")
+            .select("id, name, status, via_course, added_by, first_visit_date"),
+        ),
         supabase
           .from("memories")
           .select("id, place_id, photo_urls, author, content"),
@@ -154,11 +161,14 @@ export function RecapDashboard() {
   const stats = useMemo(() => {
     if (!places || !memories) return null;
 
-    const visited = places.filter((p) => p.status === "visited");
-    const wishlist = places.filter((p) => p.status === "wishlist");
-    const photoCount =
-      places.filter((p) => p.image_url).length +
-      memories.reduce((s, m) => s + (m.photo_urls?.length ?? 0), 0);
+    const visited = places.filter(isVisitedPlace);
+    const wishlist = places.filter(isWishlistPlace);
+    // "사진"은 추억에 올린 사진만 센다. 예전에는 장소 대표 사진까지 합산해서
+    // 사용자가 기대하는 "추억 사진 수"보다 큰 숫자가 나왔다.
+    const memoryPhotoCount = memories.reduce(
+      (s, m) => s + (m.photo_urls?.length ?? 0),
+      0,
+    );
 
     // 추억 최다 장소
     const byPlace = new Map<number, number>();
@@ -199,7 +209,7 @@ export function RecapDashboard() {
       visited: visited.length,
       wishlist: wishlist.length,
       memories: memories.length,
-      photoCount,
+      memoryPhotoCount,
       topPlace,
       firstRecord,
       race,
@@ -289,7 +299,7 @@ export function RecapDashboard() {
                 ["다녀온 곳", stats.visited],
                 ["가고 싶은 곳", stats.wishlist],
                 ["남긴 추억", stats.memories],
-                ["사진", stats.photoCount],
+                ["추억 사진", stats.memoryPhotoCount],
               ] as const
             ).map(([label, n]) => (
               <div

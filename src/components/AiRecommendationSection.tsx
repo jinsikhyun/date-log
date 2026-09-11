@@ -9,6 +9,20 @@ import { placeInputToRow, type Place } from "@/lib/places";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { GptMark } from "@/components/GptMark";
+import { AiDismissedNotice } from "@/components/AiDismissedNotice";
+import { useAiDismiss } from "@/lib/useAiDismiss";
+import {
+  AiDataNotice,
+  AiErrorNotice,
+  AiLoadingSteps,
+} from "@/components/AiRecommendationStatus";
+import {
+  AI_DATA_NOTICE,
+  describeAiError,
+  postAiStage,
+  type AiErrorView,
+  type AiLoadStage,
+} from "@/lib/aiRecommendClient";
 
 // AI_RECOMMENDATION_HANDOFF.md §2·§3: 기본 3개, "더보기"로 최대 5개까지.
 // "더보기"는 새 API 호출 없이 이미 받아둔 결과 중 숨겨둔 2개를 더 보여주기만 한다.
@@ -30,6 +44,9 @@ interface AiRecommendation {
   reason: string;
   matchedTags: string[];
   kakaoMapUrl: string | null;
+  alreadyOnWishlist?: boolean;
+  wishPlaceId?: number | null;
+  kakaoCategoryName?: string | null;
 }
 
 /**
@@ -39,26 +56,40 @@ interface AiRecommendation {
 export function AiRecommendationSection({ place }: { place: Place }) {
   const { user, authorName } = useAuth();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // 로딩을 단계로 나눈다: 후보 수집(카카오) → 취향 기준 선별(OpenAI). 이전엔 둘을 하나의
+  // 불리언으로 묶어 15초 넘게 같은 문구만 보였다. loading 은 파생값.
+  const [stage, setStage] = useState<AiLoadStage>("idle");
+  const loading = stage !== "idle";
+  // 추천 요청 실패(분류된 문구 + 재시도)와 카드 액션 실패(위시 추가·숨김)는 성격이 달라 분리한다.
+  const [loadError, setLoadError] = useState<AiErrorView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [all, setAll] = useState<AiRecommendation[] | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  // §6단계 "관심 없어요": 누른 사람에게만 숨김. 서버 기록은 다음 후보 수집에서 제외되고,
+  // 이 화면에서는 카드 자리에 한 줄(사유 선택·취소)로 남는다.
+  const { dismissed, dismiss, setReason, undo, reset: resetDismissed } = useAiDismiss("place_detail");
 
   const load = useCallback(async () => {
     if (place.lat == null || place.lng == null) {
-      setError("이 장소의 좌표가 없어서 추천을 만들 수 없어요.");
+      setLoadError({
+        title: "이 장소의 좌표가 없어서 추천을 만들 수 없어요.",
+        hint: "장소 정보를 수정해 주소를 다시 저장하면 좌표가 채워져요.",
+        retryable: false,
+      });
       return;
     }
-    setLoading(true);
+    setLoadError(null);
     setError(null);
     setShowAll(false);
+    resetDismissed(); // 새 목록이 오면 이전 "숨김" 줄은 지운다(서버 기록은 유지).
     try {
-      const candRes = await fetch("/api/kakao-candidates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      setStage("candidates");
+      const candJson = await postAiStage<{ candidates?: unknown[] }>(
+        "candidates",
+        "/api/kakao-candidates",
+        {
           category: place.category,
           tags: place.tags,
           name: place.name,
@@ -67,22 +98,19 @@ export function AiRecommendationSection({ place }: { place: Place }) {
           lng: place.lng,
           excludeAddress: place.address,
           limit: 20,
-        }),
-      });
-      const candJson = await candRes.json();
-      if (!candRes.ok) {
-        throw new Error(candJson?.error || "근처 후보를 가져오지 못했어요.");
-      }
+        },
+      );
       const candidates = candJson.candidates ?? [];
       if (candidates.length === 0) {
         setAll([]);
         return;
       }
 
-      const recRes = await fetch("/api/ai-recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      setStage("ranking");
+      const recJson = await postAiStage<{ recommendations?: AiRecommendation[] }>(
+        "ranking",
+        "/api/ai-recommend",
+        {
           place: {
             name: place.name,
             category: place.category,
@@ -94,19 +122,15 @@ export function AiRecommendationSection({ place }: { place: Place }) {
           },
           candidates,
           count: MAX_COUNT,
-        }),
-      });
-      const recJson = await recRes.json();
-      if (!recRes.ok) {
-        throw new Error(recJson?.error || "추천을 가져오지 못했어요.");
-      }
+        },
+      );
       setAll(recJson.recommendations ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "추천을 가져오지 못했어요.");
+      setLoadError(describeAiError(e));
     } finally {
-      setLoading(false);
+      setStage("idle");
     }
-  }, [place]);
+  }, [place, resetDismissed]);
 
   const toggle = () => {
     setOpen((o) => !o);
@@ -163,7 +187,19 @@ export function AiRecommendationSection({ place }: { place: Place }) {
     }
   };
 
-  const visible = (all ?? []).slice(0, showAll ? MAX_COUNT : INITIAL_COUNT);
+  const onDismiss = async (r: AiRecommendation) => {
+    const msg = await dismiss(
+      r.kakaoPlaceId,
+      place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : null,
+    );
+    if (msg) setError(msg);
+  };
+
+  // 숨긴 후보는 카드 목록에서 빠지고(뒤에 있던 후보가 자연스럽게 앞으로 올라옴),
+  // 그리드 아래에 "숨김" 줄로 남는다.
+  const notDismissed = (all ?? []).filter((r) => !dismissed.has(r.kakaoPlaceId));
+  const visible = notDismissed.slice(0, showAll ? MAX_COUNT : INITIAL_COUNT);
+  const dismissedList = (all ?? []).filter((r) => dismissed.has(r.kakaoPlaceId));
   const toCardPlace = (r: AiRecommendation): AiRecommendedPlace => ({
     id: r.kakaoPlaceId,
     name: r.name,
@@ -174,6 +210,11 @@ export function AiRecommendationSection({ place }: { place: Place }) {
     distanceLabel: r.distanceMeters != null ? fmtDist(r.distanceMeters) : null,
     imageUrl: null, // 새로 발견한 곳이라 date.log 사진이 없음 — 카드가 이모지로 대체
     kakaoMapUrl: r.kakaoMapUrl,
+    // 장소 상세 모드는 위시 후보를 주입하지 않아 모든 카드가 "새로 발견"이 된다 — 전부에
+    // 같은 배지가 붙으면 정보가 아니라 장식이라 생략한다. (위시 후보가 섞이는 코스 모드에서만
+    // 출처 배지를 보여준다.) 혹시 서버가 위시 후보를 돌려주면 그때만 표시.
+    origin: r.alreadyOnWishlist ? "wishlist" : undefined,
+    kakaoCategoryName: r.kakaoCategoryName ?? null,
   });
 
   return (
@@ -193,7 +234,7 @@ export function AiRecommendationSection({ place }: { place: Place }) {
               AI 추천 · 이런 곳은 어때요?
             </span>
             <span className="mt-0.5 block text-[11px] font-medium text-[#39816f]">
-              우리의 취향을 담은 추천 · GPT-5.6 Luna
+              {AI_DATA_NOTICE.short}
             </span>
           </span>
         </span>
@@ -207,18 +248,36 @@ export function AiRecommendationSection({ place }: { place: Place }) {
 
       {open && (
         <div className="mt-3 rounded-[22px] border border-[#10a37f]/20 bg-[linear-gradient(180deg,#fbfffd_0%,#ffffff_24%)] p-5 shadow-[0_14px_34px_-30px_rgba(16,163,127,0.7)]">
-          {loading && <p className="text-xs font-medium text-[#39816f]">✦ 취향을 살펴보고 추천을 만드는 중…</p>}
-          {error && (
-            <p className="text-sm font-medium text-red-600">{error}</p>
+          <AiLoadingSteps stage={stage} />
+          {!loading && loadError && (
+            <AiErrorNotice error={loadError} onRetry={() => void load()} />
           )}
-          {!loading && !error && all && all.length === 0 && (
+          {error && (
+            <p role="alert" className="text-sm font-medium text-red-600">
+              {error}
+            </p>
+          )}
+          {!loading && !loadError && all && all.length === 0 && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted">
+                주변에서 추천할 만한 새 장소를 찾지 못했어요.
+              </p>
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="self-start rounded-full bg-stone-100 px-3.5 py-1.5 text-[11px] font-semibold text-stone-600 hover:bg-stone-200 sm:self-auto"
+              >
+                다시 찾아보기
+              </button>
+            </div>
+          )}
+          {!loading && !loadError && all && all.length > 0 && notDismissed.length === 0 && (
             <p className="text-xs text-muted">
-              주변에서 추천할 만한 새 장소를 찾지 못했어요.
+              추천을 모두 숨겼어요. 아래에서 취소하거나 다시 추천받을 수 있어요.
             </p>
           )}
 
           {visible.length > 0 && (
-            <>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {visible.map((r) => (
                   <AiRecommendationCard
@@ -227,11 +286,30 @@ export function AiRecommendationSection({ place }: { place: Place }) {
                     onAddToWishlist={() => void addToWishlist(r)}
                     adding={addingId === r.kakaoPlaceId}
                     added={addedIds.has(r.kakaoPlaceId)}
+                    onDismiss={() => void onDismiss(r)}
                   />
                 ))}
               </div>
+          )}
+
+          {dismissedList.length > 0 && (
+            <div className={`flex flex-col gap-2 ${visible.length > 0 ? "mt-4" : ""}`}>
+              {dismissedList.map((r) => (
+                <AiDismissedNotice
+                  key={`dismissed-${r.kakaoPlaceId}`}
+                  name={r.name}
+                  entry={dismissed.get(r.kakaoPlaceId)!}
+                  onReason={(reason) => void setReason(r.kakaoPlaceId, reason).then((m) => m && setError(m))}
+                  onUndo={() => void undo(r.kakaoPlaceId).then((m) => m && setError(m))}
+                />
+              ))}
+            </div>
+          )}
+
+          {(visible.length > 0 || dismissedList.length > 0) && (
+            <>
               <div className="mt-4 flex items-center justify-center gap-3">
-                {!showAll && (all?.length ?? 0) > INITIAL_COUNT && (
+                {!showAll && notDismissed.length > INITIAL_COUNT && (
                   <button
                     type="button"
                     onClick={() => setShowAll(true)}
@@ -251,6 +329,11 @@ export function AiRecommendationSection({ place }: { place: Place }) {
               </div>
             </>
           )}
+
+          {/* 데이터 사용 안내 — 실제로 무엇이 외부 AI 로 나가는지(tasteProfile 예산 정책 그대로). */}
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <AiDataNotice />
+          </div>
         </div>
       )}
     </section>
