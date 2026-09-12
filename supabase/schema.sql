@@ -1,6 +1,6 @@
 -- ⛔ 레거시 스크립트 실행 방지 장치 (security/README.md 의 "레거시 스크립트 실행 방지 장치" 항목)
 -- security/02_enforce_membership.sql 로 커플 격리를 하드닝한 DB 에서 이 파일을 다시 실행하면
--- 예전 공개 정책(using(true))이 PERMISSIVE 로 다시 추가된다. PostgreSQL 은 PERMISSIVE 정책을
+-- 예전 공개 정책(무조건 통과 조건)이 PERMISSIVE 로 다시 추가된다. PostgreSQL 은 PERMISSIVE 정책을
 -- OR 로 합치므로, 이름이 다른 공개 정책이 하나만 살아 있어도 커플 격리가 통째로 무효가 된다
 -- (2026-09-09 categories 사고와 같은 구조).
 -- 하드닝 여부는 connect_couple RPC 존재로 판정한다(security/01_prepare_membership.sql 이 만든다).
@@ -91,22 +91,18 @@ drop policy if exists "places: public read"   on public.places;
 drop policy if exists "places: public insert" on public.places;
 drop policy if exists "places: public update" on public.places;
 drop policy if exists "places: public delete" on public.places;
-create policy "places: public read"
-  on public.places for select
-  to anon, authenticated
-  using (true);
-create policy "places: public insert"
-  on public.places for insert
-  to anon, authenticated
-  with check (true);
-create policy "places: public update"
-  on public.places for update
-  to anon, authenticated
-  using (true) with check (true);
-create policy "places: public delete"
-  on public.places for delete
-  to anon, authenticated
-  using (true);
+
+-- ⚠️ 정책은 여기서 만들지 않는다.
+--    예전에는 이 파일이 places/memories/memory_replies/categories 에
+--    `to anon, authenticated` + 무조건 통과 조건의 정책을 만들었다. 실사용자가 생긴 뒤로는
+--    그 텍스트가 파일에 남아 있는 것 자체가 위험해서(일부만 잘라 붙여넣어도 격리가 풀린다)
+--    전부 제거했다. 위의 drop 문만 남겨 예전 정책을 청소하는 역할만 한다.
+--    실제 정책은 아래 순서로 설치한다:
+--      1) supabase/add-couple-rls.sql            — 커플 스코프 RLS + set_couple_id 트리거
+--      2) supabase/security/01_prepare_membership.sql
+--      3) supabase/security/02_enforce_membership.sql
+--    이 파일만 실행한 상태에서는 RLS 가 켜져 있고 정책이 없으므로 클라이언트는 아무것도
+--    읽고 쓸 수 없다(= 안전한 기본값). 시드/DDL 은 SQL Editor 권한으로 그대로 실행된다.
 
 -- ── memories (구조만 준비, 이번 단계 UI 없음) ──────────────────
 create table if not exists public.memories (
@@ -134,22 +130,6 @@ drop policy if exists "memories: public read"   on public.memories;
 drop policy if exists "memories: public insert" on public.memories;
 drop policy if exists "memories: public update" on public.memories;
 drop policy if exists "memories: public delete" on public.memories;
-create policy "memories: public read"
-  on public.memories for select
-  to anon, authenticated
-  using (true);
-create policy "memories: public insert"
-  on public.memories for insert
-  to anon, authenticated
-  with check (true);
-create policy "memories: public update"
-  on public.memories for update
-  to anon, authenticated
-  using (true) with check (true);
-create policy "memories: public delete"
-  on public.memories for delete
-  to anon, authenticated
-  using (true);
 
 -- ── memory_replies (추억 대댓글) ────────────────────────────
 create table if not exists public.memory_replies (
@@ -165,14 +145,6 @@ drop policy if exists "memory_replies: public read"   on public.memory_replies;
 drop policy if exists "memory_replies: public insert" on public.memory_replies;
 drop policy if exists "memory_replies: public update" on public.memory_replies;
 drop policy if exists "memory_replies: public delete" on public.memory_replies;
-create policy "memory_replies: public read"
-  on public.memory_replies for select to anon, authenticated using (true);
-create policy "memory_replies: public insert"
-  on public.memory_replies for insert to anon, authenticated with check (true);
-create policy "memory_replies: public update"
-  on public.memory_replies for update to anon, authenticated using (true) with check (true);
-create policy "memory_replies: public delete"
-  on public.memory_replies for delete to anon, authenticated using (true);
 
 -- ── categories (카테고리 직접 관리) ─────────────────────────
 create table if not exists public.categories (
@@ -190,14 +162,6 @@ drop policy if exists "categories: public read"   on public.categories;
 drop policy if exists "categories: public insert" on public.categories;
 drop policy if exists "categories: public update" on public.categories;
 drop policy if exists "categories: public delete" on public.categories;
-create policy "categories: public read"
-  on public.categories for select to anon, authenticated using (true);
-create policy "categories: public insert"
-  on public.categories for insert to anon, authenticated with check (true);
-create policy "categories: public update"
-  on public.categories for update to anon, authenticated using (true) with check (true);
-create policy "categories: public delete"
-  on public.categories for delete to anon, authenticated using (true);
 
 insert into public.categories (name, color, icon, sort_order) values
   ('맛집', 'orange',  '🍽️', 10),

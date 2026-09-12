@@ -1,3 +1,97 @@
+# 남은 위험 4건 처리 (2026-09-12, 운영 정리 마이그레이션 1건 적용 · commit 함 · push 안 함)
+
+앞 절("커플 격리(RLS) 이상 현상 조사")에서 남겨 둔 위험 4건을 닫았다.
+
+## 1. `npm run build` 검증 — 통과(우회 조건 명시)
+
+Mac 에서 설치된 `node_modules` 때문에 Cowork 리눅스 VM 에서는 SWC 바이너리가 안 맞아 빌드가
+안 됐다. 사용자 저장소를 건드리지 않기 위해 **VM 스크래치로 소스만 복사(`git ls-files` 기준,
+`node_modules`·`.next`·`.git` 제외)해 `npm ci` 후 빌드**했다.
+
+- 결과: **exit 0, 33개 라우트 생성**(`/api/place-google-photo`·`/api/ai-dismiss` 포함).
+- 단, `next/font/google`(Geist·Geist Mono)이 `fonts.googleapis.com` 을 빌드 타임에 받아오는데
+  **VM·클라우드 양쪽 모두 이 도메인이 egress 에서 막혀 있다**(curl 000). 그래서 스크래치
+  사본에서만 폰트 로더를 상수로 치환하고 빌드했다. 나머지(타입·전 라우트 컴파일·프리렌더)는
+  전부 실제 코드 그대로 검증됐다.
+- 함의: **빌드가 Google Fonts 네트워크에 의존한다.** 오프라인·제한망에서는 빌드가 실패한다.
+  `next/font/local` 로 자가호스팅하면 빌드가 hermetic 해진다(폰트 파일 다운로드가 필요해
+  이 환경에서는 못 함 — 별도 과제).
+
+## 2. "가드가 파일 일부만 잘라 실행하면 못 막는다" — 위험한 SQL 텍스트 자체를 제거
+
+가드(`connect_couple` 존재 시 raise)는 파일 **전체** 실행만 막는다. 부분 붙여넣기까지 막으려면
+되돌릴 SQL 이 파일에 없어야 한다.
+
+| 파일 | 조치 |
+| --- | --- |
+| `supabase/policies_public.sql` | **폐기 스텁으로 교체** — 내용 전체가 `raise exception`. 예전 내용은 git 이력에만. |
+| `supabase/policies_open_write.sql` | 동일 |
+| `supabase/schema.sql` | 무조건 통과 정책 **statement 16개 제거**. `drop policy` 문만 남겨 예전 정책 청소 역할만 한다. RLS 는 켜되 정책 0개 = 안전한 기본값. 설치 순서 주석 추가 |
+| `supabase/add-couple-rls.sql` | `couples: insert authed`(with check true) 제거, `couples: select authed`(using true) → **`couples: select own using (id = my_couple_id())`** 로 교체. security/02 와 정책 이름·정의가 같아져, 이 파일이 다시 실행돼도 격리가 되돌아가지 않는다. 커플 생성·합류는 `connect_couple()` RPC 가 담당하므로 클라이언트 insert 정책은 불필요 |
+| `README.md` | 설치 순서 갱신(schema.sql 은 정책을 만들지 않음, 폐기 파일 명시) |
+
+회귀 테스트 2개 추가(`test-couple-isolation.mjs`, 총 12개):
+"무조건 통과(true) 정책이 어느 커플 스코프 테이블에도 없다",
+"레거시 SQL 파일에 무조건 통과 정책 텍스트가 남아 있지 않다"(정규식 정적 검사).
+기존 "하드닝 전에는 couples 가 전체 공개" 시나리오는 이제 성립하지 않아
+"add-couple-rls.sql 만으로도 couples 는 내 커플만 보인다"로 교체했다.
+
+## 3. 구성원 0명 커플의 잔재 — 정리 완료 (운영 적용)
+
+`supabase/migrations/20260912010000_cleanup_memberless_couple_places.sql` 작성 후
+**사용자 승인 하에 운영 적용**(Supabase MCP `apply_migration`, 이력 등록됨).
+
+- 대상: 구성원 0명 커플 2개(`06e10e74…`, `9a6f1c5a…`) — 2026-08-30 유출 복구 때 프로필만
+  분리되고 데이터가 남은 케이스. 장소 3건(id 61·65·68, 사진·추억·코스 참조 전부 0),
+  카테고리 14건(백필 시드), 커플 행 2건.
+- 지운 이유: 지금은 아무도 못 읽지만 **커플 행과 invite_code 가 살아 있어** 누군가 그 코드를
+  알면 `connect_couple()` 로 합류해 인계받을 수 있었다.
+- 안전장치: 지우기 전 전체 행을 `datelog_private` 의 백업 테이블 3개로 복사(RLS on + revoke all).
+  롤백 SQL 은 마이그레이션 파일 상단 주석에 있다.
+- 적용 후 확인: 구성원 0명 커플 **0개**, couples 10→8, places 81→78, `places.couple_id is null` 0건,
+  진식지민 커플(`a6b01b81…`)은 장소 57·카테고리 8로 **변화 없음**.
+
+## 4. `place-photos` 루트 레거시 객체 65개 — 노출 위험은 이미 닫혀 있음(삭제하지 않음)
+
+읽기 전용 감사 결과:
+
+- 버킷 `place-photos` 는 **private**(`public=false`). 정책은 RESTRICTIVE 3개(인증 가드·커플 격리·
+  소유자 가드) + PERMISSIVE 읽기/쓰기로, 읽기 조건이 `can_access_place_photo(name)` 이다.
+- 그 함수는 (a) 새 경로 `couple/user/uuid.jpg` 이거나 (b) `place_photo_legacy_access` 에
+  내 커플로 매핑된 이름일 때만 true. **루트 65개 전부 매핑돼 있다** → 커플 밖으로 새지 않는다.
+- 65개 중 **58개는 지금도 실제로 쓰이는 사용자 사진**(장소 대표사진 50 + 추억 사진 8).
+  **절대 삭제 대상이 아니다.**
+- 나머지 7개는 미참조(2.9MB): 4개는 legacy ACL 의 `couple_id` 가 null 이라 아무도 못 읽고,
+  3개는 살아 있는 커플 소유지만 어떤 행도 참조하지 않는다.
+
+**삭제하지 않기로 판단했다.** 되돌릴 수 없는 사용자 사진 파일인데, 노출 위험은 0이고
+회수 용량은 2.9MB 뿐이다. 참조 탐지(파일명 부분일치)가 한 건이라도 틀리면 사진이 영구 소실된다.
+
+### 근본 원인 (새로 발견, 별도 과제)
+
+**앱에 Storage 객체 삭제 경로가 아예 없다.** `src/lib/photos.ts` 의 `uploadPhoto()` 만 있고
+`.remove()` 호출이 코드 전체에 0건이다. 그래서 사진을 바꾸거나 지워도 `image_url` 만 비워지고
+파일(+최대 5장의 썸네일)은 버킷에 영구히 남는다. 2026-09-11 QA 가 남긴 고아 파일도,
+위 미참조 7개도 전부 같은 원인이다. 고아 파일이 계속 쌓인다.
+
+## 검증
+
+- 스크래치 빌드 `npm run build` exit 0, 33 라우트(위 1번의 폰트 치환 조건).
+- PGlite 격리 DB: `test-couple-isolation.mjs` **12개**, `test-membership.mjs` 12개,
+  `test-preferences.mjs` 11개 통과.
+- `node --test scripts/*.test.mjs` 62개 통과. `npx tsc --noEmit` 오류 0, `npx eslint` 오류 0.
+- 운영: 위 3번 마이그레이션 적용 후 검증 쿼리 통과(구성원 0명 커플 0개).
+
+## 남은 위험 / 다음
+
+1. **사진 삭제 경로 구현** — 사진 교체·삭제 시 원본 + 썸네일까지 Storage 에서 지우는 경로.
+   구현 후 미참조 파일 일괄 정리를 한 번 돌린다. (현재 미참조 7개는 그때 함께 처리)
+2. `next/font/google` → `next/font/local` 자가호스팅 검토(빌드의 네트워크 의존 제거).
+3. 운영 정리 마이그레이션의 백업 테이블 3개는 일정 기간 뒤 정리 대상.
+4. push 는 아직 안 함.
+
+---
+
 # 커플 격리(RLS) 이상 현상 조사 — 원인 확정: RLS 정상, 테스트 세션 계정 혼선 (2026-09-12, commit/push 안 함)
 
 관측(아래 Google Places 절에 기록된 건): 한 브라우저 세션에서 `/settings` 가 보여준 로그인 계정의

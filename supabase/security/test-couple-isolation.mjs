@@ -145,15 +145,38 @@ await check('커플에 연결되지 않은 계정과 익명은 아무 장소도 
   assert.equal((await as('anon', null, 'select * from public.places')).rows.length, 0);
 })();
 
-await check('하드닝 전에는 couples 가 전체 공개다 (02 적용의 근거)', async () => {
-  // add-couple-rls.sql 의 "couples: select authed" 는 using(true) 라 초대코드까지 다 보인다.
-  assert.equal((await as('authenticated', user(2), 'select * from public.couples')).rows.length, 2);
+await check('add-couple-rls.sql 만으로도 couples 는 내 커플만 보인다', async () => {
+  // 예전에는 여기서 초대코드까지 전부 보였다("couples: select authed"). 이제는 02 와
+  // 같은 정의라, 이 파일이 다시 실행돼도 커플 격리가 되돌아가지 않는다.
+  const rows = (await as('authenticated', user(2), 'select id from public.couples')).rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].id, coupleB);
+})();
+
+await check('무조건 통과(true) 정책이 어느 커플 스코프 테이블에도 없다', async () => {
+  const open = (await db.query(
+    `select tablename, policyname from pg_policies
+      where schemaname='public'
+        and tablename in ('places','memories','memory_replies','courses','course_places',
+                          'profiles','couples','categories')
+        and (qual = 'true' or with_check = 'true')`)).rows;
+  assert.deepEqual(open, []);
+})();
+
+await check('레거시 SQL 파일에 무조건 통과 정책 텍스트가 남아 있지 않다', async () => {
+  // 가드는 "파일 전체 실행"만 막는다. 일부만 잘라 붙여넣는 경우까지 막으려면
+  // 위험한 SQL 텍스트 자체가 파일에 없어야 한다.
+  const pattern = /create\s+policy[\s\S]{0,400}?(using\s*\(\s*true\s*\)|with\s+check\s*\(\s*true\s*\))/i;
+  for (const name of ['../schema.sql', '../policies_public.sql', '../policies_open_write.sql',
+    '../add-couple-rls.sql']) {
+    assert.equal(pattern.test(await sql(name)), false, `${name} 에 공개 정책 텍스트가 남아 있음`);
+  }
 })();
 
 await db.exec(await sql('./01_prepare_membership.sql'));
 await db.exec(await sql('./02_enforce_membership.sql'));
 
-await check('02 적용 후에는 내 커플만 보인다', async () => {
+await check('02 적용 후에도 내 커플만 보인다 (정의 동일)', async () => {
   const rows = (await as('authenticated', user(2), 'select id from public.couples')).rows;
   assert.equal(rows.length, 1);
   assert.equal(rows[0].id, coupleB);

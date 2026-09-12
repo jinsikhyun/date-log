@@ -1,6 +1,6 @@
 -- ⛔ 레거시 스크립트 실행 방지 장치 (security/README.md 의 "레거시 스크립트 실행 방지 장치" 항목)
 -- security/02_enforce_membership.sql 로 커플 격리를 하드닝한 DB 에서 이 파일을 다시 실행하면
--- 예전 공개 정책(using(true))이 PERMISSIVE 로 다시 추가된다. PostgreSQL 은 PERMISSIVE 정책을
+-- 예전 공개 정책(무조건 통과 조건)이 PERMISSIVE 로 다시 추가된다. PostgreSQL 은 PERMISSIVE 정책을
 -- OR 로 합치므로, 이름이 다른 공개 정책이 하나만 살아 있어도 커플 격리가 통째로 무효가 된다
 -- (2026-09-09 categories 사고와 같은 구조).
 -- 하드닝 여부는 connect_couple RPC 존재로 판정한다(security/01_prepare_membership.sql 이 만든다).
@@ -183,15 +183,22 @@ create policy "profiles: insert self" on public.profiles for insert to authentic
 create policy "profiles: update self" on public.profiles for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
 
--- 8) couples (로그인 사용자면 select/insert 가능) ────────────
+-- 8) couples (내 커플만) ─────────────────────────────────────
+--    예전에는 select/insert 를 모든 로그인 사용자에게 무조건 열어뒀다. 그러면
+--    초대코드(invite_code)까지 전부 읽히고, 코드를 알면 2명 미만인 남의 커플에
+--    합류할 수 있다. security/02_enforce_membership.sql 이 이미 "내 커플만"으로
+--    바꿔 운영에 적용돼 있으므로 이 파일도 같은 정의로 맞춘다 — 이 파일이 다시
+--    실행되더라도 격리가 되돌아가지 않게 하기 위함이다(정책 이름도 02 와 동일).
+--    커플 생성/합류는 public.connect_couple() RPC(security definer)가 담당하므로
+--    클라이언트 insert 정책은 필요 없다.
 alter table public.couples enable row level security;
 drop policy if exists "couples: insert authed" on public.couples;
 drop policy if exists "couples: select authed" on public.couples;
-create policy "couples: insert authed" on public.couples for insert to authenticated
-  with check (true);
-create policy "couples: select authed" on public.couples for select to authenticated
-  using (true);
--- update/delete 정책 없음 → 커플 수정·삭제 불가 (의도)
+drop policy if exists "couples: select own" on public.couples;
+create policy "couples: select own" on public.couples for select to authenticated
+  using (id = public.my_couple_id());
+-- insert/update/delete 정책 없음 → 클라이언트 직접 생성·수정·삭제 불가 (의도).
+--   시작일 수정은 security/02 의 "couples: update own" 이 담당한다.
 
 -- ═════════════════════════════════════════════════════════════
 -- 확인용:

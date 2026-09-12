@@ -32,7 +32,11 @@ npm run dev                  # http://localhost:3000
 
 ## 데이터베이스 / 인증 (Supabase)
 
-1. `supabase/schema.sql` 을 대시보드 > SQL Editor 에서 실행 (테이블 + 커플 스코프 RLS + 시드, 멱등).
+1. `supabase/schema.sql` 을 대시보드 > SQL Editor 에서 실행 (테이블 + 인덱스 + 시드, 멱등).
+   **이 파일은 정책을 만들지 않는다** — RLS 만 켠 상태(= 클라이언트 접근 전면 차단)로 끝난다.
+   실제 정책은 `add-couple-rls.sql` → `security/01_prepare_membership.sql` →
+   `security/02_enforce_membership.sql` 순서로 설치한다.
+   `policies_public.sql` · `policies_open_write.sql` 은 폐기됐고 실행되지 않는다.
 2. 그 뒤 추가된 마이그레이션도 순서대로 실행 (`supabase/` 폴더의 개별 `.sql` — 각 파일 상단 주석 참고). 주요:
    `add-couples-model.sql` → `add-couple-rls.sql` → `add-couple-start-date.sql` →
    `add-categories-table.sql` · `courses.sql` · `add-wishlist-columns.sql` ·
