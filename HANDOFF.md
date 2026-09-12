@@ -1,3 +1,139 @@
+# 커플 격리(RLS) 이상 현상 조사 — 원인 확정: RLS 정상, 테스트 세션 계정 혼선 (2026-09-12, commit/push 안 함)
+
+관측(아래 Google Places 절에 기록된 건): 한 브라우저 세션에서 `/settings` 가 보여준 로그인 계정의
+커플과 **다른 커플의 위시 장소(id=136)** 가 보이고 수정까지 허용됐다. 재현 실패.
+
+## 결론 (운영 읽기 전용 조회로 확정)
+
+**RLS 는 정상이었다. 격리 실패가 아니라 테스트 세션이 다른 계정으로 로그인된 상태였다.**
+
+증거:
+
+| 확인 | 결과 |
+| --- | --- |
+| public 스키마 전체의 `using(true)`/`with_check(true)` 정책 | **0건** — 정책 드리프트 없음 |
+| `places`·`memories`·`memory_replies`·`courses`·`course_places` 정책 | 전부 `couple_id = my_couple_id()`, `to authenticated` 4종만 |
+| `couples` 정책 | `select own`/`update own` (= security/02 하드닝이 운영에 살아 있음). 레거시 `couples: select authed` 없음 |
+| RLS 활성화 | public 15개 테이블 전부 `true` |
+| `places.id=136` 소유 | 커플 `a9fdc457`(구성원 1명, visited 2·wish 1 — 관측 기록과 일치) |
+| `jasonhyun03` 프로필 소속 | `a6b01b81` 단 하나. `a9fdc457` 에 속한 적 없음 |
+| 업로드된 테스트 사진 객체 | `place-photos/a9fdc457…/46746935…/f7d28518….jpg`, **owner = 46746935**(= `a9fdc457` 의 유일한 구성원), 761B, 2026-09-11 18:52:07Z |
+| `jasonhyun03` 마지막 로그인 | 2026-09-11 **18:55:34Z** — 위 업로드 **3분 27초 뒤** |
+| `46746935` 마지막 로그인 | 2026-09-09 07:27Z (세션이 리프레시로 09-11 까지 살아 있었음) |
+
+Storage 객체의 `owner` 와 경로 prefix 가 둘 다 `46746935`/`a9fdc457` 이라는 것은, 그 업로드를
+**그 계정의 JWT 로** 했다는 뜻이다(경로·owner 는 서버가 세션에서 결정). 즉 브라우저가 09-09 에
+로그인해 둔 세션을 그대로 들고 있었고, 그 상태로 QA 가 진행됐다. 3분 뒤 `jasonhyun03` 으로
+로그인하면서 `/settings` 만 진짜 계정을 보여준 것이다. `@supabase/ssr` 세션은 `path=/` 쿠키라
+브라우저 프로필 하나에 세션도 하나뿐이라, 이 전환은 앱 전체에 동시에 적용된다.
+
+**따라서 (B) 정책 드리프트 가설은 실측으로 배제됐다.** 아래 정적 분석은 왜 (A) 외에는 불가능한지의
+근거로 남겨둔다.
+
+## 이 QA 가 남긴 흔적 — 조치 완료
+
+1. **고아 Storage 객체 1개 삭제 완료** — `place-photos/a9fdc457…/46746935…/f7d28518….jpg` (761B).
+   `places.image_url` 에서는 지웠지만 파일이 남아 있었고 어떤 place·memory 도 참조하지 않았다.
+   2026-09-12 사용자 승인 후 Supabase 대시보드 Storage 에서 삭제(파일 → 빈 폴더까지). 삭제 후
+   `storage.objects` 재조회로 `a9fdc457%` 0건 확인. `storage.objects` 직접 DELETE 는
+   `storage.protect_delete` 트리거가 막는다(뚫으면 S3 실제 파일이 고아로 남음) — 반드시 Storage
+   API 또는 대시보드를 쓸 것.
+2. `places.id=136` 의 `google_place_id` 는 그대로 둔다. 기능이 정상 동작할 때 어차피 쓰는 캐시
+   값이고 정책상 저장 허용 범위 — 사용자 확인 완료.
+3. `a9fdc457` 구성원(`ji***@naver.com`, 2026-09-07 가입)은 **우리 테스트 계정**임을 사용자가 확인.
+   제3자 사용자 데이터 사고가 아니며 고지 대상 아님.
+
+## 재발 방지 (제안)
+
+- QA 는 전용 테스트 계정 + 전용 브라우저 프로필에서만. 에이전트와 사람이 같은 브라우저를 공유하지 않는다.
+- 쓰기 동작 전에 `/settings` 로 **로그인 계정과 커플을 먼저 확인**하고, 확인한 값을 작업 기록에 남긴다.
+- 실브라우저 QA 대상 장소 id 는 미리 "우리 커플 소유"임을 확인한 뒤 고른다.
+
+## 부수적으로 확인된 것 (이번 건과 별개)
+
+- 구성원이 0명인 커플 2개에 장소 3건이 묶여 있다(과거 유출 복구 때 분리된 잔재). 아무도 읽을 수
+  없는 행이라 노출 위험은 없지만 정리 대상.
+- `place-photos` 버킷 루트에 커플 스코프 이전의 레거시 객체 65개(2026-09-04 까지). 이미 별도
+  과제로 추적 중(`place_photo_legacy_access`).
+
+## 정적 분석 결론
+
+저장소의 RLS(`add-couple-rls.sql`)만 놓고 보면 이 증상은 **한 세션 안에서는 성립할 수 없다.**
+`/settings` 의 커플 표시와 `places` 정책은 둘 다 같은 출처(`profiles.couple_id where id = auth.uid()`,
+`my_couple_id()`)에서 나오므로 같은 순간에 서로 다른 커플을 가리킬 수 없다. 페이지도 전부 클라이언트
+컴포넌트라 서버 렌더 캐시가 남의 데이터를 실어 나를 경로가 없다(`app/**/page.tsx` 는 껍데기만,
+데이터는 브라우저 Supabase 클라이언트가 현재 쿠키 세션으로 직접 조회). 서버 라우트는 전부
+요청별 `createClient()` 이고, 전역 싱글턴 Supabase 클라이언트는 `"use client"` 모듈에서만 쓰인다.
+
+따라서 남는 가능성은 둘뿐이다.
+
+| 가설 | 내용 | 판별 방법 |
+| --- | --- | --- |
+| (A) 세션/계정 전환 | 관측 사이에 같은 브라우저(쿠키 저장소 공유)의 로그인 계정이 바뀌었다. `@supabase/ssr` 세션은 path=/ 쿠키라 브라우저 프로필 하나에 세션도 하나 — 사람과 에이전트가 같은 브라우저를 동시에 쓰면 정확히 이 증상이 난다. | `places.id=136` 의 `couple_id` 와 그때 그 브라우저 계정의 프로필 소속 확인 |
+| (B) 운영 정책 드리프트 | 운영 DB 의 `places` 정책에 이름이 다른 `using(true)` 정책이 살아 있다. PERMISSIVE 정책은 OR 로 합쳐지므로 한 줄만 있어도 격리가 통째로 무효. | `pg_policies` 읽기 전용 조회 |
+
+(B) 는 **가설이 아니라 이미 한 번 실제로 일어난 일**이다 — `categories` 가 정확히 이 구조로
+`"categories: authenticated access" for all using(true)` 상태였고 2026-09-09(`048061c`)에 고쳤다.
+
+## 조사 중 확인한 별개의 실제 결함 — 레거시 스크립트 재실행 구멍
+
+`supabase/` 의 레거시 스크립트 4개가 커플 격리를 **되돌리는** 내용을 담고 있는데, 헤더에는
+"여러 번 실행해도 안전"이라고 적혀 있었다.
+
+| 파일 | 재실행 시 다시 생기는 것 |
+| --- | --- |
+| `schema.sql` | `places`/`memories` 에 `to anon, authenticated ... using(true)` SELECT·INSERT·UPDATE·DELETE — **익명까지** 전면 개방 |
+| `policies_public.sql` | `places`/`memories` 공개 read·insert |
+| `policies_open_write.sql` | `places`/`memories` 공개 update·delete |
+| `add-couple-rls.sql` | `couples: select authed using(true)` — 모든 로그인 사용자가 **전체 커플 행 + `invite_code`** 조회. 초대코드를 알면 `connect_couple(이름, 코드)` 로 2명 미만인 남의 커플에 합류 가능 |
+
+마지막 줄이 특히 위험하다. `security/02_enforce_membership.sql` 은 `couples` 정책을 전부 지우고
+`couples: select own` 으로 교체하는데, `add-couple-rls.sql` 은 **이름이 다른** `couples: select authed`
+를 다시 만들 뿐 `select own` 을 지우지 않는다 → 두 정책이 OR 로 공존 → 다시 전면 공개.
+`security/README.md` 가 "레거시 스크립트 실행 방지 장치는 후속 작업이다"라고 남겨둔 항목이 이것이다.
+
+## 변경 (코드만, 운영 미적용)
+
+- `supabase/schema.sql` · `policies_public.sql` · `policies_open_write.sql` · `add-couple-rls.sql`
+  네 파일 맨 앞에 가드 블록 추가: `to_regprocedure('public.connect_couple(text,text)')` 가 있으면
+  (= security/01·02 로 하드닝된 DB) `raise exception` 으로 실행 중단. 신규 설치 DB 에는 RPC 가
+  없으므로 걸리지 않는다(설치 순서 schema → add-couple-rls → … → 01 → 02 는 그대로 동작).
+- `supabase/security/test-couple-isolation.mjs` **신규** — PGlite 격리 DB 회귀 테스트 10개.
+  실제 `add-couple-rls.sql` 을 그대로 적용해 커플 A/B 격리(places·memories·memory_replies·
+  courses·course_places SELECT/UPDATE/DELETE/INSERT, 미연결 계정, 익명)를 검증하고,
+  02 하드닝 후 레거시 4개 스크립트가 실제로 차단되는지·차단 후에도 `using(true)` 정책이
+  하나도 없는지까지 확인한다.
+- `supabase/security/diagnose-couple-isolation-readonly.sql` **신규** — 위 (A)/(B) 판별용 읽기 전용
+  진단 SQL. 장소명·주소·좌표·초대코드·이메일·사진 URL 은 조회하지 않는다. **2026-09-12 사용자 승인 후 Supabase MCP 로 실행 완료 — 결과는 위 "결론" 절.**
+
+## 검증
+
+- PGlite 격리 DB(운영 접속 없음): `test-couple-isolation.mjs` 10개 통과,
+  기존 `test-membership.mjs` 12개 · `test-preferences.mjs` 11개 통과(가드 추가로 인한 회귀 없음).
+- `node --test scripts/*.test.mjs` 62개 통과. `npx tsc --noEmit` 오류 0. `npx eslint` 오류 0.
+- `npm run build` 는 **이 환경에서 실행 불가** — node_modules 가 macOS(darwin-arm64)로 설치돼 있어
+  Cowork 로컬 Linux VM 에서 SWC 바이너리 로드 실패. 이번 변경은 SQL 파일과 테스트 스크립트뿐이라
+  Next 빌드에 영향이 없지만, Mac Terminal 에서 한 번 확인 필요.
+
+## 미검증 / 남은 위험
+
+- ~~운영 DB 의 실제 정책 미확인~~ — 확인 완료(위 "결론"). 정책 드리프트 없음.
+- 가드는 SQL Editor 로 파일 **전체**를 붙여넣어 실행하는 경우를 막는다. 파일 일부만 잘라 붙이면
+  막지 못한다 — 운영 절차로 보완해야 한다.
+- 브라우저 세션 자체의 로그는 없다. 결론은 Storage 객체의 `owner`·경로와 로그인 시각으로
+  역추적한 것이며, 그 조합이 다른 설명을 허용하지 않는다고 판단했다.
+- 기존 HANDOFF 최상단 두 절의 "commit/push 안 함" 기재는 stale — 실제로는 `4a35fdc`·`7e77774`
+  로 커밋·push 완료(`origin/main` = `HEAD` = `7e77774`, 워킹트리 tracked 변경 없음). 문구 정정은 미실시.
+
+## 다음
+
+1. ~~고아 Storage 객체 삭제~~ · ~~테스트 계정 여부 확인~~ · ~~QA 절차 명문화(`AGENTS.md`)~~ — 완료.
+2. 구성원 0명 커플 2개에 묶인 장소 3건 정리 여부 결정(읽을 수 있는 사람이 없어 노출 위험은 없음).
+3. `place-photos` 루트의 레거시 객체 65개 정리(기존 별도 과제).
+4. `places`/`memories` 도 `couples` 처럼 "남은 정책 전부 삭제 후 재생성" 방식으로 잠그는 마이그레이션 검토(예방).
+
+---
+
 # Google Places 자동 대표사진 (2026-09-12, 로컬 구현 완료 · 운영 SQL(컬럼 1개) 적용 · 실브라우저 검증 완료 · commit/push 안 함)
 
 기준 문서: `GOOGLE_PLACES_PHOTO_FEATURE_HANDOFF.md`. AI 추천 고도화와 완전히 별개 기능 — 위 "AI 추천 고도화" 섹션은 이 작업으로 손대지 않았다.
